@@ -26,7 +26,7 @@ export const fetchusers = onRequest({ cors: true }, async (req, res) => {
 
     const { data, error } = await supabase
       .from("users")
-      .select("display_name");
+      .select("*");
 
     if (error) throw error;
 
