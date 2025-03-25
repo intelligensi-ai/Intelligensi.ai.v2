@@ -1,0 +1,18 @@
+cat > .gitignore <<EOL
+# Firebase
+.firebase/
+.firebaserc
+
+# Node
+node_modules/
+lib/
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+EOL
