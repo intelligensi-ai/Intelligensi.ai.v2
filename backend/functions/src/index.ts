@@ -1,44 +1,53 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { createClient } from "@supabase/supabase-js";
+import { defineSecret } from "firebase-functions/params";
 
-// Explicitly typed configuration
-const SUPABASE_CONFIG = {
-  url: "https://hacvqagzlqobaktgcrkp.supabase.co",
-  key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhY3ZxYWd6bHFvYmFrdGdjcmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI2Mzk4NjUsImV4cCI6MjA1ODIxNTg2NX0.e9AjPyUe2DBe-ppVgy2fYl1CD_dLKpc8Z4Z3K6T0HDo"
-};
+// ✅ Define Firebase Secrets
+const supabaseUrl = defineSecret("SUPABASE_URL");
+const supabaseKey = defineSecret("SUPABASE_KEY");
 
-// Initialize Supabase client immediately
-const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key, {
-  auth: { persistSession: false }
-});
+// ✅ Use secrets inside the function runtime
+export const fetchusers = onRequest(
+  {
+    cors: true,
+    secrets: [supabaseUrl, supabaseKey] // Include secrets here!
+  },
+  async (req, res) => {
+    try {
+      if (req.method !== "GET") {
+        res.status(405).json({ error: "Method Not Allowed" });
+        return;
+      }
 
-// Used in the response type
-interface _User {
-  display_name: string;
-}
+      // ✅ Initialize Supabase client with secret values
+      const supabase = createClient(
+        supabaseUrl.value(),
+        supabaseKey.value(),
+        { auth: { persistSession: false } }
+      );
 
-export const fetchusers = onRequest({ cors: true }, async (req, res) => {
-  try {
-    if (req.method !== "GET") {
-      res.status(405).json({ error: "Method Not Allowed" });
-      return;
+      const { data, error } = await supabase.from("users")
+        .select("display_name, id, uid, email, company_id, is_active");
+
+      if (error) throw error;
+
+      res.status(200).json({
+        success: true,
+        data: data.map((user) => ({
+            display_name: user.display_name,
+            id: user.id,
+            uid: user.uid,
+            email: user.email,
+            company_id: user.company_id,
+            is_active: user.is_active
+        }))
+      });
+    } catch (error) {
+      console.error(" Error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
-
-    const { data, error } = await supabase
-      .from("users")
-      .select("*");
-
-    if (error) throw error;
-
-    res.status(200).json({
-      success: true,
-      data: data.map((user) => user.display_name)
-    });
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error"
-    });
   }
-});
+);
