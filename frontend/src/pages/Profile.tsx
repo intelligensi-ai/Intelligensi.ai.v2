@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../Context/AuthContext';
+import { auth } from '../firebase';
 import axios from 'axios';
 
-// Define User interface based on the function's response
 interface User {
   display_name: string;
   id: number;
@@ -11,7 +12,8 @@ interface User {
   is_active: boolean;
 }
 
-const UsersPage: React.FC = () => {
+const Profile: React.FC = () => {
+  const { currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,22 +21,45 @@ const UsersPage: React.FC = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/intelligensi-ai-v2/us-central1/fetchusers');
+        if (!currentUser) return;
+        
+        // Get the Firebase ID token
+        const token = await currentUser.getIdToken();
+        
+        const response = await axios.get(
+          'https://us-central1-intelligensi-ai-v2.cloudfunctions.net/fetchusers',
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
         setUsers(response.data.data);
         setLoading(false);
       } catch (err) {
-        setError('Failed to fetch users');
+        setError('Failed to fetch users. Please try again.');
         setLoading(false);
+        console.error('Error fetching users:', err);
       }
     };
 
     fetchUsers();
-  }, []);
+  }, [currentUser]);
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#152125] flex items-center justify-center text-red-500">
+        Please sign in to view this page
+      </div>
+    );
+  }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#152125] flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
       </div>
     );
   }
@@ -50,15 +75,23 @@ const UsersPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#152125] text-white">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between mb-8">
+        <div className="flex justify-between items-center mb-8">
           <img 
             src="/logocutout.png" 
             alt="Intelligensi.ai Logo" 
-            className="h-24 w-24  mr-4"
+            className="h-24 w-24 mr-4"
           />
-          <h1 className="text-3xl font-bold">
-            {users.map((user) => user.display_name).join(', ')}
-          </h1>
+          <div className="flex items-center space-x-4">
+            <div>
+              <p className="text-teal-400">Logged in as: {currentUser.email}</p>
+              <button 
+                onClick={() => auth.signOut()}
+                className="text-sm text-red-400 hover:text-red-300 mt-1"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="bg-[#1E2B32] rounded-lg shadow-md overflow-hidden">
@@ -96,4 +129,4 @@ const UsersPage: React.FC = () => {
   );
 };
 
-export default UsersPage;
+export default Profile;

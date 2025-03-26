@@ -1,17 +1,64 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './firebase';
 import './App.css';
 import Profile from './pages/Profile';
 
+// Auth Context
+interface AuthContextType {
+  currentUser: User | null;
+  loading: boolean;
+}
+
+const AuthContext = React.createContext<AuthContextType>({ currentUser: null, loading: true });
+
+// Auth Provider Component
+const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ currentUser, loading }}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+};
+
+const useAuth = () => React.useContext(AuthContext);
+
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return currentUser ? <>{children}</> : <Navigate to="/" replace />;
+};
+
+// Auth Form Component
 interface AuthFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
   isLogin: boolean;
   error: string;
+  loading: boolean;
 }
 
-const AuthForm: React.FC<AuthFormProps> = ({ onSubmit, isLogin, error }) => {
+const AuthForm: React.FC<AuthFormProps> = ({ onSubmit, isLogin, error, loading }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
@@ -33,6 +80,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSubmit, isLogin, error }) => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          disabled={loading}
         />
       </div>
       <div className="mb-6">
@@ -47,34 +95,56 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSubmit, isLogin, error }) => {
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={6}
+          disabled={loading}
         />
       </div>
       {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
       <div className="flex items-center justify-between">
         <button
-          className="bg-teal-700 hover:bg-teal-800 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full"
+          className={`bg-teal-700 hover:bg-teal-800 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full flex justify-center items-center ${loading ? 'opacity-75 cursor-not-allowed' : ''}`}
           type="submit"
+          disabled={loading}
         >
-          {isLogin ? 'Sign In' : 'Register'}
+          {loading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Processing...
+            </>
+          ) : (
+            isLogin ? 'Sign In' : 'Register'
+          )}
         </button>
       </div>
     </form>
   );
 };
 
+// Login Component
 const Login: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/pages/profile');
+    }
+  }, [currentUser, navigate]);
 
   const handleAuth = async (email: string, password: string) => {
+    setError('');
+    setLoading(true);
     try {
       if (isRegistering) {
         await createUserWithEmailAndPassword(auth, email, password);
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      navigate('/pages/profile');
     } catch (err) {
       const error = err as { code?: string; message?: string };
       let errorMessage = 'An error occurred. Please try again.';
@@ -94,9 +164,14 @@ const Login: React.FC = () => {
           case 'auth/wrong-password':
             errorMessage = 'Invalid email or password.';
             break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many attempts. Please try again later.';
+            break;
         }
       }
       setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,9 +181,9 @@ const Login: React.FC = () => {
         <img
           src="logocutout.png"
           alt="Intelligensi AI Logo"
-          className="mx-auto mb-4"
+          className="mx-auto mb-4 h-24 w-24"
         />
-        <h1 className="text-4xl text-white mb-2">Intelligensi.ai</h1>
+        <h1 className="text-4xl text-white mb-2 font-bold">Intelligensi.ai</h1>
         <p className="text-lg text-white">
           Smarter Content. Stronger Connections.
         </p>
@@ -121,13 +196,15 @@ const Login: React.FC = () => {
         <AuthForm 
           onSubmit={handleAuth} 
           isLogin={!isRegistering} 
-          error={error} 
+          error={error}
+          loading={loading}
         />
         
         <div className="mt-4 text-center">
           <button
-            className="text-teal-700 hover:text-teal-900 text-sm font-medium"
-            onClick={() => setIsRegistering(!isRegistering)}
+            className={`text-teal-700 hover:text-teal-900 text-sm font-medium ${loading ? 'cursor-not-allowed opacity-50' : ''}`}
+            onClick={() => !loading && setIsRegistering(!isRegistering)}
+            disabled={loading}
           >
             {isRegistering 
               ? 'Already have an account? Sign In' 
@@ -139,13 +216,23 @@ const Login: React.FC = () => {
   );
 };
 
+// Main App Component
 const App: React.FC = () => {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/pages/profile" element={<Profile />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route 
+            path="/pages/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } 
+          />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 };
