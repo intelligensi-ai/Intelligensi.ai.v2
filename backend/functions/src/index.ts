@@ -55,7 +55,7 @@ export const fetchusers = onRequest(
   }
 );
 
-// update subabase update user function
+// update subabase updateuser function
 
 export const updateuser = onRequest(
   {
@@ -116,6 +116,92 @@ export const updateuser = onRequest(
       });
     } catch (error) {
       console.error("Update User Error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+);
+
+// New fetchuser function
+export const fetchuser = onRequest(
+  {
+    cors: true,
+    secrets: [supabaseUrl, supabaseKey]
+  },
+  async (req, res) => {
+    try {
+      // Check for GET method
+      if (req.method !== "GET") {
+        res.status(405).json({ error: "Method Not Allowed" });
+        return;
+      }
+
+      // Extract query parameters
+      const { email, id, uid } = req.query;
+
+      // Validate that at least one identifier is provided
+      if (!email && !id && !uid) {
+        res.status(400).json({
+          success: false,
+          error: "Must provide either email, id, or uid"
+        });
+        return;
+      }
+
+      // Initialize Supabase client with secret values
+      const supabase = createClient(
+        supabaseUrl.value(),
+        supabaseKey.value(),
+        { auth: { persistSession: false } }
+      );
+
+      // Prepare the query
+      let query = supabase.from("users").select(
+        "display_name, id, uid, email, company_id, is_active, created_at, updated_at"
+      );
+
+      // Add filter based on provided identifier
+      if (email) {
+        query = query.eq("email", email);
+      } else if (id) {
+        query = query.eq("id", id);
+      } else if (uid) {
+        query = query.eq("uid", uid);
+      }
+
+      // Execute the query
+      const { data, error } = await query.single();
+
+      if (error) {
+        // Handle case where no user is found
+        if (error.code === "PGRST116") {
+          res.status(404).json({
+            success: false,
+            error: "User not found"
+          });
+          return;
+        }
+        throw error;
+      }
+
+      // Return the user data
+      res.status(200).json({
+        success: true,
+        data: {
+          display_name: data.display_name,
+          id: data.id,
+          uid: data.uid,
+          email: data.email,
+          company_id: data.company_id,
+          is_active: data.is_active,
+          created_at: data.created_at,
+          updated_at: data.updated_at
+        }
+      });
+    } catch (error) {
+      console.error("Fetch User Error:", error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "Unknown error"

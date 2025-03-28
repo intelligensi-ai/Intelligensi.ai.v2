@@ -21,8 +21,8 @@ interface Props {
   };
 }
 
-const UsersPage: React.FC<Props> = ({ user }) => {
-  const [users, setUsers] = useState<User[]>([]);
+const Profile: React.FC<Props> = ({ user }) => {
+  const [userData, setUserData] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -31,47 +31,53 @@ const UsersPage: React.FC<Props> = ({ user }) => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // Navigate back to the login page
       navigate('/');
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
-  // POST Request to write user data to Supabase
-  const addUserToSupabase = async () => {
+  // Check if user exists in Supabase and add if not
+  const checkAndAddUser = async () => {
+    if (!user.email) return;
+
     try {
-      await axios.post('http://localhost:5001/intelligensi-ai-v2/us-central1/updateuser', {
-        uid: user.uid,
-        display_name: user.displayName || 'Anonymous User',
-        email: user.email || 'no-email@example.com',
-        company_id: 'company-123', 
-        is_active: true
-      });
-      console.log('User added to Supabase');
+      // 🔥 Check if user exists in Supabase
+      const response = await axios.get(
+        `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchuser?email=${user.email}`
+      );
+
+      if (response.data.success && response.data.data) {
+        console.log('User found:', response.data.data);
+        setUserData(response.data.data);
+      } else {
+        console.log('User not found, adding to Supabase...');
+        // 🛠️ Add user to Supabase if not found
+        const addUserResponse = await axios.post(
+          'http://localhost:5001/intelligensi-ai-v2/us-central1/updateuser',
+          {
+            uid: user.uid,
+            display_name: user.displayName || 'Anonymous User',
+            email: user.email,
+            company_id: 'company-123', 
+            is_active: true
+          }
+        );
+        setUserData(addUserResponse.data.data);
+        console.log('User added to Supabase:', addUserResponse.data.data);
+      }
     } catch (err) {
-      console.error('Failed to add user:', err);
+      console.error('Error checking/adding user:', err);
+      setError('Failed to fetch or add user.');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await axios.get('http://localhost:5001/intelligensi-ai-v2/us-central1/fetchusers');
-        setUsers(response.data.data);
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to fetch users');
-        setLoading(false);
-      }
-    };
-
-    // Only write user once on initial load
     if (user) {
-      addUserToSupabase();
+      checkAndAddUser();
     }
-
-    fetchUsers();
   }, [user]);
 
   if (loading) {
@@ -97,7 +103,7 @@ const UsersPage: React.FC<Props> = ({ user }) => {
           <div className="flex items-center">
             <img src="/logocutout.png" alt="Intelligensi.ai Logo" className="h-24 w-24 mr-4" />
             <h1 className="text-3xl font-bold">
-              {user.displayName || 'Unknown User'}
+              {userData?.display_name || 'Unknown User'}
             </h1>
           </div>
           <button 
@@ -119,20 +125,20 @@ const UsersPage: React.FC<Props> = ({ user }) => {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="border-b border-[#273238] hover:bg-[#273238] transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">{user.display_name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{user.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{user.company_id}</td>
+              {userData && (
+                <tr key={userData.id} className="border-b border-[#273238] hover:bg-[#273238] transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">{userData.display_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{userData.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{userData.company_id}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 rounded-full text-xs ${
-                      user.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      userData.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                     }`}>
-                      {user.is_active ? 'Active' : 'Inactive'}
+                      {userData.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -141,4 +147,4 @@ const UsersPage: React.FC<Props> = ({ user }) => {
   );
 };
 
-export default UsersPage;
+export default Profile;

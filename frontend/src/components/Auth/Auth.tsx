@@ -15,21 +15,22 @@ const Auth: React.FC = () => {
     try {
       // 🔥 Check if user exists in Supabase
       const { data } = await axios.get(
-        `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchusers?email=${email}`
+        `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchuser?email=${email}`
       );
 
-      if (!data || data.data.length === 0) {
-        setError('User not found in Supabase.');
+      // Check if user exists and is active
+      if (!data.success || !data.data.is_active) {
+        setError('User not found or account is inactive.');
         return;
       }
 
-      // ✅ Firebase login if Supabase user exists
+      // ✅ Firebase login if Supabase user exists and is active
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/profile');
 
     } catch (err) {
       console.error('Login error:', err);
-      setError('Invalid credentials or Supabase lookup failed.');
+      setError('Invalid credentials or account not found.');
     }
   };
 
