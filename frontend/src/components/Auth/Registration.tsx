@@ -1,130 +1,84 @@
-import React, { useState, FormEvent } from 'react';
-import { getAuth, createUserWithEmailAndPassword, UserCredential } from 'firebase/auth';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
-import { app } from '../Config/firebaseConfig';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getAuth, createUserWithEmailAndPassword, User } from 'firebase/auth';
+import axios from 'axios';
 
 const Registration: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [name, setName] = useState<string>('');
   const [error, setError] = useState<string>('');
-  const [userId, setUserId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const auth = getAuth();
 
-  const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
-
-    if (password !== confirmPassword) {
-      setError("Passwords don't match");
-      return;
-    }
-
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
+  const handleRegister = async () => {
     try {
-      const userCredential: UserCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
+      // ✅ Register in Firebase
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser: User = userCredential.user;
 
-      // Store user info in Firestore
-      await setDoc(doc(db, 'users', user.uid), {
-        email: user.email,
-        createdAt: new Date().toISOString(),
+      // 🔥 Store in Supabase
+      await axios.post('http://localhost:5001/intelligensi-ai-v2/us-central1/updateuser', {
+        uid: firebaseUser.uid,
+        display_name: name,
+        email: firebaseUser.email,
+        company_id: `company-${Date.now()}`,
+        is_active: true
       });
 
-      console.log('User registered:', user.uid);
-      setUserId(user.uid); // Store user ID in state to display
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
+      navigate('/profile');
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError('Failed to register user.');
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-t from-teal-900 to-teal-700">
-      <div className="text-center mb-8">
-        <img
-          src="/logocutout.png"
-          alt="Intelligensi AI Logo"
-          className="mx-auto mb-4"
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-4">Register</h2>
+
+        <input
+          type="text"
+          placeholder="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full mb-3 p-2 border rounded"
         />
-        <h1 className="text-4xl text-white mb-2">Intelligensi.ai</h1>
-        <p className="text-lg text-white">
-          Smarter Content. Stronger Connections.
-        </p>
-        <p className="text-sm text-white mt-2">
-          Enhance search, automation, and retrieval with AI-driven optimization.
-        </p>
-      </div>
 
-      <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-        <h2 className="text-xl font-semibold text-center mb-4">Register</h2>
-        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-        {userId && (
-          <p className="text-green-600 text-center mb-4">User ID: {userId}</p>
-        )}
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full mb-3 p-2 border rounded"
+        />
 
-        <form onSubmit={handleRegister}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="Enter your email"
-              required
-            />
-          </div>
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full mb-3 p-2 border rounded"
+        />
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="Create a password"
-              required
-            />
-          </div>
+        {error && <p className="text-red-500">{error}</p>}
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="Confirm your password"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-teal-500 text-white py-2 rounded-lg hover:bg-blue-600 transition duration-300"
-          >
-            Register
-          </button>
-        </form>
-      </div>
-
-      <div className="mt-8 flex space-x-4">
         <button
-          className="bg-white text-teal-900 px-6 py-2 rounded-lg shadow-md hover:bg-gray-100 transition duration-300"
-          onClick={() => navigate('/')}
+          onClick={handleRegister}
+          className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-2 px-4 rounded"
         >
-          Back to Login
+          Register
         </button>
+
+        <div className="mt-4 text-center">
+          <button
+            className="text-teal-700 hover:text-teal-900 text-sm"
+            onClick={() => navigate('/')}
+          >
+            Already have an account? Login
+          </button>
+        </div>
       </div>
     </div>
   );

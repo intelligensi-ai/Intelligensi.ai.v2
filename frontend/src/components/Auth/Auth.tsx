@@ -1,88 +1,76 @@
-import React, { useState, FormEvent } from 'react';
-import { getAuth, signInWithEmailAndPassword, UserCredential } from 'firebase/auth'; // Firebase Auth
-import { app } from '../Config/firebaseConfig';
-import { useNavigate } from 'react-router-dom'; // For navigation
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../Config/firebaseConfig';  // ✅ Use shared Firebase instance
+import axios from 'axios';
 
 const Auth: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-  const [error, setError] = useState<string>(''); // State for error messages
-  const navigate = useNavigate(); // Hook for navigation
+  const [error, setError] = useState<string>('');
+  const navigate = useNavigate();
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError(''); // Clear previous errors
-
-    const auth = getAuth(app); // Get Firebase Auth instance
-
+  // 🔥 Handle user login with Supabase lookup
+  const handleLogin = async () => {
     try {
-      // Sign in with Firebase
-      const userCredential: UserCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
+      // 🔥 Check if user exists in Supabase
+      const { data } = await axios.get(
+        `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchusers?email=${email}`
       );
-      const user = userCredential.user;
 
-      console.log('Logged in user:', user); // Debugging
+      if (!data || data.data.length === 0) {
+        setError('User not found in Supabase.');
+        return;
+      }
 
-      // Store login state in localStorage
-      localStorage.setItem('isLoggedIn', 'true');
+      // ✅ Firebase login if Supabase user exists
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate('/profile');
 
-      // Redirect to the dashboard after successful login
-      navigate('/dashboard');
-    } catch (err: any) {
-      // Handle errors
-      const errorMessage = err.message || 'An error occurred during login';
-      setError(errorMessage);
-      console.error('Login Error:', err);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Invalid credentials or Supabase lookup failed.');
     }
   };
 
   return (
-    <div className="bg-white p-8 rounded-lg shadow-md w-80">
-      <h2 className="text-xl font-semibold mb-4">Login</h2>
-      {error && <p className="text-red-500 mb-4">{error}</p>}{' '}
-      {/* Display error message */}
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg"
-            placeholder="Enter your email"
-            required
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg"
-            placeholder="Enter your password"
-            required
-          />
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-4">Login</h2>
+
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full mb-3 p-2 border rounded"
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full mb-3 p-2 border rounded"
+        />
+
+        {error && <p className="text-red-500">{error}</p>}
+
         <button
-          type="submit"
-          className="w-full bg-teal-500 text-white py-2 rounded-lg hover:bg-blue-600"
+          onClick={handleLogin}
+          className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-2 px-4 rounded"
         >
-          Sign In
+          Login
         </button>
-      </form>
-      {/* Registration Button */}
-      <div className="mt-4 text-center">
-        <p className="text-sm">Don't have an account?</p>
-        <button
-          className="mt-2 text-teal-500 hover:underline"
-          onClick={() => navigate('/register')}
-        >
-          Register Here
-        </button>
+
+        <div className="mt-4 text-center">
+          <button
+            className="text-teal-700 hover:text-teal-900 text-sm"
+            onClick={() => navigate('/register')}
+          >
+            Need an account? Register
+          </button>
+        </div>
       </div>
     </div>
   );
