@@ -10,6 +10,7 @@ interface User {
   uid: string;
   email: string;
   company_id: number;
+  profile_picture: string;
   is_active: boolean;
 }
 
@@ -26,8 +27,11 @@ const Profile: React.FC<Props> = ({ user }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  
+  // Retry mechanism settings
+  const maxRetries = 5;
+  const retryInterval = 1000; // 1 second
 
-  // Logout function
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -37,12 +41,10 @@ const Profile: React.FC<Props> = ({ user }) => {
     }
   };
 
-  // Check if user exists in Supabase and add if not
-  const checkAndAddUser = async () => {
+  const fetchUserWithRetry = async (retries = 0) => {
     if (!user.email) return;
 
     try {
-      // 🔥 Check if user exists in Supabase
       const response = await axios.get(
         `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchuser?email=${user.email}`
       );
@@ -51,24 +53,16 @@ const Profile: React.FC<Props> = ({ user }) => {
         console.log('User found:', response.data.data);
         setUserData(response.data.data);
       } else {
-        console.log('User not found, adding to Supabase...');
-        // 🛠️ Add user to Supabase if not found
-        const addUserResponse = await axios.post(
-          'http://localhost:5001/intelligensi-ai-v2/us-central1/updateuser',
-          {
-            uid: user.uid,
-            display_name: user.displayName || 'Anonymous User',
-            email: user.email,
-            company_id: 'company-123', 
-            is_active: true
-          }
-        );
-        setUserData(addUserResponse.data.data);
-        console.log('User added to Supabase:', addUserResponse.data.data);
+        throw new Error('User not found');
       }
     } catch (err) {
-      console.error('Error checking/adding user:', err);
-      setError('Failed to fetch or add user.');
+      if (retries < maxRetries) {
+        console.log(`Retrying fetch user... (${retries + 1}/${maxRetries})`);
+        setTimeout(() => fetchUserWithRetry(retries + 1), retryInterval);
+      } else {
+        console.error('Failed to fetch user:', err);
+        setError('Failed to fetch user after multiple retries.');
+      }
     } finally {
       setLoading(false);
     }
@@ -76,7 +70,7 @@ const Profile: React.FC<Props> = ({ user }) => {
 
   useEffect(() => {
     if (user) {
-      checkAndAddUser();
+      fetchUserWithRetry();
     }
   }, [user]);
 
@@ -120,7 +114,7 @@ const Profile: React.FC<Props> = ({ user }) => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Company ID</th>
+                {/* <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Company ID</th> */}
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
               </tr>
             </thead>
@@ -129,7 +123,7 @@ const Profile: React.FC<Props> = ({ user }) => {
                 <tr key={userData.id} className="border-b border-[#273238] hover:bg-[#273238] transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">{userData.display_name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{userData.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{userData.company_id}</td>
+                  {/* <td className="px-6 py-4 whitespace-nowrap">{userData.company_id}</td> */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       userData.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'

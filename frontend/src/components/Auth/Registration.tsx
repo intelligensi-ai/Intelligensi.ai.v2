@@ -13,20 +13,28 @@ const Registration: React.FC = () => {
 
   const handleRegister = async () => {
     try {
-      // ✅ Register in Firebase
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser: User = userCredential.user;
 
       // 🔥 Store in Supabase
-      await axios.post('http://localhost:5001/intelligensi-ai-v2/us-central1/updateuser', {
+      const { data } = await axios.post('http://localhost:5001/intelligensi-ai-v2/us-central1/updateuser', {
         uid: firebaseUser.uid,
-        display_name: name,
+        display_name: name, // ✅ Fix: use snake_case
         email: firebaseUser.email,
-        company_id: `company-${Date.now()}`,
+        company_id: null, 
+        profile_picture: '', 
         is_active: true
       });
 
-      navigate('/profile');
+      console.log('User added to Supabase:', data);
+
+      // ✅ Only navigate if user is successfully added
+      if (data.success) {
+        navigate('/profile');
+      } else {
+        setError('Failed to add user to Supabase');
+      }
+
     } catch (err) {
       console.error('Registration error:', err);
       setError('Failed to register user.');
