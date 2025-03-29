@@ -55,74 +55,79 @@ export const fetchusers = onRequest(
   }
 );
 
-// update subabase updateuser function
-
 export const updateuser = onRequest(
   {
     cors: true,
-    secrets: [supabaseUrl, supabaseKey]
+    secrets: [supabaseUrl, supabaseKey],
   },
   async (req, res) => {
     try {
-      // Check for POST method
       if (req.method !== "POST") {
         res.status(405).json({ error: "Method Not Allowed" });
         return;
       }
 
-      // Validate request body
       const {
         uid,
-        displayName,
+        displayName,       // camelCase for TS
         email,
-        companyId,
-        isActive = true
+        password,
+        companyId,           // camelCase for TS
+        profilePicture = '',  // camelCase for TS
+        isActive = true,
       } = req.body;
 
-      // Validate required fields
+      // ✅ Field validation
       if (!uid || !email) {
         res.status(400).json({
           success: false,
-          error: "UID and email are required"
+          error: "UID and email are required",
         });
         return;
       }
 
-      // Initialize Supabase client with secret values
-      const supabase = createClient(
-        supabaseUrl.value(),
-        supabaseKey.value(),
-        { auth: { persistSession: false } }
-      );
+      // ✅ Initialize Supabase client
+      const supabase = createClient(supabaseUrl, supabaseKey, {
+        auth: { persistSession: false },
+      });
 
-      // Perform upsert operation
+      // ✅ Map camelCase to snake_case for Supabase
+      const userData = {
+        uid,
+        display_name: displayName,          // snake_case for Supabase
+        email,
+        password,
+        company_id: companyId,              // snake_case
+        profile_picture: profilePicture,    // snake_case
+        is_active: isActive,                // snake_case
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // ✅ Upsert Operation
       const { data, error } = await supabase
         .from("users")
-        .upsert({
-          uid,
-          display_name: displayName,
-          email,
-          company_id: companyId,
-          is_active: isActive,
-          updated_at: new Date().toISOString()
-        })
+        .upsert(userData, { onConflict: ["uid"] })
         .select();
 
       if (error) throw error;
 
       res.status(200).json({
         success: true,
-        data: data?.[0] || null
+        message: "User added or updated successfully",
+        data: data?.[0] || null,
       });
-    } catch (error) {
-      console.error("Update User Error:", error);
+
+    } catch (error: any) {
+      console.error("🔥 Update User Error:", error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
 );
+
 
 // New fetchuser function
 export const fetchuser = onRequest(
