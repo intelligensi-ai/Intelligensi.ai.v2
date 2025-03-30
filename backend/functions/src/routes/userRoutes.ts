@@ -1,79 +1,180 @@
-import type { Request, Response, NextFunction } from "express";
-import { Router } from "express"; // Removed NextFunction from here
-import supabase from "../services/supabaseService";
-import asyncHandler from "../utils/asyncHandler";
+import type { Request } from "firebase-functions/v2/https";
+import { onRequest, HttpsError } from "firebase-functions/v2/https";
+import { createClient } from "@supabase/supabase-js";
+import { defineSecret } from "firebase-functions/params";
+import cors from "cors";
 
-// eslint-disable-next-line new-cap
-const router = Router();
+// Firebase Secrets
+const supabaseUrl = defineSecret("SUPABASE_URL");
+const supabaseKey = defineSecret("SUPABASE_KEY");
 
-// ✅ Fetch user by email with asyncHandler
-router.get("/fetchuser", asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { email } = req.query;
+// Initialize Supabase Client
+const getSupabaseClient = () =>
+  createClient(
+    supabaseUrl.value(),
+    supabaseKey.value(),
+    { auth: { persistSession: false } }
+  );
 
-  if (!email || typeof email !== "string") {
-    res.status(400).json({ error: "Valid email is required" });
-    return;
-  }
+// CORS Middleware
+const corsHandler = cors({ origin: true });
 
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("email", email)
-    .single();
+type CorsCallback = (error?: Error | null) => void;
 
-  if (error || !data) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
-
-  res.status(200).json({ success: true, data });
-}));
-
-// ✅ Update or create user with asyncHandler
-router.post("/updateuser", asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const {
-    uid,
-    displayName,
-    email,
-    companyId,
-    profilePicture,
-    isActive
-  }: {
-    uid: string;
-    displayName: string;
-    email: string;
-    companyId?: number;
-    profilePicture?: string;
-    isActive?: boolean;
-  } = req.body;
-
-  if (!uid || !email) {
-    res.status(400).json({ error: "UID and Email are required" });
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from("users")
-    .upsert([
-      {
-        uid,
-        display_name: displayName,
-        email,
-        company_id: companyId || null,
-        profile_picture: profilePicture || "",
-        is_active: isActive ?? true
+// Fetch all users
+export const fetchusers = onRequest(
+  { cors: false, secrets: [supabaseUrl, supabaseKey] },
+  (req: Request, res) => {
+    corsHandler(req, res, async (err?: Error) => {
+      if (err) {
+        res.status(500).json({ error: "Failed to process CORS" });
+        return;
       }
-    ])
-    .select()
-    .single();
 
-  if (error) {
-    console.error("Error upserting user:", error.message);
-    res.status(500).json({ error: "Failed to upsert user." });
-    return;
+      try {
+        if (req.method !== "GET") {
+          res.status(405).json({ error: "Method Not Allowed" });
+          return;
+        }
+
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from("users")
+          .select("display_name, id, uid, email, company_id, is_active");
+
+        if (error) throw new HttpsError("internal", error.message);
+
+        res.status(200).json({
+          success: true,
+          data: data.map((user) => ({
+            displayName: user.display_name,
+            id: user.id,
+            uid: user.uid,
+            email: user.email,
+            companyId: user.company_id,
+            isActive: user.is_active
+          }))
+        });
+      } catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    });
   }
+);
 
-  res.status(200).json({ success: true, data });
-}));
+// Update user
+export const updateuser = onRequest(
+  { cors: false, secrets: [supabaseUrl, supabaseKey] },
+  (req: Request, res) => {
+    corsHandler(req, res, async (err?: Error) => {
+      if (err) {
+        res.status(500).json({ error: "Failed to process CORS" });
+        return;
+      }
 
-export default router;
+      try {
+        if (req.method !== "POST") {
+          res.status(405).json({ error: "Method Not Allowed" });
+          return;
+        }
+
+        const { uid, displayName, email, companyId, isActive = true } = req.body;
+
+        if (!uid || !email) {
+          res.status(400).json({
+            success: false,
+            error: "UID and email are required"
+          });
+          return;
+        }
+
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from("users")
+          .upsert({
+            uid,
+            display_name: displayName,
+            email,
+            company_id: companyId,
+            is_active: isActive,
+            updated_at: new Date().toISOString()
+          })
+          .select();
+
+        if (error) throw new HttpsError("internal", error.message);
+
+        res.status(200).json({
+          success: true,
+          data: data?.[0] || null
+        });
+      } catch (error) {
+        console.error("Update User Error:", error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    });
+  }
+);
+
+// Fetch single user
+export const fetchuser = onRequest(
+  { cors: false, secrets: [supabaseUrl, supabaseKey] },
+  (req: Request, res) => {
+    corsHandler(req, res, async (err?: Error) => {
+      if (err) {
+        res.status(500).json({ error: "Failed to process CORS" });
+        return;
+      }
+
+      try {
+        if (req.method !== "GET") {
+          res.status(405).json({ error: "Method Not Allowed" });
+          return;
+        }
+
+        const { email, id, uid } = req.query;
+
+        if (!email && !id && !uid) {
+          res.status(400).json({
+            success: false,
+            error: "Must provide either email, id, or uid"
+          });
+          return;
+        }
+
+        const supabase = getSupabaseClient();
+        let query = supabase
+          .from("users")
+          .select("display_name, id, uid, email, company_id, is_active, created_at, updated_at");
+
+        if (email) query = query.eq("email", email as string);
+        else if (id) query = query.eq("id", id as string);
+        else if (uid) query = query.eq("uid", uid as string);
+
+        const { data, error } = await query.single();
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            res.status(404).json({ success: false, error: "User not found" });
+            return;
+          }
+          throw new HttpsError("internal", error.message);
+        }
+
+        res.status(200).json({ success: true, data });
+      } catch (error) {
+        console.error("Fetch User Error:", error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    });
+  }
+);
