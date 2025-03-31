@@ -8,7 +8,7 @@ import { auth } from './components/Config/firebaseConfig';
 // ✅ Import Pages
 import Auth from './components/Auth/Auth';
 import Registration from './components/Auth/Registration';
-import Profile from './pages/Profile';
+import Profile from './pages/Dashboard/Profile';
 import Dashboard from './pages/Dashboard/Dashboard';  
 
 const App: React.FC = () => {
