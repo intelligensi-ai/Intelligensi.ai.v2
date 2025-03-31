@@ -16,14 +16,14 @@ const Registration: React.FC = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser: User = userCredential.user;
 
-      // 🔥 Store in Supabase
+      // Store in Supabase
       const { data } = await axios.post('http://localhost:5001/intelligensi-ai-v2/us-central1/updateuser', {
         uid: firebaseUser.uid,
-        display_name: name, // ✅ Fix: use snake_case
+        displayName: name,    // ✅ camelCase here
         email: firebaseUser.email,
-        company_id: null, 
-        profile_picture: '', 
-        is_active: true
+        companyId: null, 
+        profilePicture: '', 
+        isActive: true
       });
 
       console.log('User added to Supabase:', data);

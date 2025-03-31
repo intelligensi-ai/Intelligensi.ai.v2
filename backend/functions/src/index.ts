@@ -5,6 +5,7 @@ import openaiRoutes from "./routes/openaiRoutes";
 import * as UserRoutes from "./routes/userRoutes";
 import { onRequest } from "firebase-functions/v2/https";
 
+
 // Set global Firebase Functions options
 setGlobalOptions({
   region: "us-central1", // Choose your preferred region
