@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { auth } from "../../components/Config/firebaseConfig";
-import { FiUser, FiX } from "react-icons/fi"; // Clean icon imports
 
 // ✅ Interface for user data
 interface UserData {
@@ -32,7 +31,7 @@ const Header: React.FC = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `https://your-firebase-function-url/fetchuser?email=${auth.currentUser.email}`
+        `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchuser?email=${auth.currentUser.email}`
       );
       const data = await response.json();
       if (data.success) {
@@ -68,7 +67,7 @@ const Header: React.FC = () => {
             aria-label="User profile"
           >
             {/* ✅ Explicit JSX cast */}
-            {<FiUser className="w-6 h-6" /> as JSX.Element}
+            <h2 className="text-xl font-bold">User Profile</h2>
           </button>
           <button
             onClick={handleLogout}
@@ -87,12 +86,14 @@ const Header: React.FC = () => {
       >
         <div className="p-6 h-full flex flex-col">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">User Profile</h2>
+            <h2 className="text-xl font-bold items-center text-center w-full">
+              {userData?.display_name || "Guest"}
+            </h2>
             <button
               onClick={toggleDrawer}
               className="p-1 rounded-full hover:bg-gray-700"
             >
-              {<FiX className="w-5 h-5" /> as JSX.Element}
+             {/* <p>:-)</p> */}
             </button>
           </div>
 
@@ -104,7 +105,7 @@ const Header: React.FC = () => {
             <div className="flex-1">
               <div className="flex flex-col items-center mb-6">
                 <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center mb-4">
-                  {<FiUser className="w-10 h-10" /> as JSX.Element}
+                {/* <h2 className="text-xl font-bold">User Profile</h2> */}
                 </div>
                 <h3 className="text-lg font-semibold">
                   {userData.display_name}
