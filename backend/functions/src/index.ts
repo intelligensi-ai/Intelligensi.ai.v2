@@ -13,7 +13,7 @@ import { createSchema } from "./routes/schemaRoutes";
 // New routes/imports from ea22d36
 import authRouter from "./routes/authRoutes"; 
 
-// Set global Firebase Functions options
+// Set global options
 setGlobalOptions({
   region: "us-central1",
   maxInstances: 10,
