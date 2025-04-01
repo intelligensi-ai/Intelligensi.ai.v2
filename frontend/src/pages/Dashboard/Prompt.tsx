@@ -14,24 +14,12 @@ const Prompt: React.FC = () => {
     setSuccess(null);
 
     try {
-      // First, get the auth token
-      const tokenResponse = await axios.get(
-        "https://us-central1-intelligensi-ai-v2.cloudfunctions.net/api/auth/token"
-      );
-
-      if (!tokenResponse.data.token) {
-        throw new Error("No token received from auth endpoint");
-      }
-
-      // Then make the OpenAI request with the token
+      // Directly make the OpenAI request without auth
       const response = await axios.post(
-        "https://us-central1-intelligensi-ai-v2.cloudfunctions.net/api/openai/update-homepage",
+        "http://localhost:5001/intelligensi-ai-v2/us-central1/updateHomepage",
         { prompt: query },
         {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${tokenResponse.data.token}`,
-          },
+          headers: { "Content-Type": "application/json" }
         }
       );
 

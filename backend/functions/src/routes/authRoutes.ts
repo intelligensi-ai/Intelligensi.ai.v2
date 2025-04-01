@@ -5,7 +5,7 @@ import { sign } from "jsonwebtoken";
 const router = Router();
 
 // This should be moved to environment variables in production
-const JWT_SECRET = "your-secret-key-here";
+const JWT_SECRET = process.env.JWT_SECRET as string;
 
 // Generate token route
 const generateToken: RequestHandler = async (req, res) => {
