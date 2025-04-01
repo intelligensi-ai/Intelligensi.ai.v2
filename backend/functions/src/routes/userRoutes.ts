@@ -17,8 +17,6 @@ const getSupabaseClient = () =>
 // CORS Middleware
 const corsHandler = cors({ origin: true });
 
-type CorsCallback = (error?: Error | null) => void;
-
 // Fetch all users
 export const fetchusers = onRequest(
   { cors: false, secrets: [supabaseUrl, supabaseKey] },

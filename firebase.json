@@ -16,19 +16,19 @@
   "emulators": {
     "functions": {
       "port": 5001,
-      "runtime": "nodejs22"  // Added explicit runtime for emulator
+      "host": "127.0.0.1"
     },
     "hosting": {
       "port": 5002
     },
     "ui": {
-      "port": 4000
+      "enabled": false
     },
     "singleProjectMode": true
   },
   "functions": {
     "source": "backend/functions",
-    "runtime": "nodejs22",  
+    "runtime": "nodejs22",
     "ignore": [
       "node_modules",
       ".git",

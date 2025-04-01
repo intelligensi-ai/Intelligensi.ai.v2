@@ -1,23 +1,25 @@
-import express from "express";
-import type { RequestHandler } from "express";
-import axios from "axios";
+import { Router } from "express";
+import axios, { AxiosError } from "axios";
 import https from "https";
 import { config } from "dotenv";
+import { defineSecret } from "firebase-functions/params";
+import { onRequest } from "firebase-functions/v2/https";
 
 config();
 
-const router = express.Router();
+// Define Firebase secret
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
+
+const router = Router();
 
 // HTTPS Agent for secure connections
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
-
-// OpenAI API key
 
 // Sanitize text
 const sanitizeText = (text: string): string => text.replace(/<[^>]*>?/gm, "");
 
 // Update Homepage route
-const updateHomepage: RequestHandler = async (req, res) => {
+export const updateHomepage = onRequest({ secrets: [openaiApiKey] }, async (req, res) => {
   const { prompt } = req.body;
 
   if (!prompt) {
@@ -53,34 +55,82 @@ router.post("/update-homepage", function(req, res) {
         model: "gpt-4",
 >>>>>>> 6f2b9ca (Refactor OpenAI integration in updateHomepage route; streamline request handling, improve error responses, and enhance text sanitization)
         messages: [{ role: "user", content: prompt }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "update_homepage",
+              strict: false,
+              parameters: {
+                type: "object",
+                required: ["updateText"],
+                properties: {
+                  updateText: {
+                    type: "string",
+                    description: "The text to update the homepage with.",
+                  },
+                },
+              },
+              description: "Updates the homepage with the provided text.",
+            },
+          },
+        ],
         temperature: 1,
         max_tokens: 2048,
-        response_format: { type: "text" }
+        response_format: { type: "text" },
       },
       {
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${OPENAI_API_KEY}`
+          "Authorization": `Bearer ${openaiApiKey.value()}`,
         },
-        httpsAgent
       }
     );
 
-    const message = openAIResponse.data.choices?.[0]?.message?.content || "No content returned";
-    const sanitizedText = sanitizeText(message);
+    // Extract function call if it exists
+    const toolCall = openAIResponse.data.choices?.[0]?.message?.tool_calls?.[0];
 
-    res.status(200).json({
-      message: `Homepage updated successfully with: ${sanitizedText}`
-    });
-  } catch (error: any) {
-    console.error("OpenAI API error:", error);
+    if (toolCall?.function?.name === "update_homepage") {
+      try {
+        if (!toolCall.function.arguments) {
+          throw new Error("Function arguments are undefined");
+        }
+        const { updateText } = JSON.parse(toolCall.function.arguments);
+
+        // Sanitize the text
+        const sanitizedText = sanitizeText(updateText);
+
+        // Send the sanitized text to the Drupal API
+        const drupalResponse = await axios.post(
+          "https://drupal7.intelligensi.online/api/update-homepage",
+          { update_text: sanitizedText },
+          {
+            headers: { "Content-Type": "application/json" },
+            httpsAgent,
+          }
+        );
+
+        res.status(200).json({
+          message: `Homepage updated successfully with: ${sanitizedText}`,
+          drupalResponse: drupalResponse.data,
+        });
+      } catch (parseError) {
+        console.error("Error parsing function arguments:", parseError);
+        res.status(500).json({ error: "Error parsing function arguments." });
+      }
+    } else {
+      const message = openAIResponse.data.choices?.[0]?.message?.content ||
+        "Could not determine the homepage update.";
+      res.status(200).json({ message });
+    }
+  } catch (error: unknown) {
+    console.error("OpenAI API error:", error instanceof AxiosError ? error.response?.data : error);
     res.status(500).json({
-      error: "Failed to process your request",
-      details: error.message
+      error: "Failed to process your request.",
+      details: error instanceof AxiosError ? error.response?.data :
+        error instanceof Error ? error.message : "Unknown error",
     });
   }
-};
-
-router.post("/update-homepage", updateHomepage);
+});
 
 export default router;
