@@ -1,72 +1,92 @@
-// src/components/Prompt/Prompt.tsx
-import React, { useState } from 'react'; 
-import { useVoiceRecognition } from '../../components/Utils/VoiceRecogition';
-import { MicrophoneButton } from '../../components/Utils/MicrophoneButton'; 
-// import { ChatMessage } from '../../components/types/chat';
+import React, { useState } from "react";
+import axios from "axios";
 
-interface PromptProps {
-  onSend: (message: string) => Promise<void>;
-  disabled?: boolean;
-}
+const Prompt: React.FC = () => {
+  const [query, setQuery] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-export const Prompt: React.FC<PromptProps> = ({ onSend, disabled = false }) => {
-  const [query, setQuery] = useState<string>('');
-
-  const { isListening, startListening, stopListening } = useVoiceRecognition({
-    setQuery: setQuery,
-    handleSubmit: async () => {
-      if (query.trim()) {
-        await onSend(query);
-        setQuery('');
-      }
-    }
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePromptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || disabled) return;
-    
-    await onSend(query);
-    setQuery('');
-  };
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
 
-  const handleMicrophoneClick = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
+    try {
+      // First, get the auth token
+      const tokenResponse = await axios.get(
+        "https://us-central1-intelligensi-ai-v2.cloudfunctions.net/api/auth/token"
+      );
+
+      if (!tokenResponse.data.token) {
+        throw new Error("No token received from auth endpoint");
+      }
+
+      // Then make the OpenAI request with the token
+      const response = await axios.post(
+        "https://us-central1-intelligensi-ai-v2.cloudfunctions.net/api/openai/update-homepage",
+        { prompt: query },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${tokenResponse.data.token}`,
+          },
+        }
+      );
+
+      setSuccess(response.data.message);
+      setQuery(""); // Clear the input after successful submission
+    } catch (err) {
+      console.error("Error details:", err);
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.error || err.message || "Failed to process request");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to process request");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-3 border-gray-200">
-      <div className="flex items-center">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Please ask a question to intelligensi.ai"
-          className="flex-1 p-4 mx-5 py-2 text-gray-600 rounded-full bg-gray-100 focus:outline-none"
-          disabled={disabled || isListening}
-        />
-        <div className="flex">
-          <MicrophoneButton
-            isListening={isListening}
-            onClick={handleMicrophoneClick}
-            className="rounded-r-none"
-            // disabled={disabled}
+    <div className="bg-[#2D3748] p-6 rounded-lg shadow-md mb-8">
+      <h2 className="text-xl font-bold mb-4">AI Assistant</h2>
+      <form onSubmit={handlePromptSubmit} className="flex flex-col gap-4">
+        <div className="flex items-center">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Ask something or trigger a migration..."
+            className="flex-1 px-4 py-2 rounded-l bg-gray-700 text-white placeholder-gray-400 focus:outline-none"
+            disabled={isLoading}
           />
           <button
             type="submit"
-            className={`bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-r-full ${
-              disabled || isListening ? 'opacity-50 cursor-not-allowed' : ''
+            className={`bg-teal-500 hover:bg-teal-600 text-white px-6 py-2 rounded-r ${
+              isLoading ? "opacity-50 cursor-not-allowed" : ""
             }`}
-            disabled={disabled || isListening}
+            disabled={isLoading}
           >
-            Send
+            {isLoading ? "Sending..." : "Submit"}
           </button>
         </div>
-      </div>
-    </form>
+        
+        {error && (
+          <div className="text-red-500 text-sm mt-2">
+            {error}
+          </div>
+        )}
+        
+        {success && (
+          <div className="text-green-500 text-sm mt-2">
+            {success}
+          </div>
+        )}
+      </form>
+    </div>
   );
 };
+
+export default Prompt;
