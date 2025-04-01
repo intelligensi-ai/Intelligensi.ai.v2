@@ -1,24 +1,23 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2022"],
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
     "outDir": "lib",
-    "rootDir": "src",
     "sourceMap": true,
-    "noImplicitAny": true,
-    "moduleResolution": "node",
-    "types": ["node"],
-    "resolveJsonModule": true,
-    "baseUrl": ".",
-    "paths": {
-      "*": ["node_modules/*"]
+    "strict": true,
+    "target": "es2017",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true, 
+    "moduleResolution": "node", 
+    "experimentalDecorators": true, 
+    "emitDecoratorMetadata": true, 
+    "baseUrl": ".", 
+    "paths": { 
+      "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*.ts", "../../frontend/src/components/Utils/voiceRecogition.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "lib", "**/*.spec.ts", "**/*.test.ts"]
 }
