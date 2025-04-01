@@ -19,6 +19,6 @@
       "*": ["node_modules/*"]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "../../frontend/src/components/Utils/voiceRecogition.ts"],
   "exclude": ["node_modules", "lib", "**/*.spec.ts", "**/*.test.ts"]
 }
