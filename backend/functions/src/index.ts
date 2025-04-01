@@ -7,6 +7,7 @@ import cors from "cors";
 import { defineSecret } from "firebase-functions/params";
 import openaiRoutes from "./routes/openaiRoutes";
 import authRoutes from "./routes/authRoutes";
+import * as UserRoutes from "./routes/userRoutes";
 
 // Define secrets
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
@@ -25,6 +26,12 @@ app.use(json());
 // Register routes
 app.use("/openai", openaiRoutes);
 app.use("/auth", authRoutes);
+
+// ✅ Export individual user functions DEFINED in userRoutes.ts
+// These will be deployed as separate Firebase Functions (e.g., .../fetchusers, .../updateuser)
+export const fetchusers = UserRoutes.fetchusers;
+export const updateuser = UserRoutes.updateuser;
+export const fetchuser = UserRoutes.fetchuser;
 
 // Health check endpoint
 app.get("/healthcheck", (req, res) => {
