@@ -7,9 +7,10 @@ import type { Request, Response, NextFunction } from "express";
  * @param {Function} fn - The async route handler function to wrap
  * @return {Function} A middleware function that properly handles async operations
  */
-const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
+const asyncHandler =
+  (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
+    (req: Request, res: Response, next: NextFunction) => {
+      Promise.resolve(fn(req, res, next)).catch(next);
+    };
 
 export default asyncHandler;

@@ -10,11 +10,9 @@ const supabaseKey = defineSecret("SUPABASE_KEY");
 
 // Initialize Supabase Client
 const getSupabaseClient = () =>
-  createClient(
-    supabaseUrl.value(),
-    supabaseKey.value(),
-    { auth: { persistSession: false } }
-  );
+  createClient(supabaseUrl.value(), supabaseKey.value(), {
+    auth: { persistSession: false },
+  });
 
 // CORS Middleware
 const corsHandler = cors({ origin: true });
@@ -52,18 +50,18 @@ export const fetchusers = onRequest(
             uid: user.uid,
             email: user.email,
             companyId: user.company_id,
-            isActive: user.is_active
-          }))
+            isActive: user.is_active,
+          })),
         });
       } catch (error) {
         console.error("Error:", error);
         res.status(500).json({
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error"
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     });
-  }
+  },
 );
 
 // Update user
@@ -82,12 +80,18 @@ export const updateuser = onRequest(
           return;
         }
 
-        const { uid, displayName, email, companyId, isActive = true } = req.body;
+        const {
+          uid,
+          displayName,
+          email,
+          companyId,
+          isActive = true,
+        } = req.body;
 
         if (!uid || !email) {
           res.status(400).json({
             success: false,
-            error: "UID and email are required"
+            error: "UID and email are required",
           });
           return;
         }
@@ -101,7 +105,7 @@ export const updateuser = onRequest(
             email,
             company_id: companyId,
             is_active: isActive,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .select();
 
@@ -109,17 +113,17 @@ export const updateuser = onRequest(
 
         res.status(200).json({
           success: true,
-          data: data?.[0] || null
+          data: data?.[0] || null,
         });
       } catch (error) {
         console.error("Update User Error:", error);
         res.status(500).json({
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error"
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     });
-  }
+  },
 );
 
 // Fetch single user
@@ -143,7 +147,7 @@ export const fetchuser = onRequest(
         if (!email && !id && !uid) {
           res.status(400).json({
             success: false,
-            error: "Must provide either email, id, or uid"
+            error: "Must provide either email, id, or uid",
           });
           return;
         }
@@ -151,7 +155,9 @@ export const fetchuser = onRequest(
         const supabase = getSupabaseClient();
         let query = supabase
           .from("users")
-          .select("display_name, id, uid, email, company_id, is_active, created_at, updated_at");
+          .select(
+            "display_name, id, uid, email, company_id, is_active, created_at, updated_at",
+          );
 
         if (email) query = query.eq("email", email as string);
         else if (id) query = query.eq("id", id as string);
@@ -172,9 +178,9 @@ export const fetchuser = onRequest(
         console.error("Fetch User Error:", error);
         res.status(500).json({
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error"
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     });
-  }
+  },
 );
