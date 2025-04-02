@@ -9,7 +9,7 @@ import { auth } from './components/Config/firebaseConfig';
 import Auth from './components/Auth/Auth';
 import Registration from './components/Auth/Registration';
 import Profile from './pages/Dashboard/Profile';
-import Dashboard from './pages/Dashboard/Dashboard';  
+import { Dashboard } from './pages/Dashboard/Dashboard'; 
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);

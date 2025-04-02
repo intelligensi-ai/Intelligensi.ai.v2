@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../Config/firebaseConfig';  // ✅ Use shared Firebase instance
+import { auth } from '../Config/firebaseConfig';
 import axios from 'axios';
 
 const Auth: React.FC = () => {
@@ -10,24 +10,19 @@ const Auth: React.FC = () => {
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
 
-  // 🔥 Handle user login with Supabase lookup
   const handleLogin = async () => {
     try {
-      // 🔥 Check if user exists in Supabase
       const { data } = await axios.get(
         `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchuser?email=${email}`
       );
 
-      // Check if user exists and is active
       if (!data.success || !data.data.is_active) {
         setError('User not found or account is inactive.');
         return;
       }
 
-      // ✅ Firebase login if Supabase user exists and is active
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/profile');
-
     } catch (err) {
       console.error('Login error:', err);
       setError('Invalid credentials or account not found.');
@@ -35,43 +30,95 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-4">Login</h2>
-
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full mb-3 p-2 border rounded"
+    <div className="min-h-screen bg-[#1A202C] flex flex-col items-center justify-center p-4">
+      {/* Logo at the very top */}
+      <div className="mb-2">
+        <img 
+          src="/logocutout.png" 
+          alt="Intelligensi Logo" 
+          className="h-50 w-50 mx-auto"
         />
+      </div>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-3 p-2 border rounded"
-        />
+      {/* Header Section */}
+      <div className="text-center mb-6">
+        <h1 className="text-4xl font-light text-white mb-1">Intelligensi.ai</h1>
+        <p className="text-gray-300 text-lg">
+          Smarter Content. Stronger Connections.
+        </p>
+        <p className="text-gray-400 mt-1 text-sm">
+          Enhance search, automation, and retrieval with AI-driven optimization.
+        </p>
+      </div>
 
-        {error && <p className="text-red-500">{error}</p>}
+      {/* Login Card with curved design */}
+      <div className="bg-[#2D3748] p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <h2 className="text-2xl font-bold text-white mb-6 text-center">Login</h2>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-[#1A202C] text-white p-3 rounded-xl border border-gray-600 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition"
+            />
+          </div>
 
-        <button
-          onClick={handleLogin}
-          className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-2 px-4 rounded"
-        >
-          Login
-        </button>
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-1">Password</label>
+            <input
+              type="password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-[#1A202C] text-white p-3 rounded-xl border border-gray-600 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition"
+            />
+          </div>
 
-        <div className="mt-4 text-center">
+          {error && (
+            <div className="text-red-400 text-sm py-2 px-3 bg-red-900/30 rounded-xl">
+              {error}
+            </div>
+          )}
+
           <button
-            className="text-teal-700 hover:text-teal-900 text-sm"
-            onClick={() => navigate('/register')}
+            onClick={handleLogin}
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200 shadow-md"
           >
-            Need an account? Register
+            Sign in
           </button>
         </div>
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-400 text-sm">
+            Don't have an account?{' '}
+            <button
+              onClick={() => navigate('/register')}
+              className="text-teal-400 hover:text-teal-300 font-medium transition"
+            >
+              Register Here
+            </button>
+          </p>
+        </div>
+      </div>
+
+      {/* Additional Links with pill-shaped buttons */}
+      <div className="flex space-x-4 mt-8">
+        <button className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-6 rounded-full transition shadow-md">
+          Get Started
+        </button>
+        <button className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-6 rounded-full transition shadow-md">
+          Documentation
+        </button>
+      </div>
+
+      {/* Footer Branding */}
+      <div className="mt-12 text-center text-gray-500 text-sm space-y-1">
+        <p>Intelligensi AI - Cloud Firestore</p>
+        <p>Intelligensi AI – Authentication</p>
       </div>
     </div>
   );

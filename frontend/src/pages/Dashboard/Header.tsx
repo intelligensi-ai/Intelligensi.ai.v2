@@ -57,24 +57,52 @@ const Header: React.FC = () => {
       <header className="bg-[#2D3748] text-white py-4 px-8 flex justify-between items-center shadow-md">
         <div className="flex items-center">
           <img src="/logocutout.png" alt="Logo" className="h-12 w-12 mr-4" />
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl">Intelligensi.ai</h1>
         </div>
 
         <div className="flex items-center space-x-4">
+       
+          <div className="flex-1 flex justify-end items-center space-x-4">
           <button
             onClick={toggleDrawer}
-            className="p-2 rounded-full hover:bg-gray-700 transition-colors"
+            className="p-2 rounded-full hover:bg-gray-700 transition-colors flex items-center"
             aria-label="User profile"
           >
-            {/* ✅ Explicit JSX cast */}
-            <h2 className="text-xl font-bold">User Profile</h2>
+            {/* User Icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-8 w-8 text-gray-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
           </button>
           <button
             onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition"
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition flex items-center"
           >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 mr-1"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
+                clipRule="evenodd"
+              />
+            </svg>
             Logout
           </button>
+        </div>
         </div>
       </header>
 
