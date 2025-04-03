@@ -106,15 +106,30 @@ export const Dashboard: React.FC = () => {
         </div>
       </main>
 
-      {/* Sites Section */}
+      {/* Updated Sites Section with Drupal 7 Logo */}
       <div className="bg-[#2D3748] p-4 border-t border-gray-700">
-        <h3 className="font-semibold mb-2">Connected Sites</h3>
-        <div className="text-sm text-gray-400">
-          {messages.length > 0 ? (
-            <div>Analysis in progress...</div>
-          ) : (
-            <div>No sites connected yet.</div>
-          )}
+        <div className="flex items-start space-x-4">
+          {/* Drupal 7 Logo */}
+          <div className="flex flex-col items-center min-w-[60px]">
+            <img 
+              src="/D7-logo.png" 
+              alt="Drupal 7 Logo" 
+              className="w-10 h-10 object-contain"
+            />
+            <span className="text-xs mt-1 text-gray-300">Drupal 7</span>
+          </div>
+          
+          {/* Sites Content */}
+          <div className="flex-1">
+            <h3 className="font-semibold mb-2">Connected Sites</h3>
+            <div className="text-sm text-gray-400">
+              {messages.length > 0 ? (
+                <div>Analysis in progress...</div>
+              ) : (
+                <div>Drupal 7 site connected</div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

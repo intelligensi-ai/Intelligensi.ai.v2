@@ -39,14 +39,14 @@ export const Prompt: React.FC<PromptProps> = ({ onSend, disabled = false }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 border-gray-200">
+    <form onSubmit={handleSubmit} className="p-3 border-gray-200">
       <div className="flex items-center">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1 px-4 py-2 text-gray-600 rounded-full bg-gray-100 focus:outline-none"
+          placeholder="Please ask a question..."
+          className="flex-1 p-4 mx-5 py-2 text-gray-600 rounded-full bg-gray-100 focus:outline-none"
           disabled={disabled || isListening}
         />
         <div className="flex">
