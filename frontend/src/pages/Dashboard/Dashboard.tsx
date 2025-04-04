@@ -7,11 +7,17 @@ import { ChatMessage } from '../../types/chat';
 import Header from './Header';
 import InitialDisplay from '../../components/Display/InitialDisplay';
 import { AnimatePresence } from 'framer-motion';
+import Sites from './Sites';
+import { ISite } from '../../types/sites';
+import { ICMS } from '../../types/cms'; 
 
 export const Dashboard: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Start with empty sites array
+  const [sites, setSites] = useState<ISite[]>([]);
 
   const handleSend = async (message: string) => {
     setIsLoading(true);
@@ -57,6 +63,10 @@ export const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAddSite = (newSite: ISite) => {
+    setSites(prev => [...prev, newSite]);
   };
 
   return (
@@ -106,32 +116,11 @@ export const Dashboard: React.FC = () => {
         </div>
       </main>
 
-      {/* Updated Sites Section with Drupal 7 Logo */}
-      <div className="bg-[#2D3748] p-4 border-t border-gray-700">
-        <div className="flex items-start space-x-4">
-          {/* Drupal 7 Logo */}
-          <div className="flex flex-col items-center min-w-[60px]">
-            <img 
-              src="/D7-logo.png" 
-              alt="Drupal 7 Logo" 
-              className="w-10 h-10 object-contain"
-            />
-            <span className="text-xs mt-1 text-gray-300">Drupal 7</span>
-          </div>
-          
-          {/* Sites Content */}
-          <div className="flex-1">
-            <h3 className="font-semibold mb-2">Connected Sites</h3>
-            <div className="text-sm text-gray-400">
-              {messages.length > 0 ? (
-                <div>Analysis in progress...</div>
-              ) : (
-                <div>Drupal 7 site connected</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Updated Sites Section */}
+      <Sites 
+            sites={sites} 
+            onSiteAdded={handleAddSite}  // Only pass these two props
+        />
     </div>
   );
 };
