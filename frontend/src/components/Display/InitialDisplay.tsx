@@ -11,20 +11,19 @@ const InitialDisplay: React.FC<InitialDisplayProps> = ({ show }) => {
 
   return (
     <motion.div 
-      className="fixed inset-0 flex items-center justify-center bg-[#1A202C] z-10"
-      initial={{ opacity: 0.15 }}
+      className=" inset-0 flex items-center justify-center bg-[#1A202C] z-10"
+      initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 1 }}
     >
       <div className="text-center">
-        {/* Company Logo - replace with your actual logo */}
         <motion.div
           animate={{
             scale: [1, 1, 1],
-            opacity: [0.8, 1, 0.8]
+            opacity: [0.7, 1, 0.7]
           }}
           transition={{
-            duration: 2,
+            duration: 3,
             repeat: Infinity,
             ease: "easeInOut"
           }}
