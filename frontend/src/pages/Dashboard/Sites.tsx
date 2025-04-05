@@ -49,11 +49,11 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   return (
-    <div className="bg-[#2D3748] p-4 border-t border-gray-700 relative">
+    <div className="bg-[#2D3748] p-5 border-t border-gray-700 relative">
       {/* New Site Button - Left-aligned with SVG icon */}
       <button 
         onClick={() => setIsFormOpen(true)}
-        className="absolute top-4 left-4 bg-teal-400 hover:bg-teal-700 text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors duration-200 shadow-md"
+        className="absolute top-4 py-6 px-6 left-4 bg-teal-400 hover:bg-teal-700 text-white rounded-md text-lg flex items-center transition-colors duration-200 shadow-md"
       >
         <PlusIcon />
         <span>New Site</span>
@@ -82,7 +82,7 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded }) => {
         
         {/* Connected Sites - Right-aligned with distinct styling */}
         <div className="bg-[#3A4556] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm">
-          <h3 className="font-semibold mb-1 text-gray-100">Connected Sites</h3>
+          <h3 className="font-semibold p-2 mb-1 text-gray-100">Connected Sites</h3>
           <div className="text-sm text-blue-300 font-medium">
             {sites.length} site{sites.length !== 1 ? 's' : ''} connected
           </div>
