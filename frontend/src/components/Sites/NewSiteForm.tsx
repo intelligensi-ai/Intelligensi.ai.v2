@@ -1,11 +1,12 @@
 // src/components/Sites/NewSiteForm.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ISite, ICMS } from '../../types/sites';
 
 interface NewSiteFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (site: ISite) => void;
+  initialData?: ISite | null;
 }
 
 const CMS_OPTIONS: ICMS[] = [
@@ -14,8 +15,9 @@ const CMS_OPTIONS: ICMS[] = [
   { id: 3, name: 'Joomla', version: '' },
 ];
 
-const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave }) => {
-  const [formData, setFormData] = useState<Omit<ISite, 'id'>>({
+const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, initialData }) => {
+  const [formData, setFormData] = useState<ISite>({
+    id: Date.now(),
     user_id: 1,
     cms: CMS_OPTIONS[0],
     site_name: '',
@@ -30,6 +32,30 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave }) =>
     updated_at: new Date().toISOString()
   });
 
+  // Initialize form with initialData when it changes
+  useEffect(() => {
+    if (initialData) {
+      setFormData(initialData);
+    } else {
+      // Reset to default when creating new site
+      setFormData({
+        id: Date.now(),
+        user_id: 1,
+        cms: CMS_OPTIONS[0],
+        site_name: '',
+        description: '',
+        mysql_file_url: undefined,
+        status: 'active',
+        is_active: true,
+        company_id: undefined,
+        migration_ids: undefined,
+        tags: undefined,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
+  }, [initialData]);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const file = e.target.files[0];
@@ -42,11 +68,10 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave }) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newSite: ISite = {
+    onSave({
       ...formData,
-      id: Date.now() // Temporary ID for local state
-    };
-    onSave(newSite);
+      updated_at: new Date().toISOString()
+    });
     onClose();
   };
 
@@ -56,7 +81,9 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave }) =>
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-end">
       <div className="bg-[#2D3748] w-96 h-full p-6 overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">Add New Site</h2>
+          <h2 className="text-xl font-semibold">
+            {initialData ? 'Edit Site' : 'Add New Site'}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
             &times;
           </button>
@@ -160,7 +187,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave }) =>
               type="submit"
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md"
             >
-              Save Site
+              {initialData ? 'Update Site' : 'Save Site'}
             </button>
           </div>
         </form>

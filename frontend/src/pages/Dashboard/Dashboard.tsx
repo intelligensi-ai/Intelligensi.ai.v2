@@ -119,7 +119,12 @@ export const Dashboard: React.FC = () => {
       {/* Updated Sites Section */}
       <Sites 
             sites={sites} 
-            onSiteAdded={handleAddSite}  // Only pass these two props
+            onSiteAdded={handleAddSite} 
+            onSiteUpdated={(updatedSite: ISite) => {
+              setSites(prev => prev.map(site => 
+                site.id === updatedSite.id ? updatedSite : site
+              ));
+            }}
         />
     </div>
   );

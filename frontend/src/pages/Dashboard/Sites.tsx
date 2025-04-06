@@ -1,5 +1,5 @@
-import NewSiteForm from '../../components/Sites/NewSiteForm';
 // src/components/Sites/Sites.tsx
+import NewSiteForm from '../../components/Sites/NewSiteForm';
 import React, { useState } from 'react';
 import { ISite } from '../../types/sites';
 
@@ -43,30 +43,56 @@ const getSiteDisplayName = (siteName: string): string => {
 interface SitesProps {
   sites: ISite[];
   onSiteAdded: (newSite: ISite) => void;
+  onSiteUpdated: (updatedSite: ISite) => void;
 }
 
-const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded }) => {
+const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [currentSite, setCurrentSite] = useState<ISite | null>(null);
+
+  const handleEditClick = (site: ISite) => {
+    setCurrentSite(site);
+    setIsFormOpen(true);
+  };
+
+  const handleSave = (siteData: ISite) => {
+    if (currentSite) {
+      // Update existing site
+      onSiteUpdated({ ...currentSite, ...siteData });
+    } else {
+      // Add new site
+      onSiteAdded(siteData);
+    }
+    setIsFormOpen(false);
+    setCurrentSite(null);
+  };
 
   return (
-    <div className="bg-[#2D3748] p-5 border-t border-gray-700 relative">
-      {/* New Site Button - Left-aligned with SVG icon */}
+    <div className="bg-[#2D3748] p-4 border-t border-gray-700 relative">
+      {/* New Site Button */}
       <button 
-        onClick={() => setIsFormOpen(true)}
-        className="absolute top-4 py-6 px-6 left-4 bg-teal-400 hover:bg-teal-700 text-white rounded-md text-lg flex items-center transition-colors duration-200 shadow-md"
+        onClick={() => {
+          setCurrentSite(null);
+          setIsFormOpen(true);
+        }}
+        className="absolute top-4 left-4 bg-teal-400 hover:bg-teal-700 text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors duration-200 shadow-md"
       >
         <PlusIcon />
         <span>New Site</span>
       </button>
 
-      {/* Sites Display - Improved layout */}
+      {/* Sites Display */}
       <div className="flex pl-40 bg-[#2D3748]"> 
-        <div className="flex overflow-x-auto pb-2  flex-1">
+        <div className="flex overflow-x-auto pb-2 flex-1">
           {sites.length === 0 ? (
             <div className="text-gray-400 italic flex items-center">No sites connected</div>
           ) : (
             sites.map((site) => (
-              <div key={site.id} className="flex flex-col items-center min-w-[90px] group">
+              <div 
+                key={site.id} 
+                className="flex flex-col items-center min-w-[90px] group"
+                onClick={() => handleEditClick(site)}
+              >
                 <img 
                   src={getSiteIcon(site.site_name)} 
                   alt={`${site.site_name} Logo`}
@@ -80,24 +106,22 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded }) => {
           )}
         </div>
         
-        {/* Connected Sites - Right-aligned with distinct styling */}
+        {/* Connected Sites */}
         <div className="bg-[#3A4556] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm">
-          <h3 className="font-semibold p-2 mb-1 text-gray-100">Connected Sites</h3>
+          <h3 className="font-semibold mb-1 text-gray-100">Connected Sites</h3>
           <div className="text-sm text-blue-300 font-medium">
             {sites.length} site{sites.length !== 1 ? 's' : ''} connected
           </div>
         </div>
       </div>
 
-      {/* New Site Form */}
+      {/* Site Form (for both create and edit) */}
       <NewSiteForm 
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSave={(newSite) => {
-          onSiteAdded(newSite);
-          setIsFormOpen(false);
-        }}
-      />
+          isOpen={isFormOpen}
+          onClose={() => setIsFormOpen(false)}
+          onSave={handleSave}
+          initialData={currentSite} // Pass null or undefined for new sites
+        />
     </div>
   );
 };
