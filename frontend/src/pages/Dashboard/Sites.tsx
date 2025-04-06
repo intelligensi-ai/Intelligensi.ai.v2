@@ -6,7 +6,7 @@ import { ISite } from '../../types/sites';
 // Plus icon SVG component
 const PlusIcon = () => (
   <svg 
-    className="w-4 h-4 mr-2" 
+    className="w-4 h-4 mr-1" 
     fill="none" 
     stroke="currentColor" 
     viewBox="0 0 24 24" 
@@ -75,22 +75,22 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
           setCurrentSite(null);
           setIsFormOpen(true);
         }}
-        className="absolute top-4 left-4 bg-teal-400 hover:bg-teal-700 text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors duration-200 shadow-md"
+        className="absolute top-4 left-4 px-4 py-3  border-teal-200 border-2 font-extrabold bg-teal-500 hover:bg-teal-400 text-white rounded-md text-1xl flex items-center transition-colors duration-200 shadow-md"
       >
         <PlusIcon />
         <span>New Site</span>
       </button>
 
       {/* Sites Display */}
-      <div className="flex pl-40 bg-[#2D3748]"> 
-        <div className="flex overflow-x-auto pb-2 flex-1">
+      <div className="flex pl-32 bg-[#2D3748]"> 
+        <div className="flex overflow-x-auto  flex-1 bg-[#344054]  py-3 rounded-lg ml-4 border border-gray-600 shadow-sm">
           {sites.length === 0 ? (
             <div className="text-gray-400 italic flex items-center">No sites connected</div>
           ) : (
             sites.map((site) => (
               <div 
                 key={site.id} 
-                className="flex flex-col items-center min-w-[90px] group"
+                className="flex py-1 flex-col items-center min-w-[90px] group"
                 onClick={() => handleEditClick(site)}
               >
                 <img 
@@ -98,7 +98,7 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
                   alt={`${site.site_name} Logo`}
                   className="w-15 h-14 object-contain group-hover:scale-110 transition-transform duration-200"
                 />
-                <span className="text-xs mt-1 text-gray-300 group-hover:text-white transition-colors">
+                <span className="text-xs mt-1 text-gray-300 font-bold group-hover:text-white transition-colors">
                   {getSiteDisplayName(site.site_name)}
                 </span>
               </div>
@@ -107,7 +107,7 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
         </div>
         
         {/* Connected Sites */}
-        <div className="bg-[#3A4556] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm">
+        <div className="bg-[#3e4c62] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm">
           <h3 className="font-semibold mb-1 text-gray-100">Connected Sites</h3>
           <div className="text-sm text-blue-300 font-medium">
             {sites.length} site{sites.length !== 1 ? 's' : ''} connected
