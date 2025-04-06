@@ -1,4 +1,3 @@
-// src/components/Sites/NewSiteForm.tsx
 import React, { useState, useEffect } from 'react';
 import { ISite, ICMS } from '../../types/sites';
 
@@ -21,6 +20,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
     user_id: 1,
     cms: CMS_OPTIONS[0],
     site_name: '',
+    site_url: '', // Initialize with empty string
     description: '',
     mysql_file_url: undefined,
     status: 'active',
@@ -32,17 +32,16 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
     updated_at: new Date().toISOString()
   });
 
-  // Initialize form with initialData when it changes
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
     } else {
-      // Reset to default when creating new site
       setFormData({
         id: Date.now(),
         user_id: 1,
         cms: CMS_OPTIONS[0],
         site_name: '',
+        site_url: '', // Reset to empty string
         description: '',
         mysql_file_url: undefined,
         status: 'active',
@@ -97,6 +96,19 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
               type="text"
               value={formData.site_name}
               onChange={(e) => setFormData({ ...formData, site_name: e.target.value })}
+              className="w-full bg-[#1A202C] border border-gray-600 rounded-md p-2"
+              required
+            />
+          </div>
+
+          {/* Site URL */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Site URL *</label>
+            <input
+              type="url"
+              value={formData.site_url}
+              onChange={(e) => setFormData({ ...formData, site_url: e.target.value })}
+              placeholder="https://example.com"
               className="w-full bg-[#1A202C] border border-gray-600 rounded-md p-2"
               required
             />

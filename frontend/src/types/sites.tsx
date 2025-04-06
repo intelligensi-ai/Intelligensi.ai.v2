@@ -1,4 +1,3 @@
-// src/types/sites.ts
 export interface ICMS {
     id?: number;
     name: string;
@@ -12,10 +11,11 @@ export interface ICMS {
 export interface ISite {
     id?: number;
     user_id: number;
-    cms: ICMS; // Now using the exported ICMS
+    cms: ICMS;
     company_id?: number | null;
     site_name: string;
-    description?: string; // Added missing description field
+    site_url: string; // 
+    description?: string;
     mysql_file_url?: string | null;
     status?: string | null;
     migration_ids?: number[] | null;
