@@ -107,7 +107,7 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
         </div>
         
         {/* Connected Sites */}
-        <div className="bg-[#3e4c62] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm">
+        <div className="bg-[#2D3748] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm">
           <h3 className="font-semibold mb-1 text-gray-100">Connected Sites</h3>
           <div className="text-sm text-blue-300 font-medium">
             {sites.length} site{sites.length !== 1 ? 's' : ''} connected
