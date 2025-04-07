@@ -31,10 +31,15 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   });
+  const [useHttps, setUseHttps] = useState(true); // Default to HTTPS
 
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
+      // Set the protocol toggle based on existing URL
+      if (initialData.site_url) {
+        setUseHttps(initialData.site_url.startsWith('https://'));
+      }
     } else {
       setFormData({
         id: Date.now(),
@@ -67,11 +72,34 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Ensure the URL has the correct protocol
+    let finalUrl = formData.site_url;
+    if (finalUrl && !finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = `${useHttps ? 'https://' : 'http://'}${finalUrl}`;
+    }
+    
     onSave({
       ...formData,
+      site_url: finalUrl,
       updated_at: new Date().toISOString()
     });
     onClose();
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    
+    // Remove protocol if user types it (we'll handle it with our toggle)
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      value = value.split('://')[1] || '';
+    }
+    
+    setFormData({ ...formData, site_url: value });
+  };
+
+  const toggleProtocol = () => {
+    setUseHttps(!useHttps);
   };
 
   if (!isOpen) return null;
@@ -104,16 +132,26 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
           {/* Site URL */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-1">Site URL *</label>
-            <input
-              type="url"
-              value={formData.site_url}
-              onChange={(e) => setFormData({ ...formData, site_url: e.target.value })}
-              placeholder="https://example.com"
-              className="w-full bg-[#1A202C] border border-gray-600 rounded-md p-2"
-              required
-            />
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={toggleProtocol}
+                className="bg-[#1A202C] border border-gray-600 rounded-l-md px-3 py-2 text-sm"
+              >
+                {useHttps ? 'https://' : 'http://'}
+              </button>
+              <input
+                type="text"
+                value={formData.site_url}
+                onChange={handleUrlChange}
+                placeholder="example.com"
+                className="flex-1 bg-[#1A202C] border-t border-b border-r border-gray-600 rounded-r-md p-2"
+                required
+              />
+            </div>
           </div>
 
+          {/* Rest of the form remains the same */}
           {/* CMS Type */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-1">CMS Type *</label>
