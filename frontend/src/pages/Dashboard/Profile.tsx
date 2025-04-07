@@ -123,7 +123,7 @@ const Profile: React.FC<Props> = ({ user }) => {
                 <tr key={userData.id} className="border-b border-[#273238] hover:bg-[#273238] transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">{userData.display_name}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{userData.email}</td>
-                  {/* <td className="px-6 py-4 whitespace-nowrap">{userData.company_id}</td> */}
+                  {/* <td className="px-6 py-4 whitespace-nowrap">{userData.company_id}</td> to be done */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       userData.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'

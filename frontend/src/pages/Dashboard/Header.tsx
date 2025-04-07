@@ -133,7 +133,23 @@ const Header: React.FC = () => {
             <div className="flex-1">
               <div className="flex flex-col items-center mb-6">
                 <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center mb-4">
-                {/* <h2 className="text-xl font-bold">User Profile</h2> */}
+                <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center mb-4">
+                          {/* Avatar Icon - will be replaced by uploaded image */}
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-12 w-12 text-teal-500" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={1.5} 
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" 
+                            />
+                          </svg>
+                        </div>
                 </div>
                 <h3 className="text-lg font-semibold">
                   {userData.display_name}
@@ -142,7 +158,7 @@ const Header: React.FC = () => {
                 <span
                   className={`mt-2 px-3 py-1 rounded-full text-xs ${
                     userData.is_active
-                      ? "bg-green-500/20 text-green-400"
+                      ? "bg-green-500/20 text-teal-500"
                       : "bg-red-500/20 text-red-400"
                   }`}
                 >
