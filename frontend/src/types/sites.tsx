@@ -6,6 +6,7 @@ export interface ICMS {
     has_migrations?: boolean;
     created_at?: Date | string;
     updated_at?: Date | string;
+    user_id?: string; // Added user_id property
 }
 
 export interface ISite {

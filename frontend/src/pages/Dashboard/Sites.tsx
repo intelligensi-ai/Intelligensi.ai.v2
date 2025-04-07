@@ -20,30 +20,12 @@ const PlusIcon = () => (
   </svg>
 );
 
-// External link icon SVG component
-const ExternalLinkIcon = () => (
-  <svg
-    className="w-3 h-3 ml-1"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-    />
-  </svg>
-);
-
 // Helper functions remain the same
 const getSiteIcon = (siteName: string): string => {
   const icons: Record<string, string> = {
     'drupal': 'icons/drupal7.png',
-    'wordpress': '/wordpress-logo.png',
-    'joomla': '/joomla-logo.png',
+    'wordpress': '/icons/wordpress.png', 
+    'joomla': '/icons/joomla.png',
   };
   return icons[siteName.toLowerCase()] || 'icons/drupal7.png';
 };
@@ -61,9 +43,24 @@ interface SitesProps {
   sites: ISite[];
   onSiteAdded: (newSite: ISite) => void;
   onSiteUpdated: (updatedSite: ISite) => void;
+  onAddChatMessage: (message: {
+    text: string;
+    site?: {
+      id: number;
+      name: string;
+      url: string;
+      cms: string;
+      description?: string;
+    };
+  }) => void;
 }
 
-const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
+const Sites: React.FC<SitesProps> = ({ 
+  sites, 
+  onSiteAdded, 
+  onSiteUpdated,
+  onAddChatMessage 
+}) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<ISite | null>(null);
 
@@ -73,23 +70,27 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
   };
 
   const handleSave = (siteData: ISite) => {
-    if (currentSite) {
-      // Update existing site
+    const isUpdate = !!currentSite;
+    
+    if (isUpdate) {
       onSiteUpdated({ ...currentSite, ...siteData });
     } else {
-      // Add new site
       onSiteAdded(siteData);
     }
+
+    onAddChatMessage({
+      text: `Site "${siteData.site_name}" has been ${isUpdate ? 'updated' : 'created'}`,
+      site: {
+        id: siteData.id || Date.now(),
+        name: siteData.site_name,
+        url: siteData.site_url,
+        cms: siteData.cms.name,
+        description: siteData.description
+      }
+    });
+
     setIsFormOpen(false);
     setCurrentSite(null);
-  };
-
-  const handleSiteClick = (site: ISite) => {
-    if (site.site_url) {
-      window.open(site.site_url, '_blank');
-    } else {
-      handleEditClick(site);
-    }
   };
 
   return (
@@ -100,7 +101,7 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
           setCurrentSite(null);
           setIsFormOpen(true);
         }}
-        className="absolute top-4 left-4 px-4 py-3 border-teal-200 border-2 font-extrabold bg-teal-500 hover:bg-teal-400 text-white rounded-md text-1xl flex items-center transition-colors duration-200 shadow-md"
+        className="absolute top-4 left-4 px-4 py-5 border-teal-200 border-2 font-extrabold bg-teal-500 hover:bg-teal-400 text-white rounded-md text-1xl flex items-center transition-colors duration-200 shadow-md"
       >
         <PlusIcon />
         <span>New Site</span>
@@ -110,13 +111,13 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
       <div className="flex pl-32 bg-[#2D3748]"> 
         <div className="flex overflow-x-auto flex-1 bg-[#344054] py-3 rounded-lg ml-4 border border-gray-600 shadow-sm">
           {sites.length === 0 ? (
-            <div className="text-gray-400 italic flex items-center">No sites connected</div>
+            <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">No sites connected</div>
           ) : (
             sites.map((site) => (
               <div 
                 key={site.id} 
                 className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
-                onClick={() => handleSiteClick(site)}
+                onClick={() => handleEditClick(site)}
               >
                 <img 
                   src={getSiteIcon(site.cms.name)} 
@@ -126,12 +127,6 @@ const Sites: React.FC<SitesProps> = ({ sites, onSiteAdded, onSiteUpdated }) => {
                 <span className="text-xs mt-1 text-gray-300 font-bold group-hover:text-white transition-colors">
                   {getSiteDisplayName(site.cms.name)}
                 </span>
-                {site.site_url && (
-                  <div className="flex items-center mt-1 text-xs text-blue-300 group-hover:text-blue-200">
-                    <span className="truncate max-w-[80px]">{new URL(site.site_url).hostname}</span>
-                    <ExternalLinkIcon />
-                  </div>
-                )}
               </div>
             ))
           )}

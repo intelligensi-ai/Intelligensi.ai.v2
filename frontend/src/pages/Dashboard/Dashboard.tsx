@@ -1,4 +1,3 @@
-// src/components/Dashboard/Dashboard.tsx
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Chat } from '../../components/Chat/Chat';
@@ -8,17 +7,15 @@ import Header from './Header';
 import InitialDisplay from '../../components/Display/InitialDisplay';
 import { AnimatePresence } from 'framer-motion';
 import Sites from './Sites';
-import { ISite } from '../../types/sites';
-import { ICMS } from '../../types/cms'; 
+import { ISite, ICMS } from '../../types/sites';
 
 export const Dashboard: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Start with empty sites array
   const [sites, setSites] = useState<ISite[]>([]);
 
+  // Handle sending chat messages
   const handleSend = async (message: string) => {
     setIsLoading(true);
     setError(null);
@@ -40,15 +37,15 @@ export const Dashboard: React.FC = () => {
       );
 
       setMessages(prev => prev.map(msg => 
-        msg.id === userMessage.id ? {...msg, status: 'delivered'} : msg
+        msg.id === userMessage.id ? {...msg, status: 'sent'} : msg
       ));
 
       const aiMessage: ChatMessage = {
         id: Date.now().toString(),
         text: response.data.message,
-        sender: 'Intelligensi',
+        sender: 'assistant',
         timestamp: new Date(),
-        status: 'delivered'
+        status: 'sent'
       };
       setMessages(prev => [...prev, aiMessage]);
     } catch (err) {
@@ -65,8 +62,35 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Handle adding a new site
   const handleAddSite = (newSite: ISite) => {
     setSites(prev => [...prev, newSite]);
+  };
+
+  // Handle updating an existing site
+  const handleUpdateSite = (updatedSite: ISite) => {
+    setSites(prev => prev.map(site => 
+      site.id === updatedSite.id ? updatedSite : site
+    ));
+  };
+
+  // Helper function to add site-related chat messages
+  const addSiteChatMessage = (site: ISite, isUpdate: boolean) => {
+    const message: ChatMessage = {
+      id: Date.now().toString(),
+      text: `Site "${site.site_name}" has been ${isUpdate ? 'updated' : 'created'}`,
+      sender: 'assistant',
+      status: 'sent',
+      timestamp: new Date(),
+      site: {
+        id: site.id || Date.now(),
+        name: site.site_name,
+        url: site.site_url,
+        cms: site.cms.name,
+        description: site.description
+      }
+    };
+    setMessages(prev => [...prev, message]);
   };
 
   return (
@@ -76,7 +100,7 @@ export const Dashboard: React.FC = () => {
       <main className="flex-1 flex flex-col relative">
         {/* Chat Content Area */}
         <div className="flex-1 overflow-y-auto p-4 relative">
-          {/* Initial Display (centered overlay) */}
+          {/* Initial welcome message when no messages exist */}
           <AnimatePresence>
             {messages.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -105,7 +129,7 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Prompt Section (always visible) */}
+        {/* Prompt Input Section */}
         <div className="bg-[#2D3748] rounded-lg m-4 mt-0 p-4">
           <Prompt onSend={handleSend} disabled={isLoading} />
           {error && (
@@ -116,16 +140,32 @@ export const Dashboard: React.FC = () => {
         </div>
       </main>
 
-      {/* Updated Sites Section */}
+      {/* Sites Section */}
       <Sites 
-            sites={sites} 
-            onSiteAdded={handleAddSite} 
-            onSiteUpdated={(updatedSite: ISite) => {
-              setSites(prev => prev.map(site => 
-                site.id === updatedSite.id ? updatedSite : site
-              ));
-            }}
-        />
+        sites={sites} 
+        onSiteAdded={handleAddSite} 
+        onSiteUpdated={handleUpdateSite}
+        onAddChatMessage={(message) => {
+          const site = message.site;
+          if (site) {
+            addSiteChatMessage(
+              {
+                id: site.id,
+                user_id: 1, // Default or get from auth context
+                site_name: site.name,
+                site_url: site.url,
+                cms: { 
+                  id: 0, // Default or get from CMS data
+                  name: site.cms,
+                  user_id: '1' // Default or get from auth context
+                },
+                description: site.description
+              },
+              message.text.includes('updated') // Determine if update based on message
+            );
+          }
+        }}
+      />
     </div>
   );
 };
