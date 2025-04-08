@@ -16,11 +16,11 @@ const CMS_OPTIONS: ICMS[] = [
 
 const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, initialData }) => {
   const [formData, setFormData] = useState<ISite>({
-    id: Date.now(),
-    user_id: 1,
+    id: Math.floor(Math.random() * 1000) + 1,
+    user_id: Math.floor(Math.random() * 100),
     cms: CMS_OPTIONS[0],
     site_name: '',
-    site_url: '', // Initialize with empty string
+    site_url: '',
     description: '',
     mysql_file_url: undefined,
     status: 'active',
@@ -36,17 +36,16 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
-      // Set the protocol toggle based on existing URL
       if (initialData.site_url) {
         setUseHttps(initialData.site_url.startsWith('https://'));
       }
     } else {
       setFormData({
-        id: Date.now(),
-        user_id: 1,
+        id: Math.floor(Math.random() * 1000) + 1,
+        user_id: Math.floor(Math.random() * 100),
         cms: CMS_OPTIONS[0],
         site_name: '',
-        site_url: '', // Reset to empty string
+        site_url: '',
         description: '',
         mysql_file_url: undefined,
         status: 'active',

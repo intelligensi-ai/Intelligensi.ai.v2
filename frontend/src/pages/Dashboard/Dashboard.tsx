@@ -165,6 +165,9 @@ export const Dashboard: React.FC = () => {
             );
           }
         }}
+        onSiteSelected={(site) => {
+          console.log('Site selected:', site);
+        }}
       />
     </div>
   );

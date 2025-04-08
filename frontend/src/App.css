@@ -36,3 +36,8 @@
     transform: rotate(360deg);
   }
 }
+
+.selected-site-icon {
+  -webkit-filter: drop-shadow(1px 1px 0 black) drop-shadow(-1px -1px 0 white);
+  filter: drop-shadow(1px 1px 0 black) drop-shadow(-1px -1px 0 white);
+}

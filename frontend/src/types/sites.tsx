@@ -6,7 +6,7 @@ export interface ICMS {
     has_migrations?: boolean;
     created_at?: Date | string;
     updated_at?: Date | string;
-    user_id?: string; // Added user_id property
+    user_id?: string;
 }
 
 export interface ISite {
@@ -15,13 +15,14 @@ export interface ISite {
     cms: ICMS;
     company_id?: number | null;
     site_name: string;
-    site_url: string; // 
+    site_url: string;
     description?: string;
     mysql_file_url?: string | null;
     status?: string | null;
     migration_ids?: number[] | null;
     tags?: string | null;
     is_active?: boolean;
+    is_selected?: boolean; // New property to track selection state
     created_at?: Date | string;
     updated_at?: Date | string;
 }

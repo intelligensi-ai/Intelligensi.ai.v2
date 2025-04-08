@@ -53,16 +53,25 @@ interface SitesProps {
       description?: string;
     };
   }) => void;
+  onSiteSelected: (siteId: number) => void; // New prop for selection
 }
 
 const Sites: React.FC<SitesProps> = ({ 
   sites, 
   onSiteAdded, 
   onSiteUpdated,
-  onAddChatMessage 
+  onAddChatMessage,
+  onSiteSelected 
 }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<ISite | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
+
+  const handleSiteSelect = (siteId: number) => {
+    const newSelectedId = selectedSiteId === siteId ? null : siteId;
+    setSelectedSiteId(newSelectedId);
+    onSiteSelected(newSelectedId ?? -1); // Send -1 or null as an indicator of deselection
+  };
 
   const handleEditClick = (site: ISite) => {
     setCurrentSite(site);
@@ -117,15 +126,23 @@ const Sites: React.FC<SitesProps> = ({
               <div 
                 key={site.id} 
                 className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
-                onClick={() => handleEditClick(site)}
+                onClick={() => handleSiteSelect(site.id!)}
+                onDoubleClick={() => handleEditClick(site)}
               >
-                <img 
-                  src={getSiteIcon(site.cms.name)} 
-                  alt={`${site.cms.name} Logo`}
-                  className="w-15 h-14 object-contain group-hover:scale-110 transition-transform duration-200"
-                />
-                <span className="text-xs mt-1 text-gray-300 font-bold group-hover:text-white transition-colors">
+                <div className={`relative p-1 rounded-lg transition-all duration-200 
+                   'ring-2 ring-teal-400' : ''
+                }`}>
+                  <img 
+                    src={getSiteIcon(site.cms.name)} 
+                    alt={`${site.cms.name} Logo`}
+                    className="w-15 h-14 object-contain group-hover:scale-110 transition-transform duration-200"
+                  />
+                </div>
+                <span className={`text-xs mt-1 font-bold transition-colors ${
+                  selectedSiteId === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'
+                }`}>
                   {getSiteDisplayName(site.cms.name)}
+                  {getSiteDisplayName(String(site.cms.id))}
                 </span>
               </div>
             ))
