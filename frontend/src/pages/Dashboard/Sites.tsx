@@ -1,6 +1,7 @@
 import NewSiteForm from '../../components/Sites/NewSiteForm';
 import React, { useState } from 'react';
 import { ISite } from '../../types/sites';
+import ContentPreview from '../../components/Content/contentPreview'; 
 
 // Plus icon SVG component
 const PlusIcon = () => (
@@ -20,7 +21,7 @@ const PlusIcon = () => (
   </svg>
 );
 
-// Helper functions remain the same
+// Helper functions
 const getSiteIcon = (siteName: string): string => {
   const icons: Record<string, string> = {
     'drupal': 'icons/drupal7.png',
@@ -53,7 +54,7 @@ interface SitesProps {
       description?: string;
     };
   }) => void;
-  onSiteSelected: (siteId: number) => void; // New prop for selection
+  onSiteSelected: (siteId: number) => void;
 }
 
 const Sites: React.FC<SitesProps> = ({ 
@@ -66,11 +67,12 @@ const Sites: React.FC<SitesProps> = ({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<ISite | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
+  const [showContentPreview, setShowContentPreview] = useState(false);
 
   const handleSiteSelect = (siteId: number) => {
     const newSelectedId = selectedSiteId === siteId ? null : siteId;
     setSelectedSiteId(newSelectedId);
-    onSiteSelected(newSelectedId ?? -1); // Send -1 or null as an indicator of deselection
+    onSiteSelected(newSelectedId ?? -1);
   };
 
   const handleEditClick = (site: ISite) => {
@@ -129,8 +131,8 @@ const Sites: React.FC<SitesProps> = ({
                 onClick={() => handleSiteSelect(site.id!)}
                 onDoubleClick={() => handleEditClick(site)}
               >
-                <div className={`relative p-1 rounded-lg transition-all duration-200 
-                   'ring-2 ring-teal-400' : ''
+                <div className={`relative p-1 rounded-lg transition-all duration-200 ${
+                  selectedSiteId === site.id ? 'ring-2 ring-teal-400' : ''
                 }`}>
                   <img 
                     src={getSiteIcon(site.cms.name)} 
@@ -142,7 +144,6 @@ const Sites: React.FC<SitesProps> = ({
                   selectedSiteId === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'
                 }`}>
                   {getSiteDisplayName(site.cms.name)}
-                  {getSiteDisplayName(String(site.cms.id))}
                 </span>
               </div>
             ))
@@ -155,16 +156,32 @@ const Sites: React.FC<SitesProps> = ({
           <div className="text-sm text-teal-400 font-medium">
             {sites.length} site{sites.length !== 1 ? 's' : ''} connected
           </div>
+          {selectedSiteId && (
+            <button 
+              onClick={() => setShowContentPreview(true)}
+              className="mt-3 w-full bg-blue-600 hover:bg-blue-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+            >
+              Preview Content
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Site Form (for both create and edit) */}
+      {/* Site Form */}
       <NewSiteForm 
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSave={handleSave}
         initialData={currentSite}
       />
+
+      {/* Content Preview Modal */}
+      {showContentPreview && selectedSiteId && (
+        <ContentPreview 
+          site={sites.find(s => s.id === selectedSiteId)!}
+          onClose={() => setShowContentPreview(false)}
+        />
+      )}
     </div>
   );
 };

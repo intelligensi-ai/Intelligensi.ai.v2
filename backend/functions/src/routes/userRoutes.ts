@@ -182,3 +182,76 @@ export const fetchuser = onRequest(
     });
   },
 );
+
+// Update the bulkExport function to properly handle CORS
+export const bulkExport = onRequest(
+  { cors: true, secrets: [supabaseUrl, supabaseKey] }, // Enable CORS here
+  async (req: Request, res) => {
+    // Set CORS headers
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    // Handle OPTIONS method for CORS preflight
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      if (req.method !== "POST") {
+        res.status(405).json({ error: "Method Not Allowed" });
+        return;
+      }
+
+      const { siteUrl } = req.body;
+
+      if (!siteUrl) {
+        res.status(400).json({
+          success: false,
+          error: "siteUrl is required",
+        });
+        return;
+      }
+
+      // Validate and normalize the URL
+      let validatedUrl;
+      try {
+        validatedUrl = new URL(siteUrl);
+      } catch (e) {
+        res.status(400).json({
+          success: false,
+          error: "Invalid URL provided",
+        });
+        return;
+      }
+
+      // Construct the API endpoint
+      const apiUrl = `${validatedUrl.origin}/api/bulk-export`;
+
+      // Fetch content from the site's API with proper headers
+      const siteResponse = await fetch(apiUrl, {
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      if (!siteResponse.ok) {
+        throw new Error(`Failed to fetch content: ${siteResponse.status} ${siteResponse.statusText}`);
+      }
+
+      const content = await siteResponse.json();
+
+      res.status(200).json({
+        success: true,
+        data: content,
+      });
+    } catch (error) {
+      console.error("Bulk Export Error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);

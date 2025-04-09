@@ -16,7 +16,7 @@ const CMS_OPTIONS: ICMS[] = [
 
 const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, initialData }) => {
   const [formData, setFormData] = useState<ISite>({
-    id: Math.floor(Math.random() * 1000) + 1,
+    id: Date.now(), // Use timestamp for better uniqueness
     user_id: Math.floor(Math.random() * 100),
     cms: CMS_OPTIONS[0],
     site_name: '',
@@ -31,7 +31,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   });
-  const [useHttps, setUseHttps] = useState(true); // Default to HTTPS
+  const [useHttps, setUseHttps] = useState(true);
 
   useEffect(() => {
     if (initialData) {
@@ -40,9 +40,10 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         setUseHttps(initialData.site_url.startsWith('https://'));
       }
     } else {
+      // Generate a more unique ID using timestamp + random number
       setFormData({
-        id: Math.floor(Math.random() * 1000) + 1,
-        user_id: Math.floor(Math.random() * 100),
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        user_id: 6,
         cms: CMS_OPTIONS[0],
         site_name: '',
         site_url: '',
@@ -57,8 +58,8 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         updated_at: new Date().toISOString()
       });
     }
-  }, [initialData]);
-
+  }, [initialData, isOpen]); 
+  
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const file = e.target.files[0];
