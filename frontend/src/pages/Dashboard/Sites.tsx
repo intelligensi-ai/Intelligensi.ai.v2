@@ -1,7 +1,33 @@
 import NewSiteForm from '../../components/Sites/NewSiteForm';
 import React, { useState } from 'react';
 import { ISite } from '../../types/sites';
-import ContentPreview from '../../components/Content/contentPreview'; 
+
+// Define the props interfaces for the content components
+interface ContentPreviewProps {
+  site: ISite;
+  onClose: () => void;
+}
+
+interface ContentVectorizeProps {
+  site: ISite;
+  onClose: () => void;
+  content: any; // Specify proper type
+  onComplete: () => void;
+  onError: (error: Error) => void;
+}
+
+type VectorizeProps = ContentVectorizeProps;
+
+// Dynamically import the components with type assertions
+const ContentPreview = React.lazy(() =>
+  import('../../components/Content/contentPreview')
+    .then(module => ({ default: module.default as React.FC<ContentPreviewProps> }))
+);
+
+const ContentVectorize = React.lazy(() =>
+  import('../../components/Content/contentVectorize')
+    .then(module => ({ default: module.default as unknown as React.FC<ContentVectorizeProps> }))
+);
 
 // Plus icon SVG component
 const PlusIcon = () => (
@@ -68,6 +94,7 @@ const Sites: React.FC<SitesProps> = ({
   const [currentSite, setCurrentSite] = useState<ISite | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
   const [showContentPreview, setShowContentPreview] = useState(false);
+  const [showContentVectorize, setShowContentVectorize] = useState(false);
 
   const handleSiteSelect = (siteId: number) => {
     const newSelectedId = selectedSiteId === siteId ? null : siteId;
@@ -90,7 +117,7 @@ const Sites: React.FC<SitesProps> = ({
     }
 
     onAddChatMessage({
-      text: `Site "${siteData.site_name}" has been ${isUpdate ? 'updated' : 'created'}`,
+      text: `Site "${siteData.site_name}" has been ${isUpdate ? 'updated' : 'connected'}`,
       site: {
         id: siteData.id || Date.now(),
         name: siteData.site_name,
@@ -115,11 +142,11 @@ const Sites: React.FC<SitesProps> = ({
         className="absolute top-4 left-4 px-4 py-5 border-teal-200 border-2 font-extrabold bg-teal-500 hover:bg-teal-400 text-white rounded-md text-1xl flex items-center transition-colors duration-200 shadow-md"
       >
         <PlusIcon />
-        <span>New Site</span>
+        <span>Connect CMS</span>
       </button>
 
       {/* Sites Display */}
-      <div className="flex pl-32 bg-[#2D3748]"> 
+      <div className="flex pl-40 bg-[#2D3748]"> 
         <div className="flex overflow-x-auto flex-1 bg-[#344054] py-3 rounded-lg ml-4 border border-gray-600 shadow-sm">
           {sites.length === 0 ? (
             <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">No sites connected</div>
@@ -157,12 +184,26 @@ const Sites: React.FC<SitesProps> = ({
             {sites.length} site{sites.length !== 1 ? 's' : ''} connected
           </div>
           {selectedSiteId && (
-            <button 
-              onClick={() => setShowContentPreview(true)}
-              className="mt-3 w-full bg-blue-600 hover:bg-blue-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-            >
-              Preview Content
-            </button>
+            <div className="mt-3 space-y-2">
+              <button 
+                onClick={() => setShowContentPreview(true)}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+              >
+                Preview Content
+              </button>
+              <button 
+                onClick={() => console.log('Migrate site', selectedSiteId)}
+                className="w-full bg-purple-600 hover:bg-purple-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+              >
+                Migrate
+              </button>
+              <button 
+                onClick={() => setShowContentVectorize(true)}
+                className="w-full bg-green-600 hover:bg-green-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+              >
+                Vectorise
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -177,10 +218,25 @@ const Sites: React.FC<SitesProps> = ({
 
       {/* Content Preview Modal */}
       {showContentPreview && selectedSiteId && (
-        <ContentPreview 
-          site={sites.find(s => s.id === selectedSiteId)!}
-          onClose={() => setShowContentPreview(false)}
-        />
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ContentPreview 
+            site={sites.find(s => s.id === selectedSiteId)!}
+            onClose={() => setShowContentPreview(false)}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Content Vectorize Modal */}
+      {showContentVectorize && selectedSiteId && (
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ContentVectorize
+            site={sites.find(s => s.id === selectedSiteId)!}
+            onClose={() => setShowContentVectorize(false)}
+            content={null} // Replace 'null' with the appropriate value or import for ContentNode
+            onComplete={() => console.log('Vectorization complete')}
+            onError={(error) => console.error('Vectorization error:', error)}
+          />
+        </React.Suspense>
       )}
     </div>
   );

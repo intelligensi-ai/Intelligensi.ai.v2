@@ -41,7 +41,7 @@ export const useVoiceRecognition = ({ setQuery, handleSubmit }: UseVoiceRecognit
       // Auto-submit after 3 seconds
       const id = setTimeout(() => {
         handleSubmit();
-      }, 3000);
+      }, 6000);
       setTimeoutId(id);
     };
 

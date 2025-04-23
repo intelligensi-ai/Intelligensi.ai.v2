@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ISite } from '../../types/sites';
-
-interface ContentNode {
-  nid: string;
-  title: string;
-  created: string;
-  status: string;
-  type: string;
-  body: string;
-}
-
+import { fetchDrupalContent, ContentNode } from '../Lib/fetchDrupalContent';
 interface ContentPreviewProps {
   site: ISite;
   onClose: () => void;
@@ -21,68 +12,49 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
-  // Determine the appropriate API endpoint based on environment
-  const getApiEndpoint = () => {
-    if (process.env.NODE_ENV === 'development') {
-      return 'http://localhost:5001/intelligensi-ai-v2/us-central1/bulkExport';
+  const constructEndpointUrl = (baseUrl: string) => {
+    try {
+      // Ensure the URL has a protocol
+      let url = baseUrl;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = `https://${url}`;
+      }
+
+      // Remove trailing slash if present
+      url = url.replace(/\/$/, '');
+
+      // Append the API endpoint
+      return `${url}/api/bulk-export`;
+    } catch (error) {
+      console.error('Error constructing endpoint URL:', error);
+      return null;
     }
-    return 'https://us-central1-intelligensi-ai-v2.cloudfunctions.net/bulkExport';
   };
 
   useEffect(() => {
-    const fetchContent = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const apiEndpoint = getApiEndpoint();
-        const response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            siteUrl: site.site_url
-          }),
-          credentials: 'same-origin' // Ensure cookies are sent if needed
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.message || 
-            `Server returned ${response.status}: ${response.statusText}`
-          );
-        }
-
-        const result = await response.json();
-        
-        if (!result.success) {
-          throw new Error(result.error || 'Invalid response format from server');
-        }
-
-        setContent(result.data || []);
-      } catch (err) {
-        console.error('Content fetch error:', err);
-        setError(
-          err instanceof Error ? 
-          err.message : 
-          'An unexpected error occurred while fetching content'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Only fetch if we have a valid site URL
-    if (site?.site_url) {
-      fetchContent();
-    } else {
-      setError('No site URL provided');
+  const fetchContent = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchDrupalContent(site);
+      setContent(data);
+    } catch (err) {
+      console.error('Content fetch error:', err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'An unexpected error occurred while fetching content'
+      );
+    } finally {
       setLoading(false);
     }
-  }, [site.site_url]);
+  };
 
+  fetchContent();
+}, [site.site_url]);
+
+
+  // ... rest of the component remains the same ...
   const toggleExpand = (nid: string) => {
     setExpandedNodes(prev => {
       const newSet = new Set(prev);
@@ -98,12 +70,10 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
   const cleanBodyText = (text: string) => {
     if (!text) return '';
     
-    // First decode any HTML entities
     const textArea = document.createElement('textarea');
     textArea.innerHTML = text;
     let cleaned = textArea.value;
 
-    // Then remove HTML tags and normalize whitespace
     cleaned = cleaned
       .replace(/<[^>]*>?/gm, '')
       .replace(/\\(r|n|"|')/g, '')
@@ -176,7 +146,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
               No content found for this site.
             </div>
           ) : (
-            <div className="space-y-4 pr-2"> {/* Add padding for scrollbar */}
+            <div className="space-y-4 pr-2">
               {content.map((node) => (
                 <div 
                   key={node.nid} 

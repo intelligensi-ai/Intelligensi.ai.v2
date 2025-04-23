@@ -45,7 +45,7 @@ export const Prompt: React.FC<PromptProps> = ({ onSend, disabled = false }) => {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Please ask a question..."
+          placeholder="Please ask a question to intelligensi.ai"
           className="flex-1 p-4 mx-5 py-2 text-gray-600 rounded-full bg-gray-100 focus:outline-none"
           disabled={disabled || isListening}
         />

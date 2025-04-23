@@ -27,7 +27,8 @@
     "firebase": "^11.5.0",
     "firebase-admin": "^12.6.0",
     "firebase-functions": "^6.0.1",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "weaviate-client": "^3.5.1"
   },
   "devDependencies": {
     "@types/chai": "^5.2.1",
