@@ -11,10 +11,11 @@ interface ContentPreviewProps {
 interface ContentVectorizeProps {
   site: ISite;
   onClose: () => void;
-  content: any; // Specify proper type
-  onComplete: () => void;
-  onError: (error: Error) => void;
+  content?: any;
+  onComplete?: () => void;
+  onError?: (error: Error) => void;
 }
+
 
 type VectorizeProps = ContentVectorizeProps;
 
@@ -25,8 +26,9 @@ const ContentPreview = React.lazy(() =>
 );
 
 const ContentVectorize = React.lazy(() =>
-  import('../../components/Content/contentVectorize')
-    .then(module => ({ default: module.default as unknown as React.FC<ContentVectorizeProps> }))
+  import('../../components/Content/contentVectorize').then(module => ({
+    default: module.default as unknown as React.FC<ContentVectorizeProps>
+  }))
 );
 
 // Plus icon SVG component
@@ -95,6 +97,7 @@ const Sites: React.FC<SitesProps> = ({
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
   const [showContentPreview, setShowContentPreview] = useState(false);
   const [showContentVectorize, setShowContentVectorize] = useState(false);
+  const [vectorizeStatus, setVectorizeStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle');
 
   const handleSiteSelect = (siteId: number) => {
     const newSelectedId = selectedSiteId === siteId ? null : siteId;
@@ -130,6 +133,28 @@ const Sites: React.FC<SitesProps> = ({
     setIsFormOpen(false);
     setCurrentSite(null);
   };
+
+  const handleVectorizeComplete = () => {
+    setVectorizeStatus('complete');
+    onAddChatMessage({
+      text: `Content from site has been successfully vectorized`,
+      site: selectedSiteId ? {
+        id: selectedSiteId,
+        name: sites.find(s => s.id === selectedSiteId)?.site_name || '',
+        url: sites.find(s => s.id === selectedSiteId)?.site_url || '',
+        cms: sites.find(s => s.id === selectedSiteId)?.cms.name || ''
+      } : undefined
+    });
+    setTimeout(() => setShowContentVectorize(false), 1500);
+  };
+
+  const handleVectorizeError = (error: Error) => {
+    setVectorizeStatus('error');
+    console.error('Vectorization error:', error);
+    // Optionally show error to user
+  };
+
+  const selectedSite = selectedSiteId ? sites.find(s => s.id === selectedSiteId) : null;
 
   return (
     <div className="bg-[#2D3748] p-4 border-t border-gray-700 relative">
@@ -198,10 +223,13 @@ const Sites: React.FC<SitesProps> = ({
                 Migrate
               </button>
               <button 
-                onClick={() => setShowContentVectorize(true)}
+                onClick={() => {
+                  setVectorizeStatus('idle');
+                  setShowContentVectorize(true);
+                }}
                 className="w-full bg-green-600 hover:bg-green-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
               >
-                Vectorise
+                Vectorize
               </button>
             </div>
           )}
@@ -217,25 +245,51 @@ const Sites: React.FC<SitesProps> = ({
       />
 
       {/* Content Preview Modal */}
-      {showContentPreview && selectedSiteId && (
-        <React.Suspense fallback={<div>Loading...</div>}>
+      {showContentPreview && selectedSite && (
+        <React.Suspense fallback={<div>Loading preview...</div>}>
           <ContentPreview 
-            site={sites.find(s => s.id === selectedSiteId)!}
+            site={selectedSite}
             onClose={() => setShowContentPreview(false)}
           />
         </React.Suspense>
       )}
 
       {/* Content Vectorize Modal */}
-      {showContentVectorize && selectedSiteId && (
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <ContentVectorize
-            site={sites.find(s => s.id === selectedSiteId)!}
-            onClose={() => setShowContentVectorize(false)}
-            content={null} // Replace 'null' with the appropriate value or import for ContentNode
-            onComplete={() => console.log('Vectorization complete')}
-            onError={(error) => console.error('Vectorization error:', error)}
-          />
+      {showContentVectorize && selectedSite && (
+        <React.Suspense fallback={<div>Loading vectorizer...</div>}>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-[#2D3748] rounded-lg p-6 max-w-2xl w-full border border-gray-600 shadow-xl">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-white">Vectorize Content</h3>
+                <button 
+                  onClick={() => setShowContentVectorize(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <ContentVectorize
+                site={selectedSite}
+                onClose={() => setShowContentVectorize(false)}
+                onComplete={handleVectorizeComplete}
+                onError={handleVectorizeError}
+              />
+
+              {vectorizeStatus === 'complete' && (
+                <div className="mt-4 p-3 bg-green-100 text-green-800 rounded-md">
+                  Vectorization completed successfully!
+                </div>
+              )}
+              {vectorizeStatus === 'error' && (
+                <div className="mt-4 p-3 bg-red-100 text-red-800 rounded-md">
+                  Error occurred during vectorization
+                </div>
+              )}
+            </div>
+          </div>
         </React.Suspense>
       )}
     </div>
