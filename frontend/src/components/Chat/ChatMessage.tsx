@@ -23,15 +23,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   
   const statusColor = message.status === 'error' ? 'text-red-400' : 'text-gray-400';
 
+  // Get the appropriate outer card title based on message type
+  const getOuterCardTitle = () => {
+    if (message.type === 'vectorization' && message.vectorizationResults) {
+      return `${message.vectorizationResults.objectsCreated} objects have been vectorized`;
+    }
+    return message.text;
+  };
+
   return (
     <div className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
       <div className={`max-w-xs md:max-w-md px-4 py-2 rounded-lg ${messageColor}`}>
-        {/* Regular message text */}
-        {message.text && <div className="text-sm">{message.text}</div>}
+        {/* Outer Card Title */}
+        <div className="text-sm font-medium mb-2">{getOuterCardTitle()}</div>
         
         {/* Site card if present */}
         {message.site && (
-          <div className="mt-2 bg-white bg-opacity-10 p-3 rounded-md relative">
+          <div className={`mt-2 ${message.type === 'vectorization' ? 'bg-blue-700 border border-blue-500' : 'bg-white bg-opacity-10'} p-3 rounded-md relative`}>
             {/* Large top-right CMS Icon */}
             <div className="absolute top-2 right-2">
               <img 
@@ -42,7 +50,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             </div>
             
             {/* Site Name and Details */}
-            <div className="pr-12"> {/* Add padding to prevent text overlap */}
+            <div className="pr-12">
               <div className="font-semibold text-base">{message.site.name}</div>
               <div className="text-xs opacity-80 mb-1">
                 {message.site.cms} Site
@@ -50,8 +58,22 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               
               {/* Description with conditional rendering */}
               {message.site.description && (
-                <div className="text-xs mb-2 opacity-75 line-clamp-2">
+                <div className="text-xs mb-2 text-blue-100">
                   {message.site.description}
+                </div>
+              )}
+
+              {/* Vectorization Results */}
+              {message.type === 'vectorization' && message.vectorizationResults && (
+                <div className="mt-2 bg-blue-600 p-2 rounded border border-blue-400">
+                  <div className="flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-blue-100 text-sm font-medium">
+                      {message.vectorizationResults.objectsCreated} objects vectorized
+                    </span>
+                  </div>
                 </div>
               )}
               
@@ -60,7 +82,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 href={message.site.url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-teal-300 hover:text-teal-200 text-sm flex items-center"
+                className="text-blue-200 hover:text-blue-100 text-sm flex items-center mt-2"
               >
                 Visit Site
                 <svg

@@ -78,7 +78,7 @@ export const Dashboard: React.FC = () => {
   const addSiteChatMessage = (site: ISite, isUpdate: boolean) => {
     const message: ChatMessage = {
       id: Date.now().toString(),
-      text: `Site "${site.site_name}" has been ${isUpdate ? 'updated' : 'created'}`,
+      text: `Site "${site.site_name}" has been  ${isUpdate ? 'updated' : 'created'}`,
       sender: 'assistant',
       status: 'sent',
       timestamp: new Date(),

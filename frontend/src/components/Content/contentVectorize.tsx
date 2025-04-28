@@ -4,39 +4,36 @@ import { fetchDrupalContent, ContentNode } from '../Lib/fetchDrupalContent';
 import { ICMS, ISite } from '../../types/sites';
 
 interface VectorizeProps {
-  onComplete: (count: number) => void;
+  site: ISite;
+  onComplete: (result: { objectsCreated: number; siteName: string }) => void;
   onError: (message: string) => void;
+  onClose: () => void;
 }
 
-const Vectorize: React.FC<VectorizeProps> = ({ onComplete, onError }) => {
+const Vectorize: React.FC<VectorizeProps> = ({ site, onComplete, onError, onClose }) => {
   const [content, setContent] = useState<ContentNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [fetchingContent, setFetchingContent] = useState(false);
   const [contentCount, setContentCount] = useState(0);
-
-  // Hardcoded site data with proper typing
-  const hardcodedSite: ISite = {
-    site_url: 'https://drupal7.intelligensi.online',
-    site_name: 'Intelligensi',
-    user_id: 12345,
-    cms: {
-      name: 'Drupal',
-      is_active: true,
-      has_migrations: false
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch content from Drupal when component mounts
   useEffect(() => {
     const loadContent = async () => {
       try {
         setFetchingContent(true);
-        const nodes = await fetchDrupalContent(hardcodedSite);
+        setError(null);
+        const nodes = await fetchDrupalContent(site);
+        if (nodes.length === 0) {
+          setError('No content available to vectorize from this site.');
+          return;
+        }
         setContent(nodes);
         setContentCount(nodes.length);
       } catch (err) {
         console.error('Failed to fetch Drupal content:', err);
+        setError('Could not connect to the site. Please check your connection and try again.');
         onError('Could not fetch Drupal content');
       } finally {
         setFetchingContent(false);
@@ -44,7 +41,7 @@ const Vectorize: React.FC<VectorizeProps> = ({ onComplete, onError }) => {
     };
 
     loadContent();
-  }, []);
+  }, [site]);
 
   const cleanBodyText = (text: string) => {
     if (!text) return '';
@@ -79,25 +76,25 @@ const Vectorize: React.FC<VectorizeProps> = ({ onComplete, onError }) => {
   const handleVectorize = async () => {
     try {
       if (!content.length) {
-        onError('No content available to vectorize');
+        setError('No content available to vectorize');
         return;
       }
   
       setLoading(true);
       setProgress(0);
+      setError(null);
   
       // Process in batches to avoid overwhelming the server
-      const batchSize = 5; // Reduced batch size for smoother progress updates
+      const batchSize = 5;
       let successfulCount = 0;
   
       for (let i = 0; i < content.length; i += batchSize) {
         const batch = content.slice(i, i + batchSize);
         
-        // Process each item in the batch using traditional for loop
         for (let j = 0; j < batch.length; j++) {
           const node = batch[j];
           try {
-            const payload = preparePayload([node]); // Single item payload
+            const payload = preparePayload([node]);
             
             await axios.post(
               'http://localhost:5001/intelligensi-ai-v2/us-central1/writeWeaviate',
@@ -120,26 +117,71 @@ const Vectorize: React.FC<VectorizeProps> = ({ onComplete, onError }) => {
         }
       }
   
-      onComplete(successfulCount);
+      onComplete({ 
+        objectsCreated: successfulCount,
+        siteName: site.site_name
+      });
     } catch (error) {
       console.error('Vectorization error:', error);
       const errorMessage = error.response?.data?.message || 
                          error.message || 
                          'Failed to vectorize content';
+      setError(errorMessage);
       onError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  // If there's an error, show error dialog
+  if (error) {
+    return (
+      <div className="bg-[#2D3748] rounded-lg p-6 w-full ">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-white">Error</h2>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="bg-[#1F2937] border border-red-500/50 rounded-lg p-4 mb-6">
+          <div className="flex items-start text-gray-200">
+            <svg className="w-5 h-5 mr-3 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm">{error}</span>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors text-sm font-medium"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-[#2D3748] rounded-lg p-6 w-full max-w-4xl">
+    <div className="bg-[#2D3748] rounded-lg  max-w-4xl">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-white">
-          Vectorize Content from {hardcodedSite.site_name}
+          Vectorize Content from {site.site_name}
         </h2>
-        <div className="text-gray-400">
-          {contentCount > 0 && `${contentCount} items available`}
-        </div>
+        <button 
+          onClick={onClose}
+          className="text-gray-400 hover:text-white"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       <div className="mb-6">
@@ -149,7 +191,7 @@ const Vectorize: React.FC<VectorizeProps> = ({ onComplete, onError }) => {
         </div>
         <div className="w-full bg-gray-700 rounded-full h-2.5">
           <div
-            className="bg-teal-500 h-2.5 rounded-full"
+            className="bg-teal-500 h-2.5 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
@@ -177,6 +219,13 @@ const Vectorize: React.FC<VectorizeProps> = ({ onComplete, onError }) => {
       </div>
 
       <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
+        <button
+          onClick={onClose}
+          disabled={loading}
+          className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
+        >
+          Cancel
+        </button>
         <button
           onClick={handleVectorize}
           disabled={loading || fetchingContent || !content.length}

@@ -4,12 +4,17 @@ export interface ChatMessage {
   sender: 'user' | 'assistant';
   status?: 'error' | 'sending' | 'sent';
   timestamp?: Date;
+  type?: 'site' | 'vectorization';
   site?: {
     id: number;
     name: string;
     url: string;
     cms: string;
-    cmsIcon?: string;  // Add this line
+    cmsIcon?: string;
     description?: string;
+  };
+  vectorizationResults?: {
+    objectsCreated: number;
+    siteId: number;
   };
 }

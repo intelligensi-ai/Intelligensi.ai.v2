@@ -12,7 +12,7 @@ interface ContentVectorizeProps {
   site: ISite;
   onClose: () => void;
   content?: any;
-  onComplete?: () => void;
+  onComplete?: (result: { objectsCreated: number; siteName: string }) => void;
   onError?: (error: Error) => void;
 }
 
@@ -74,12 +74,17 @@ interface SitesProps {
   onSiteUpdated: (updatedSite: ISite) => void;
   onAddChatMessage: (message: {
     text: string;
+    type?: 'site' | 'vectorization';
     site?: {
       id: number;
       name: string;
       url: string;
       cms: string;
       description?: string;
+    };
+    vectorizationResults?: {
+      objectsCreated: number;
+      siteId: number;
     };
   }) => void;
   onSiteSelected: (siteId: number) => void;
@@ -120,7 +125,7 @@ const Sites: React.FC<SitesProps> = ({
     }
 
     onAddChatMessage({
-      text: `Site "${siteData.site_name}" has been ${isUpdate ? 'updated' : 'connected'}`,
+      text: `Site "${siteData.site_name}" has been ${isUpdate ? 'updated' : 'created'}`,
       site: {
         id: siteData.id || Date.now(),
         name: siteData.site_name,
@@ -134,17 +139,26 @@ const Sites: React.FC<SitesProps> = ({
     setCurrentSite(null);
   };
 
-  const handleVectorizeComplete = () => {
+  const handleVectorizeComplete = (result: { objectsCreated: number; siteName: string }) => {
     setVectorizeStatus('complete');
-    onAddChatMessage({
-      text: `Content from site has been successfully vectorized`,
-      site: selectedSiteId ? {
-        id: selectedSiteId,
-        name: sites.find(s => s.id === selectedSiteId)?.site_name || '',
-        url: sites.find(s => s.id === selectedSiteId)?.site_url || '',
-        cms: sites.find(s => s.id === selectedSiteId)?.cms.name || ''
-      } : undefined
-    });
+    if (selectedSiteId) {
+      const selectedSite = sites.find(s => s.id === selectedSiteId);
+      onAddChatMessage({
+        text: `${result.objectsCreated} objects have been vectorized`,
+        type: 'vectorization',
+        site: {
+          id: selectedSiteId,
+          name: selectedSite?.site_name || '',
+          url: selectedSite?.site_url || '',
+          cms: selectedSite?.cms.name || '',
+          description: `${result.objectsCreated} objects were successfully vectorized and are now ready for use with AI.`
+        },
+        vectorizationResults: {
+          objectsCreated: result.objectsCreated,
+          siteId: selectedSiteId
+        }
+      });
+    }
     setTimeout(() => setShowContentVectorize(false), 1500);
   };
 
@@ -180,8 +194,12 @@ const Sites: React.FC<SitesProps> = ({
               <div 
                 key={site.id} 
                 className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
-                onClick={() => handleSiteSelect(site.id!)}
-                onDoubleClick={() => handleEditClick(site)}
+                onClick={() => {
+                  handleSiteSelect(site.id!);
+                  if (selectedSiteId === site.id) {
+                    handleEditClick(site);
+                  }
+                }}
               >
                 <div className={`relative p-1 rounded-lg transition-all duration-200 ${
                   selectedSiteId === site.id ? 'ring-2 ring-teal-400' : ''
@@ -256,41 +274,16 @@ const Sites: React.FC<SitesProps> = ({
 
       {/* Content Vectorize Modal */}
       {showContentVectorize && selectedSite && (
-        <React.Suspense fallback={<div>Loading vectorizer...</div>}>
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-[#2D3748] rounded-lg p-6 max-w-2xl w-full border border-gray-600 shadow-xl">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-white">Vectorize Content</h3>
-                <button 
-                  onClick={() => setShowContentVectorize(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <ContentVectorize
-                site={selectedSite}
-                onClose={() => setShowContentVectorize(false)}
-                onComplete={handleVectorizeComplete}
-                onError={handleVectorizeError}
-              />
-
-              {vectorizeStatus === 'complete' && (
-                <div className="mt-4 p-3 bg-green-100 text-green-800 rounded-md">
-                  Vectorization completed successfully!
-                </div>
-              )}
-              {vectorizeStatus === 'error' && (
-                <div className="mt-4 p-3 bg-red-100 text-red-800 rounded-md">
-                  Error occurred during vectorization
-                </div>
-              )}
-            </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-[#2D3748] rounded-lg p-6 w-full max-w-4xl">
+            <ContentVectorize
+              site={selectedSite}
+              onClose={() => setShowContentVectorize(false)}
+              onComplete={handleVectorizeComplete}
+              onError={handleVectorizeError}
+            />
           </div>
-        </React.Suspense>
+        </div>
       )}
     </div>
   );
