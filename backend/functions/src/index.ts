@@ -5,7 +5,7 @@ import { updateHomepage } from "./routes/openaiRoutes";
 import { fetchusers, updateuser, fetchuser } from "./routes/userRoutes";
 import drupal7Router from "./migrations/drupal7Migrations";
 import { checkWeaviate, writeSchema, writeWeaviate } from "./routes/weaviateRoutes";
-
+import { createSchema } from "./routes/schemaRoutes";
 
 // Global settings
 setGlobalOptions({
@@ -33,4 +33,5 @@ export {
   checkWeaviate,
   writeSchema,
   writeWeaviate,
+  createSchema,
 };

@@ -12,8 +12,8 @@ const httpsAgent = new https.Agent({
 });
 
 /**
- * Simple hello world endpoint ERROR 
- * 
+ * Simple hello world endpoint ERROR
+ *
  *
  * @param req - Express request object
  * @param res - Express response object
