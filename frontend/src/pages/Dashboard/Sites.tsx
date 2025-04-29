@@ -1,6 +1,7 @@
 import NewSiteForm from '../../components/Sites/NewSiteForm';
 import React, { useState } from 'react';
 import { ISite } from '../../types/sites';
+import axios from 'axios';
 
 // Define the props interfaces for the content components
 interface ContentPreviewProps {
@@ -103,11 +104,11 @@ const Sites: React.FC<SitesProps> = ({
   const [showContentPreview, setShowContentPreview] = useState(false);
   const [showContentVectorize, setShowContentVectorize] = useState(false);
   const [vectorizeStatus, setVectorizeStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle');
+  const [schemaError, setSchemaError] = useState<string | null>(null);
 
   const handleSiteSelect = (siteId: number) => {
-    const newSelectedId = selectedSiteId === siteId ? null : siteId;
-    setSelectedSiteId(newSelectedId);
-    onSiteSelected(newSelectedId ?? -1);
+    setSelectedSiteId(siteId);
+    onSiteSelected(siteId);
   };
 
   const handleEditClick = (site: ISite) => {
@@ -124,19 +125,144 @@ const Sites: React.FC<SitesProps> = ({
       onSiteAdded(siteData);
     }
 
-    onAddChatMessage({
-      text: `Site "${siteData.site_name}" has been ${isUpdate ? 'updated' : 'created'}`,
-      site: {
-        id: siteData.id || Date.now(),
-        name: siteData.site_name,
-        url: siteData.site_url,
-        cms: siteData.cms.name,
-        description: siteData.description
-      }
-    });
+    // Only send chat message if we have a valid site ID
+    if (siteData.id && typeof siteData.id === 'number') {
+      onAddChatMessage({
+        text: `Site "${siteData.site_name}" has been ${isUpdate ? 'updated' : 'created'}`,
+        site: {
+          id: siteData.id,  // Use the actual ID from Supabase
+          name: siteData.site_name,
+          url: siteData.site_url,
+          cms: siteData.cms.name,
+          description: siteData.description
+        }
+      });
+    }
 
     setIsFormOpen(false);
     setCurrentSite(null);
+  };
+
+  const createSchema = async (site: ISite) => {
+    try {
+      console.log('Creating schema for site:', {
+        id: site.id,
+        name: site.site_name,
+        cms: site.cms,
+        full_site: site
+      });
+      
+      // Validate site ID
+      if (!site.id || typeof site.id !== 'number') {
+        throw new Error(`Invalid site ID: ${site.id}. Site might not be properly saved in the database.`);
+      }
+
+      // Example payload based on WordPress/Drupal common content structure
+      const examplePayload = {
+        title: "Sample Content",
+        content: "Main content body text",
+        excerpt: "Short description",
+        author: {
+          id: 1,
+          name: "Author Name",
+          email: "author@example.com"
+        },
+        status: "published",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        meta: {
+          seo_title: "SEO Title",
+          seo_description: "SEO Description",
+          keywords: ["keyword1", "keyword2"]
+        },
+        categories: ["category1", "category2"],
+        tags: ["tag1", "tag2"]
+      };
+
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+      const endpoint = `${apiUrl}/intelligensi-ai-v2/us-central1/createSchema`;
+      
+      console.log('Making request to:', endpoint);
+      const requestPayload = {
+        site_id: site.id,
+        schema_name: "content",
+        example_payload: examplePayload
+      };
+      console.log('Request payload:', requestPayload);
+
+      const response = await axios.post(
+        endpoint,
+        requestPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Schema creation response:', response.data);
+
+      if (response.data.success) {
+        console.log('Schema created/updated successfully:', response.data);
+        return true;
+      } else {
+        const errorMsg = response.data.error || 'Failed to create schema';
+        console.error('Schema creation failed:', errorMsg);
+        setSchemaError(errorMsg);
+        return false;
+      }
+    } catch (error) {
+      console.error('Schema creation error:', error);
+      if (axios.isAxiosError(error)) {
+        const errorMsg = error.response?.data?.error || error.message;
+        console.error('Axios error details:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message
+        });
+        setSchemaError(`Schema creation failed: ${errorMsg}`);
+      } else {
+        const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
+        console.error('Non-Axios error:', errorMsg);
+        setSchemaError(errorMsg);
+      }
+      return false;
+    }
+  };
+
+  const handleVectorizeClick = async (site: ISite) => {
+    if (!site || !site.id || typeof site.id !== 'number' || site.id > 1000000) {
+      setSchemaError('Invalid site ID. Please ensure the site is properly saved in the database.');
+      console.error('Invalid site data:', site);
+      return;
+    }
+
+    console.log('Starting vectorization for site:', {
+      id: site.id,
+      name: site.site_name,
+      cms: site.cms.name
+    });
+    setVectorizeStatus('processing');
+    setSchemaError(null);
+
+    try {
+      // First create/update the schema
+      const schemaCreated = await createSchema(site);
+      console.log('Schema creation result:', schemaCreated);
+      
+      if (!schemaCreated) {
+        console.error('Schema creation failed');
+        setVectorizeStatus('error');
+        return;
+      }
+
+      // If schema is created successfully, proceed with vectorization
+      setShowContentVectorize(true);
+    } catch (error) {
+      console.error('Vectorization error:', error);
+      setVectorizeStatus('error');
+      setSchemaError(error instanceof Error ? error.message : 'An error occurred during vectorization');
+    }
   };
 
   const handleVectorizeComplete = (result: { objectsCreated: number; siteName: string }) => {
@@ -168,7 +294,8 @@ const Sites: React.FC<SitesProps> = ({
     // Optionally show error to user
   };
 
-  const selectedSite = selectedSiteId ? sites.find(s => s.id === selectedSiteId) : null;
+  // Get the selected site
+  const selectedSite = sites.find(s => s.id === selectedSiteId);
 
   return (
     <div className="bg-[#2D3748] p-4 border-t border-gray-700 relative">
@@ -188,22 +315,22 @@ const Sites: React.FC<SitesProps> = ({
       <div className="flex pl-40 bg-[#2D3748]"> 
         <div className="flex overflow-x-auto flex-1 bg-[#344054] py-3 rounded-lg ml-4 border border-gray-600 shadow-sm">
           {sites.length === 0 ? (
-            <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">No sites connected</div>
+            <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">
+              No sites connected
+            </div>
           ) : (
             sites.map((site) => (
               <div 
                 key={site.id} 
                 className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
-                onClick={() => {
-                  handleSiteSelect(site.id!);
-                  if (selectedSiteId === site.id) {
-                    handleEditClick(site);
-                  }
-                }}
+                onClick={() => handleSiteSelect(site.id!)}
               >
-                <div className={`relative p-1 rounded-lg transition-all duration-200 ${
-                  selectedSiteId === site.id ? 'ring-2 ring-teal-400' : ''
-                }`}>
+                <div 
+                  className={`relative p-1 rounded-lg transition-all duration-200 ${
+                    selectedSiteId === site.id ? 'ring-2 ring-teal-400' : ''
+                  }`}
+                  onDoubleClick={() => handleEditClick(site)}
+                >
                   <img 
                     src={getSiteIcon(site.cms.name)} 
                     alt={`${site.cms.name} Logo`}
@@ -221,12 +348,12 @@ const Sites: React.FC<SitesProps> = ({
         </div>
         
         {/* Connected Sites */}
-        <div className="bg-[#2D3748] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm">
+        <div className="bg-[#2D3748] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm min-w-[200px]">
           <h3 className="font-semibold mb-1 text-gray-100">Connected Sites</h3>
           <div className="text-sm text-teal-400 font-medium">
             {sites.length} site{sites.length !== 1 ? 's' : ''} connected
           </div>
-          {selectedSiteId && (
+          {selectedSite && (
             <div className="mt-3 space-y-2">
               <button 
                 onClick={() => setShowContentPreview(true)}
@@ -235,20 +362,37 @@ const Sites: React.FC<SitesProps> = ({
                 Preview Content
               </button>
               <button 
-                onClick={() => console.log('Migrate site', selectedSiteId)}
+                onClick={() => console.log('Migrate site', selectedSite.id)}
                 className="w-full bg-purple-600 hover:bg-purple-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
               >
                 Migrate
               </button>
               <button 
-                onClick={() => {
-                  setVectorizeStatus('idle');
-                  setShowContentVectorize(true);
-                }}
-                className="w-full bg-green-600 hover:bg-green-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+                onClick={() => handleVectorizeClick(selectedSite)}
+                className={`w-full ${
+                  vectorizeStatus === 'processing' 
+                    ? 'bg-yellow-600' 
+                    : vectorizeStatus === 'error' 
+                    ? 'bg-red-600 hover:bg-red-500' 
+                    : 'bg-green-600 hover:bg-green-500'
+                } text-white py-1 px-3 rounded text-sm font-medium transition-colors`}
+                disabled={vectorizeStatus === 'processing'}
               >
-                Vectorize
+                {vectorizeStatus === 'processing' 
+                  ? 'Processing...' 
+                  : vectorizeStatus === 'error' 
+                  ? 'Retry Vectorize' 
+                  : 'Vectorize'}
               </button>
+
+              {/* Site details */}
+              <div className="mt-4 text-sm text-gray-300">
+                <p><span className="text-gray-400">Name:</span> {selectedSite.site_name}</p>
+                <p><span className="text-gray-400">CMS:</span> {selectedSite.cms.name}</p>
+                {selectedSite.description && (
+                  <p><span className="text-gray-400">Description:</span> {selectedSite.description}</p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -283,6 +427,13 @@ const Sites: React.FC<SitesProps> = ({
               onError={handleVectorizeError}
             />
           </div>
+        </div>
+      )}
+
+      {/* Add error message display */}
+      {schemaError && (
+        <div className="mt-2 text-red-500 text-sm">
+          {schemaError}
         </div>
       )}
     </div>
