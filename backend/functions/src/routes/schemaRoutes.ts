@@ -50,62 +50,62 @@ function inferZodSchemaFromObject(obj: Record<string, unknown>): z.ZodObject<Rec
 
 // Create a new schema
 export const createSchema = onRequest(
-    { cors: false, secrets: [supabaseUrl, supabaseKey] },
-    (req: Request, res) => {
-      corsHandler(req, res, async (err?: Error) => {
-        if (err) {
-          res.status(500).json({ error: "Failed to process CORS" });
+  { cors: false, secrets: [supabaseUrl, supabaseKey] },
+  (req: Request, res) => {
+    corsHandler(req, res, async (err?: Error) => {
+      if (err) {
+        res.status(500).json({ error: "Failed to process CORS" });
+        return;
+      }
+
+      try {
+        if (req.method !== "POST") {
+          res.status(405).json({ error: "Method Not Allowed" });
           return;
         }
-  
-        try {
-          if (req.method !== "POST") {
-            res.status(405).json({ error: "Method Not Allowed" });
-            return;
-          }
-  
-          const supabase = getSupabaseClient();
-          // Accept both snake_case and camelCase in request
-          const {
-            site_id: siteId,
-            siteId: siteIdAlt,
-            schema_name: schemaName,
-            schemaName: schemaNameAlt,
-            example_payload: examplePayload,
-            examplePayload: examplePayloadAlt
-          } = req.body;
-  
-          const finalSiteId = siteId || siteIdAlt;
-          const finalSchemaName = schemaName || schemaNameAlt;
-          const finalExamplePayload = examplePayload || examplePayloadAlt;
-  
-          if (!finalSiteId || !finalExamplePayload || !finalSchemaName) {
-            throw new HttpsError("invalid-argument", "Missing required fields");
-          }
-  
-          const zodSchema = inferZodSchemaFromObject(finalExamplePayload);
-          const schemaJSON = JSON.stringify(zodSchema._def);
-  
-          const { error } = await supabase.from("schemas").insert({
-            site_id: finalSiteId,
-            name: finalSchemaName,
-            zod_schema: schemaJSON,
-          });
-  
-          if (error) throw new HttpsError("internal", error.message);
-  
-          res.status(200).json({
-            success: true,
-            message: "Schema created",
-            schema: JSON.parse(schemaJSON),
-          });
-        } catch (error) {
-          console.error("Error:", error);
-          res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+
+        const supabase = getSupabaseClient();
+        // Accept both snake_case and camelCase in request
+        const {
+          site_id: siteId,
+          siteId: siteIdAlt,
+          schema_name: schemaName,
+          schemaName: schemaNameAlt,
+          example_payload: examplePayload,
+          examplePayload: examplePayloadAlt,
+        } = req.body;
+
+        const finalSiteId = siteId || siteIdAlt;
+        const finalSchemaName = schemaName || schemaNameAlt;
+        const finalExamplePayload = examplePayload || examplePayloadAlt;
+
+        if (!finalSiteId || !finalExamplePayload || !finalSchemaName) {
+          throw new HttpsError("invalid-argument", "Missing required fields");
         }
-      });
-    },
-  );
+
+        const zodSchema = inferZodSchemaFromObject(finalExamplePayload);
+        const schemaJSON = JSON.stringify(zodSchema._def);
+
+        const { error } = await supabase.from("schemas").insert({
+          site_id: finalSiteId,
+          name: finalSchemaName,
+          zod_schema: schemaJSON,
+        });
+
+        if (error) throw new HttpsError("internal", error.message);
+
+        res.status(200).json({
+          success: true,
+          message: "Schema created",
+          schema: JSON.parse(schemaJSON),
+        });
+      } catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    });
+  },
+);
