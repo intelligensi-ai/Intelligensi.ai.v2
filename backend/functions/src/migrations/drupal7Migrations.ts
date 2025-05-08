@@ -80,44 +80,43 @@ router.get("/info", async function(req: express.Request, res: express.Response) 
  */
 router.get("/structure", async function(req: express.Request, res: express.Response) {
   const drupalUrl = "https://drupal7.intelligensi.online/api/bulk-export"; // Hardcoded target URL
-  // curl options:
-  // -s : silent mode (don't show progress meter or error messages from curl itself)
-  // -S : when using -s, show error message if curl fails (though stderr handles this better)
-  // -L : follow redirects
-  // -k : allow insecure server connections when using SSL (useful if local SSL issues, but be cautious)
-  const command = `curl -sSLk "${drupalUrl}"`; // Added -k for robustness, similar to rejectUnauthorized
+  const command = `curl -sSLk "${drupalUrl}"`;
 
   console.log(`[structure_curl] Executing command: ${command}`);
 
-  exec(command, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`[structure_curl] Error executing curl: ${error.message}`);
-      console.error(`[structure_curl] Curl stderr: ${stderr}`);
-      return res.status(500).json({
-        error: "Failed to execute command to fetch Drupal structure.",
-        details: error.message,
-        stderrOutput: stderr
+  try {
+    const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`[structure_curl] Error executing curl: ${error.message}`);
+          console.error(`[structure_curl] Curl stderr: ${stderr}`);
+          reject(new Error(`Exec error: ${error.message}${stderr ? `\nStderr: ${stderr}` : ""}`));
+        } else {
+          // Even if exec error is null, stderr might contain warnings, log them
+          if (stderr) {
+            console.warn(`[structure_curl] Curl stderr (non-fatal or warning): ${stderr}`);
+          }
+          resolve({ stdout, stderr });
+        }
       });
-    }
+    });
 
-    // Even if exec error is null, stderr might contain warnings
-    if (stderr) {
-      console.warn(`[structure_curl] Curl stderr (non-fatal or warning): ${stderr}`);
-    }
+    // stdout (and potentially non-fatal stderr) are available here if exec was successful
+    const structureData = JSON.parse(stdout);
+    console.log("[structure_curl] Successfully fetched and parsed data via curl.");
+    res.json({ structure: structureData });
+  } catch (e) {
+    const execError = e as Error; // Type assertion
+    console.error(`[structure_curl] Caught exec error: ${execError.message}`);
 
-    try {
-      const structureData = JSON.parse(stdout);
-      console.log("[structure_curl] Successfully fetched and parsed data via curl.");
-      res.json({ structure: structureData }); // Match the original expected output structure
-    } catch (parseError: any) {
-      console.error(`[structure_curl] Error parsing JSON response from curl: ${parseError.message}`);
-      console.error(`[structure_curl] Curl stdout was (first 500 chars): ${stdout.substring(0, 500)}...`);
-      res.status(500).json({
-        error: "Failed to parse JSON response from Drupal site via curl.",
-        details: parseError.message,
-      });
-    }
-  });
+    // Note: stderr is now part of execError.message if it came from the promise rejection
+    // If you need to send it separately, it would require a more complex error object.
+    res.status(500).json({
+      error: "Failed to execute command to fetch Drupal structure.",
+      details: execError.message,
+      // stderrOutput: "See details for stderr if present" // Or parse from execError.message if needed
+    });
+  }
 });
 
 export default router;

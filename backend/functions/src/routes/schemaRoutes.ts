@@ -92,70 +92,77 @@ export const createSchema = onRequest(
           isNaN(finalSiteId) ||
           isNaN(finalCmsId) ||
           !finalPayload ||
-          !finalCreatedBy || typeof finalCreatedBy !== 'string'
+          !finalCreatedBy || typeof finalCreatedBy !== "string"
         ) {
-          console.error("Validation Error: Missing or invalid required fields.", { 
-            finalSiteId, 
-            finalCmsId, 
-            finalPayloadExists: !!finalPayload, 
-            finalCreatedBy 
+          console.error("Validation Error: Missing or invalid required fields.", {
+            finalSiteId,
+            finalCmsId,
+            finalPayloadExists: !!finalPayload,
+            finalCreatedBy,
           });
-          throw new HttpsError("invalid-argument", "Missing or invalid required fields (siteId, cmsId, payload, or createdBy)");
+          throw new HttpsError("invalid-argument", "Request missing fields: siteId, cmsId, payload, createdBy");
         }
 
         // Log the payload that will be used for schema inference (this is the raw payload from request)
         console.log("[createSchema] Raw payload from request (finalPayload):", JSON.stringify(finalPayload, null, 2));
 
-        let objectForSchemaInference: Record<string, unknown> | null = null;
+        let objectForSchemaInference: Record<string, unknown>;
 
-        // Check if finalPayload has a 'structure' array and use its first element
-        if (finalPayload && 
-            typeof finalPayload === 'object' && 
-            finalPayload !== null &&
-            Object.prototype.hasOwnProperty.call(finalPayload, 'structure') &&
-            Array.isArray((finalPayload as any).structure) &&
-            (finalPayload as any).structure.length > 0 &&
-            typeof (finalPayload as any).structure[0] === 'object' &&
-            (finalPayload as any).structure[0] !== null) {
-          console.log("[createSchema] Extracting first element from finalPayload.structure for schema inference.");
-          objectForSchemaInference = (finalPayload as any).structure[0] as Record<string, unknown>;
-        } else if (finalPayload && typeof finalPayload === 'object' && finalPayload !== null) {
-          // Fallback: if finalPayload is an object but not in the {structure: []} format, use it directly.
-          // This might be the case if the frontend already sent a single article.
-          console.log("[createSchema] finalPayload is not in {structure: []} format or structure array is invalid/empty. Using finalPayload directly.");
-          objectForSchemaInference = finalPayload as Record<string, unknown>;
+        if (typeof finalPayload === "object" && finalPayload !== null) {
+          // Attempt to access finalPayload.structure safely
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const structure = (finalPayload as Record<string, any>)["structure"];
+
+          if (Array.isArray(structure) &&
+              structure.length > 0 &&
+              typeof structure[0] === "object" &&
+              structure[0] !== null) {
+            console.log("[createSchema] Extracting first element from finalPayload.structure for schema inference.");
+            objectForSchemaInference = structure[0] as Record<string, unknown>;
+          } else {
+            // If no valid 'structure' array, or if it's empty, or if finalPayload has no 'structure' property,
+            // assume finalPayload itself is the object for inference.
+            console.log("[createSchema] Using finalPayload directly (no valid .structure[0] found).");
+            objectForSchemaInference = finalPayload as Record<string, unknown>;
+          }
         } else {
           console.error("[createSchema] finalPayload is not a valid object or is null.");
-          throw new HttpsError("invalid-argument", "Received invalid payload for schema creation.");
+          throw new HttpsError("invalid-argument", "Received invalid payload: not an object or null.");
         }
 
         if (!objectForSchemaInference || Object.keys(objectForSchemaInference).length === 0) {
-          console.error("[createSchema] Object for schema inference is null or empty after processing finalPayload.", objectForSchemaInference);
-          throw new HttpsError("invalid-argument", "Could not derive a valid object for schema inference from the payload.");
+          console.error(
+            "[createSchema] Inference object is null/empty after payload processing.",
+            objectForSchemaInference
+          );
+          throw new HttpsError("invalid-argument", "Could not derive valid object for schema inference.");
         }
-        
-        console.log("[createSchema] Actual object for schema inference:", JSON.stringify(objectForSchemaInference, null, 2));
+
+        console.log("[createSchema] Schema inference object:", JSON.stringify(objectForSchemaInference, null, 2));
 
         // Infer Zod schema from the determined objectForSchemaInference
         const zodSchema = inferZodSchemaFromObject(objectForSchemaInference);
 
         // Prepare the schema definition for storing, handling if _def.shape is a function
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let schemaDefToStore: any = zodSchema._def;
-        if (zodSchema._def && typeof zodSchema._def.shape === 'function') {
-          console.log("[createSchema] zodSchema._def.shape is a function. Calling it to resolve the shape.");
+        if (zodSchema._def && typeof zodSchema._def.shape === "function") {
+          console.log("[createSchema] zodSchema._def.shape is a function. Calling it.");
           schemaDefToStore = {
             typeName: zodSchema._def.typeName,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             unknownKeys: (zodSchema._def as any).unknownKeys,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             catchall: (zodSchema._def as any).catchall,
             shape: zodSchema._def.shape(), // Call the function to get the plain shape object
           };
         } else {
-          console.log("[createSchema] zodSchema._def.shape is not a function or _def is not as expected. Using _def directly.");
+          console.log("[createSchema] zodSchema._def.shape is not a function. Using _def directly.");
         }
 
         const schemaJSON = JSON.stringify(schemaDefToStore);
         // Log the generated schemaJSON
-        console.log("[createSchema] Generated schema JSON (after potential shape() call):", schemaJSON);
+        console.log("[createSchema] Generated schemaJSON:", schemaJSON);
 
         // Insert into your "schemas" table
         const { data, error } = await supabase
@@ -168,7 +175,12 @@ export const createSchema = onRequest(
             version: finalVersion,
             created_by: finalCreatedBy,
           })
-          .select('id, site_id, cms_id, schema_json, description, version, created_by, created_at, updated_at'); // optional: get back the inserted row
+          // Broke select statement into multiple lines to address max-len
+          .select([
+            "id", "site_id", "cms_id", "schema_json",
+            "description", "version", "created_by",
+            "created_at", "updated_at",
+          ].join(", "));
 
         if (error) throw new HttpsError("internal", error.message);
 

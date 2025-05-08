@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Chat } from '../../components/Chat/Chat';
-import { Prompt } from './Prompt';
+import Prompt from './Prompt';
 import { ChatMessage } from '../../types/chat';
 import Header from './Header';
 import InitialDisplay from '../../components/Display/InitialDisplay';

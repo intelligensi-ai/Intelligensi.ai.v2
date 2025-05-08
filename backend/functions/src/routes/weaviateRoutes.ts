@@ -1,6 +1,6 @@
 import { onRequest } from "firebase-functions/v2/https";
 import weaviate, { WeaviateClient, ApiKey } from "weaviate-client";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 
 // Environment variables
 const weaviateUrl = process.env.WEAVIATE_URL as string;
@@ -147,7 +147,7 @@ export const writeWeaviate = onRequest(async (req, res) => {
   } catch (error) {
     console.error("❌ Weaviate write error:", error);
 
-    if (axios.isAxiosError(error)) {
+    if (isAxiosError(error)) {
       const errorData = error.response?.data || {};
       res.status(error.response?.status || 500).json({
         success: false,

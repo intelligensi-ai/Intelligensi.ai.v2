@@ -1,6 +1,6 @@
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onRequest } from "firebase-functions/v2/https";
-import express, { json as expressJson } from "express"; 
+import express, { json as expressJson } from "express";
 import cors from "cors";
 
 // Existing routes from HEAD
@@ -11,7 +11,7 @@ import { checkWeaviate, writeSchema, writeWeaviate } from "./routes/weaviateRout
 import { createSchema } from "./routes/schemaRoutes";
 
 // New routes/imports from ea22d36
-import authRouter from "./routes/authRoutes"; 
+import authRouter from "./routes/authRoutes";
 
 // Set global options
 setGlobalOptions({
@@ -23,16 +23,16 @@ setGlobalOptions({
 const drupal7App = express();
 drupal7App.use("/", drupal7Router);
 export const drupal7 = onRequest({
-  region: "us-central1", 
+  region: "us-central1",
   memory: "1GiB",
   timeoutSeconds: 60,
 }, drupal7App);
 
 // Auth Express app (incorporating from ea22d36)
 const authApp = express();
-authApp.use(cors({ origin: true })); 
-authApp.use(expressJson()); 
-authApp.use("/", authRouter); 
+authApp.use(cors({ origin: true }));
+authApp.use(expressJson());
+authApp.use("/", authRouter);
 export const auth = onRequest(
   {
   },
