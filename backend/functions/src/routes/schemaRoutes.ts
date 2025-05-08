@@ -65,39 +65,118 @@ export const createSchema = onRequest(
         }
 
         const supabase = getSupabaseClient();
+
         // Accept both snake_case and camelCase in request
         const {
           site_id: siteId,
           siteId: siteIdAlt,
-          schema_name: schemaName,
-          schemaName: schemaNameAlt,
+          cms_id: cmsId,
+          cmsId: cmsIdAlt,
           example_payload: examplePayload,
           examplePayload: examplePayloadAlt,
+          description,
+          version,
+          created_by: createdBy,
+          createdBy: createdByAlt,
         } = req.body;
 
-        const finalSiteId = siteId || siteIdAlt;
-        const finalSchemaName = schemaName || schemaNameAlt;
-        const finalExamplePayload = examplePayload || examplePayloadAlt;
+        // Coerce and validate IDs
+        const finalSiteId = Number(siteId ?? siteIdAlt);
+        const finalCmsId = Number(cmsId ?? cmsIdAlt);
+        const finalPayload = examplePayload ?? examplePayloadAlt;
+        const finalDesc = description ?? "";
+        const finalVersion = version ?? "1.0.0";
+        const finalCreatedBy = createdBy ?? createdByAlt;
 
-        if (!finalSiteId || !finalExamplePayload || !finalSchemaName) {
-          throw new HttpsError("invalid-argument", "Missing required fields");
+        if (
+          isNaN(finalSiteId) ||
+          isNaN(finalCmsId) ||
+          !finalPayload ||
+          !finalCreatedBy || typeof finalCreatedBy !== 'string'
+        ) {
+          console.error("Validation Error: Missing or invalid required fields.", { 
+            finalSiteId, 
+            finalCmsId, 
+            finalPayloadExists: !!finalPayload, 
+            finalCreatedBy 
+          });
+          throw new HttpsError("invalid-argument", "Missing or invalid required fields (siteId, cmsId, payload, or createdBy)");
         }
 
-        const zodSchema = inferZodSchemaFromObject(finalExamplePayload);
-        const schemaJSON = JSON.stringify(zodSchema._def);
+        // Log the payload that will be used for schema inference (this is the raw payload from request)
+        console.log("[createSchema] Raw payload from request (finalPayload):", JSON.stringify(finalPayload, null, 2));
 
-        const { error } = await supabase.from("schemas").insert({
-          site_id: finalSiteId,
-          name: finalSchemaName,
-          zod_schema: schemaJSON,
-        });
+        let objectForSchemaInference: Record<string, unknown> | null = null;
+
+        // Check if finalPayload has a 'structure' array and use its first element
+        if (finalPayload && 
+            typeof finalPayload === 'object' && 
+            finalPayload !== null &&
+            Object.prototype.hasOwnProperty.call(finalPayload, 'structure') &&
+            Array.isArray((finalPayload as any).structure) &&
+            (finalPayload as any).structure.length > 0 &&
+            typeof (finalPayload as any).structure[0] === 'object' &&
+            (finalPayload as any).structure[0] !== null) {
+          console.log("[createSchema] Extracting first element from finalPayload.structure for schema inference.");
+          objectForSchemaInference = (finalPayload as any).structure[0] as Record<string, unknown>;
+        } else if (finalPayload && typeof finalPayload === 'object' && finalPayload !== null) {
+          // Fallback: if finalPayload is an object but not in the {structure: []} format, use it directly.
+          // This might be the case if the frontend already sent a single article.
+          console.log("[createSchema] finalPayload is not in {structure: []} format or structure array is invalid/empty. Using finalPayload directly.");
+          objectForSchemaInference = finalPayload as Record<string, unknown>;
+        } else {
+          console.error("[createSchema] finalPayload is not a valid object or is null.");
+          throw new HttpsError("invalid-argument", "Received invalid payload for schema creation.");
+        }
+
+        if (!objectForSchemaInference || Object.keys(objectForSchemaInference).length === 0) {
+          console.error("[createSchema] Object for schema inference is null or empty after processing finalPayload.", objectForSchemaInference);
+          throw new HttpsError("invalid-argument", "Could not derive a valid object for schema inference from the payload.");
+        }
+        
+        console.log("[createSchema] Actual object for schema inference:", JSON.stringify(objectForSchemaInference, null, 2));
+
+        // Infer Zod schema from the determined objectForSchemaInference
+        const zodSchema = inferZodSchemaFromObject(objectForSchemaInference);
+
+        // Prepare the schema definition for storing, handling if _def.shape is a function
+        let schemaDefToStore: any = zodSchema._def;
+        if (zodSchema._def && typeof zodSchema._def.shape === 'function') {
+          console.log("[createSchema] zodSchema._def.shape is a function. Calling it to resolve the shape.");
+          schemaDefToStore = {
+            typeName: zodSchema._def.typeName,
+            unknownKeys: (zodSchema._def as any).unknownKeys,
+            catchall: (zodSchema._def as any).catchall,
+            shape: zodSchema._def.shape(), // Call the function to get the plain shape object
+          };
+        } else {
+          console.log("[createSchema] zodSchema._def.shape is not a function or _def is not as expected. Using _def directly.");
+        }
+
+        const schemaJSON = JSON.stringify(schemaDefToStore);
+        // Log the generated schemaJSON
+        console.log("[createSchema] Generated schema JSON (after potential shape() call):", schemaJSON);
+
+        // Insert into your "schemas" table
+        const { data, error } = await supabase
+          .from("schemas")
+          .insert({
+            site_id: finalSiteId,
+            cms_id: finalCmsId,
+            schema_json: schemaJSON,
+            description: finalDesc,
+            version: finalVersion,
+            created_by: finalCreatedBy,
+          })
+          .select('id, site_id, cms_id, schema_json, description, version, created_by, created_at, updated_at'); // optional: get back the inserted row
 
         if (error) throw new HttpsError("internal", error.message);
 
+        // Return success with the new schema row
         res.status(200).json({
           success: true,
           message: "Schema created",
-          schema: JSON.parse(schemaJSON),
+          schema: data?.[0],
         });
       } catch (error) {
         console.error("Error:", error);
@@ -107,5 +186,5 @@ export const createSchema = onRequest(
         });
       }
     });
-  },
+  }
 );

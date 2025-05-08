@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ISite, ICMS } from '../../types/sites';
 import { supabase, isSupabaseConfigured } from '../../utils/supabase';
-import { getAuth } from 'firebase/auth';
+import { getAuth, User } from 'firebase/auth';
+import axios from 'axios';
 
 interface NewSiteFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (site: ISite) => void;
   initialData?: ISite | null;
+  currentUser: User | null;
 }
 
 const CMS_OPTIONS: ICMS[] = [
@@ -16,21 +18,27 @@ const CMS_OPTIONS: ICMS[] = [
   { id: 3, name: 'Joomla', version: '' },
 ];
 
-const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, initialData }) => {
-  const [formData, setFormData] = useState<ISite>({
-    user_id: 0,
-    cms: CMS_OPTIONS[0],
-    site_name: '',
-    site_url: '',
-    description: '',
-    mysql_file_url: undefined,
-    status: 'active',
-    is_active: true,
-    company_id: undefined,
-    migration_ids: undefined,
-    tags: undefined,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, initialData, currentUser }) => {
+  const [formData, setFormData] = useState<ISite>(() => {
+    const defaultCms = CMS_OPTIONS.find(cms => cms.name === 'Drupal') || CMS_OPTIONS[0];
+    return {
+      id: initialData?.id,
+      user_id: initialData?.user_id || currentUser?.uid || '',
+      cms: initialData?.cms || defaultCms,
+      site_name: initialData?.site_name || '',
+      site_url: initialData?.site_url || '',
+      description: initialData?.description || '',
+      mysql_file_url: initialData?.mysql_file_url || null,
+      status: initialData?.status || 'active',
+      migration_ids: initialData?.migration_ids || null,
+      tags: initialData?.tags || null,
+      is_active: initialData?.is_active !== undefined ? initialData.is_active : true,
+      is_selected: initialData?.is_selected !== undefined ? initialData.is_selected : false,
+      schema_id: initialData?.schema_id || null,
+      created_at: initialData?.created_at || new Date().toISOString(),
+      updated_at: initialData?.updated_at || new Date().toISOString(),
+      company_id: initialData?.company_id || null,
+    };
   });
   const [useHttps, setUseHttps] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +176,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
       initializeUser();
     }
   }, [initialData, isOpen]);
-  
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const file = e.target.files[0];
@@ -184,15 +192,15 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
     setError(null);
     console.log('Form submission started');
 
-    if (isLoading) {
-      const errorMsg = 'Please wait while we initialize your session';
+    if (!currentUser?.uid) { // Check for Firebase UID from prop
+      const errorMsg = 'No authenticated Firebase user UID found. Please ensure you are logged in.';
       console.error(errorMsg);
       setError(errorMsg);
       return;
     }
 
-    if (!supabaseUserId) {
-      const errorMsg = 'No valid user ID found. Please try refreshing the page.';
+    if (isLoading) {
+      const errorMsg = 'Please wait while we initialize your session';
       console.error(errorMsg);
       setError(errorMsg);
       return;
@@ -221,30 +229,27 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
       }
       siteUrl = `${useHttps ? 'https://' : 'http://'}${siteUrl}`;
 
-      // Prepare the site data with the Supabase user ID
-      const siteData = {
-        user_id: supabaseUserId,
+      const siteDataToSave = {
+        user_id: currentUser.uid, // USE FIREBASE STRING UID HERE
         cms_id: formData.cms.id,
-        company_id: null,
+        company_id: formData.company_id,
         site_name: formData.site_name.trim(),
         site_url: siteUrl,
         mysql_file_url: formData.mysql_file_url,
-        status: 'pending',
-        migration_ids: null,
-        tags: null,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        status: initialData?.id ? formData.status : 'pending', // Initial status for new sites
+        migration_ids: formData.migration_ids,
+        tags: formData.tags,
+        is_active: formData.is_active,
       };
 
-      console.log('Preparing to save site data:', siteData);
+      console.log('Preparing to save site data:', siteDataToSave);
 
-      let result;
+      let result; 
       if (initialData?.id) {
         console.log('Updating existing site:', initialData.id);
         const { data, error: updateError } = await supabase
           .from('sites')
-          .update(siteData)
+          .update({...siteDataToSave, updated_at: new Date().toISOString()})
           .eq('id', initialData.id)
           .select()
           .single();
@@ -258,7 +263,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         console.log('Creating new site');
         const { data, error: insertError } = await supabase
           .from('sites')
-          .insert(siteData)
+          .insert({...siteDataToSave, created_at: new Date().toISOString(), updated_at: new Date().toISOString()})
           .select()
           .single();
 
@@ -269,46 +274,152 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         result = data;
       }
 
-      console.log('Supabase response:', result);
+      console.log('Supabase response after insert/update:', result);
 
       if (!result) {
-        throw new Error('No data returned from database');
+        throw new Error('No data returned from database after site save/update');
+      }
+      
+      let siteRecordForApp = { ...result };
+
+      // If it's a new Drupal site, attempt to fetch structure and create schema
+      if (!initialData?.id && siteRecordForApp.cms_id === 1 ) { 
+        console.log(`New Drupal site created (ID: ${siteRecordForApp.id}). Attempting to create schema.`);
+        let examplePayload = null;
+        try {
+          console.log(`Fetching Drupal structure from: ${siteRecordForApp.site_url}`);
+          const structureResponse = await axios.get(
+            'http://localhost:5001/intelligensi-ai-v2/us-central1/drupal7/structure', 
+            {
+              params: {
+                endpoint: siteRecordForApp.site_url,
+              },
+              timeout: 30000, 
+            }
+          );
+
+          if (structureResponse.data && Array.isArray(structureResponse.data) && structureResponse.data.length > 0) {
+            examplePayload = structureResponse.data[0];
+            console.log('Successfully fetched example payload from Drupal structure (first item).');
+          } else if (structureResponse.data && typeof structureResponse.data === 'object' && Object.keys(structureResponse.data).length > 0) {
+            examplePayload = structureResponse.data;
+            console.log('Drupal structure response was an object, using it as example payload.');
+          } else {
+            console.warn('No suitable example payload data returned from Drupal structure. Schema creation will be based on an empty object or may be skipped.');
+          }
+        } catch (fetchError) {
+          const axiosError = axios.isAxiosError(fetchError) ? fetchError : null;
+          const errorMessage = axiosError?.response?.data?.error || axiosError?.message || (fetchError instanceof Error ? fetchError.message : "Unknown error fetching structure");
+          
+          console.error("Failed to fetch Drupal site structure for schema creation:", {
+            message: errorMessage,
+            url: axiosError?.config?.url,
+            status: axiosError?.response?.status,
+            details: fetchError
+          });
+          setError(`Failed to fetch content from ${siteRecordForApp.site_url}. Schema not auto-created. (Error: ${errorMessage})`);
+        }
+
+        if (examplePayload) {
+          const schemaDescription = `Auto-generated schema for ${siteRecordForApp.site_name}`;
+          const schemaVersion = "1.0.0";
+          try {
+            console.log('Calling /createSchema with example payload...');
+            const schemaResponse = await axios.post(
+              'http://localhost:5001/intelligensi-ai-v2/us-central1/createSchema',
+              {
+                site_id: siteRecordForApp.id,
+                cms_id: siteRecordForApp.cms_id,
+                example_payload: examplePayload,
+                description: schemaDescription,
+                version: schemaVersion,
+                created_by: currentUser.uid, // USE FIREBASE STRING UID HERE for consistency, or keep supabaseUserId if your backend expects the integer ID for 'created_by'
+              },
+              { headers: { 'Content-Type': 'application/json' } }
+            );
+
+            if (schemaResponse.data.success && schemaResponse.data.schema && schemaResponse.data.schema.id) {
+              const createdSchemaId = schemaResponse.data.schema.id;
+              console.log("Schema created successfully, ID:", createdSchemaId);
+
+              const { data: updatedSiteWithSchema, error: updateSiteError } = await supabase
+                .from('sites')
+                .update({ schema_id: createdSchemaId, status: 'active', updated_at: new Date().toISOString() })
+                .eq('id', siteRecordForApp.id)
+                .select()
+                .single();
+
+              if (updateSiteError) {
+                console.error(`Failed to update site ${siteRecordForApp.id} with schema_id:`, updateSiteError);
+                setError(`Schema was created (ID: ${createdSchemaId}) but failed to link it to the site. Please check site details.`);
+              } else {
+                console.log(`Site ${siteRecordForApp.id} updated with schema_id ${createdSchemaId} and status 'active'.`);
+                siteRecordForApp = { ...siteRecordForApp, ...updatedSiteWithSchema }; // Update with latest from DB
+              }
+            } else {
+              const schemaCreationError = schemaResponse.data.error || 'Unknown error during schema creation function execution.';
+              console.error("Schema creation via /createSchema failed or returned no schema ID:", schemaCreationError);
+              setError(`Schema creation failed: ${schemaCreationError}. Site created but schema needs manual attention.`);
+            }
+          } catch (schemaError) {
+             const axiosSchemaError = axios.isAxiosError(schemaError) ? schemaError : null;
+             const schemaErrorMessage = axiosSchemaError?.response?.data?.error || axiosSchemaError?.message || (schemaError instanceof Error ? schemaError.message : "Unknown error calling createSchema");
+            console.error("Error calling /createSchema function:", {
+                message: schemaErrorMessage,
+                url: axiosSchemaError?.config?.url,
+                status: axiosSchemaError?.response?.status,
+                details: schemaError
+            });
+            setError(`Error during schema creation: ${schemaErrorMessage}. Site created but schema needs manual attention.`);
+          }
+        } else if (siteRecordForApp.cms_id === 1) { 
+           console.warn("No example payload available for Drupal site, automatic schema creation skipped. Site status remains 'pending'.");
+           if (!error) { 
+             setError("Could not retrieve content structure from the Drupal site, so an automatic schema was not generated. The site is saved with 'pending' status.");
+           }
+        }
       }
 
-      // Convert the Supabase result to ISite format
+
       const savedSite: ISite = {
-        id: result.id,
-        user_id: result.user_id,
+        id: siteRecordForApp.id,
+        user_id: siteRecordForApp.user_id, // This will now be the string Firebase UID after the Supabase insert/update returns it
         cms: {
-          id: result.cms_id,
-          name: formData.cms.name,
-          version: formData.cms.version
+          id: siteRecordForApp.cms_id,
+          name: CMS_OPTIONS.find(opt => opt.id === siteRecordForApp.cms_id)?.name || 'Unknown CMS',
+          version: formData.cms.version 
         },
-        site_name: result.site_name,
-        site_url: result.site_url,  // Use the new site_url column
-        description: '',  // Not in DB, using empty string
-        mysql_file_url: result.mysql_file_url,  // Keep mysql_file_url for database files
-        status: result.status,
-        is_active: result.is_active,
-        company_id: result.company_id,
-        migration_ids: result.migration_ids,
-        tags: result.tags,
-        created_at: result.created_at,
-        updated_at: result.updated_at
+        site_name: siteRecordForApp.site_name,
+        site_url: siteRecordForApp.site_url,
+        description: formData.description, 
+        mysql_file_url: siteRecordForApp.mysql_file_url,
+        status: siteRecordForApp.status, 
+        is_active: siteRecordForApp.is_active,
+        company_id: siteRecordForApp.company_id,
+        migration_ids: siteRecordForApp.migration_ids,
+        tags: siteRecordForApp.tags,
+        schema_id: siteRecordForApp.schema_id,
+        created_at: siteRecordForApp.created_at,
+        updated_at: siteRecordForApp.updated_at
       };
 
-      console.log('Converted site data:', savedSite);
+      console.log('Converted site data for onSave:', savedSite);
       
-      // Call onSave with the new site data
-      onSave(savedSite);
+      onSave(savedSite); 
       
-      // Close the form
-      console.log('Form submission successful, closing form');
-      onClose();
-    } catch (error) {
-      console.error('Error saving site:', error);
+      if (!error) { 
+          onClose();
+          console.log('Form submission successful, form closed.');
+      } else {
+          console.log(`Form submission process completed with issues (see error message). Form remains open. Error: ${error}`);
+      }
+
+    } catch (error) { 
       const errorMsg = error instanceof Error ? error.message : 'Failed to save site';
-      console.error('Error message:', errorMsg);
+      console.error('Critical error in handleSubmit:', {
+        message: errorMsg,
+        errorDetails: error
+      });
       setError(errorMsg);
     }
   };
@@ -318,7 +429,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
     
     // Remove protocol if user types it (we'll handle it with our toggle)
     if (value.startsWith('http://') || value.startsWith('https://')) {
-      value = value.split('://')[1] || '';
+      value = value.split('://')[1];
     }
     
     setFormData({ ...formData, site_url: value });
@@ -389,21 +500,21 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
               </div>
             </div>
 
-            {/* Rest of the form remains the same */}
             {/* CMS Type */}
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">CMS Type *</label>
               <select
-                value={formData.cms.name}
+                value={formData.cms.id} 
                 onChange={(e) => {
-                  const selected = CMS_OPTIONS.find(opt => opt.name === e.target.value) || CMS_OPTIONS[0];
+                  const selectedId = parseInt(e.target.value, 10);
+                  const selected = CMS_OPTIONS.find(opt => opt.id === selectedId) || CMS_OPTIONS[0];
                   setFormData({ ...formData, cms: selected });
                 }}
                 className="w-full bg-[#1A202C] border border-gray-600 rounded-md p-2"
                 required
               >
                 {CMS_OPTIONS.map((cms) => (
-                  <option key={cms.id} value={cms.name}>
+                  <option key={cms.id} value={cms.id}> 
                     {cms.name}
                   </option>
                 ))}
@@ -451,7 +562,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
                 />
                 <label htmlFor="mysql-upload" className="cursor-pointer">
                   {formData.mysql_file_url ? (
-                    <span className="text-green-400">File selected ✓</span>
+                    <span className="text-green-400">File selected </span>
                   ) : (
                     <>
                       <p>Drag & drop SQL file here</p>

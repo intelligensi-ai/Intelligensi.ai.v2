@@ -11,7 +11,7 @@ export interface ICMS {
 
 export interface ISite {
     id?: number;
-    user_id: number;
+    user_id: string;
     cms: ICMS;
     company_id?: number | null;
     site_name: string;
@@ -23,6 +23,7 @@ export interface ISite {
     tags?: string | null;
     is_active?: boolean;
     is_selected?: boolean; // New property to track selection state
+    schema_id?: number | null; // <<< ADDED schema_id
     created_at?: Date | string;
     updated_at?: Date | string;
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Chat } from '../../components/Chat/Chat';
 import { Prompt } from './Prompt';
@@ -8,12 +8,103 @@ import InitialDisplay from '../../components/Display/InitialDisplay';
 import { AnimatePresence } from 'framer-motion';
 import Sites from './Sites';
 import { ISite, ICMS } from '../../types/sites';
+import { supabase } from '../../utils/supabase';
+import { getAuth, User } from 'firebase/auth';
 
 export const Dashboard: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sites, setSites] = useState<ISite[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Get current Firebase user
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch sites from Supabase when currentUser is available
+  useEffect(() => {
+    const fetchSites = async () => {
+      if (!currentUser || !supabase) return;
+
+      console.log("Fetching sites for user:", currentUser.uid);
+      setIsLoading(true); // Optional: indicate loading for sites
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('sites')
+          .select(`
+            id,
+            user_id,
+            company_id,
+            site_name,
+            site_url,
+            description,
+            mysql_file_url,
+            status,
+            migration_ids,
+            tags,
+            is_active,
+            is_selected,
+            schema_id,        
+            created_at,
+            updated_at,
+            cms:cms_id (*)
+          `)
+          .eq('user_id', currentUser.uid) // Fetch sites for the logged-in user
+          .order('created_at', { ascending: false });
+
+        if (fetchError) {
+          console.error("Error fetching sites:", fetchError);
+          setError("Failed to load your sites. " + fetchError.message);
+          setSites([]);
+        } else {
+          console.log("Fetched sites:", data);
+          // Ensure cms data is correctly mapped
+          const sitesWithCms: ISite[] = data ? data.map(s => {
+            let cmsData: ICMS | undefined = undefined;
+            if (s.cms) { // s.cms could be an object or an array from Supabase
+              if (Array.isArray(s.cms) && s.cms.length > 0) {
+                cmsData = s.cms[0] as ICMS; // Take the first element if it's an array
+              } else if (!Array.isArray(s.cms) && typeof s.cms === 'object' && s.cms !== null) {
+                cmsData = s.cms as ICMS; // Assume it's a single object
+              }
+            }
+            // Fallback if cmsData is still undefined (e.g., s.cms was null, empty array, or not an expected object)
+            if (!cmsData) {
+                console.warn(`Site with ID ${s.id} has missing, empty, or invalid CMS data. Using a default CMS.`);
+                // Provide a default/fallback ICMS object.
+                // ISite expects cms: ICMS, and ICMS requires name: string.
+                cmsData = { 
+                  id: 0, // Default ID for unknown CMS
+                  name: 'Unknown CMS', // Required by ICMS interface
+                  user_id: s.user_id || 'unknown', // s.user_id will be a string
+                  // Initialize other optional ICMS fields if necessary
+                  version: null,
+                  is_active: false,
+                  has_migrations: false
+                };
+            }
+            return { ...s, cms: cmsData };
+          }) : [];
+          setSites(sitesWithCms);
+          setError(null);
+        }
+      } catch (e) {
+        console.error("Exception fetching sites:", e);
+        setError("An unexpected error occurred while loading sites.");
+        setSites([]);
+      } finally {
+        setIsLoading(false); // Optional: stop site loading indicator
+      }
+    };
+
+    fetchSites();
+  }, [currentUser]); // Re-fetch if currentUser changes
 
   // Handle sending chat messages
   const handleSend = async (message: string) => {
@@ -64,7 +155,10 @@ export const Dashboard: React.FC = () => {
 
   // Handle adding a new site
   const handleAddSite = (newSite: ISite) => {
-    setSites(prev => [...prev, newSite]);
+    // Ensure the newSite object being added to state has the CMS object structured correctly
+    // and includes schema_id if available.
+    console.log("Adding new site to dashboard state:", newSite);
+    setSites(prev => [newSite, ...prev]); // Add to the beginning of the list
   };
 
   // Handle updating an existing site
@@ -146,28 +240,42 @@ export const Dashboard: React.FC = () => {
         onSiteAdded={handleAddSite} 
         onSiteUpdated={handleUpdateSite}
         onAddChatMessage={(message) => {
-          const site = message.site;
-          if (site) {
-            addSiteChatMessage(
-              {
-                id: site.id,
-                user_id: 1, // Default or get from auth context
-                site_name: site.name,
-                site_url: site.url,
-                cms: { 
-                  id: 0, // Default or get from CMS data
-                  name: site.cms,
-                  user_id: '1' // Default or get from auth context
+          // message.site might be a partial site object or just contain an ID
+          // We need to find the full site from our state to get all details
+          const siteFromMessage = message.site;
+          if (siteFromMessage && siteFromMessage.id !== undefined) {
+            const fullSite = sites.find(s => s.id === siteFromMessage.id);
+
+            if (fullSite) {
+              addSiteChatMessage(
+                {
+                  // Construct the payload using data from fullSite
+                  id: fullSite.id,
+                  user_id: fullSite.user_id || currentUser?.uid || '',
+                  site_name: fullSite.site_name,
+                  site_url: fullSite.site_url,
+                  cms: {
+                    id: fullSite.cms?.id || 0,
+                    name: fullSite.cms?.name || 'Unknown CMS',
+                    user_id: fullSite.cms?.user_id || fullSite.user_id || currentUser?.uid || ''
+                  },
+                  description: fullSite.description || '',
+                  schema_id: fullSite.schema_id || null,
+                  // Add any other fields from ISite that addSiteChatMessage might need
                 },
-                description: site.description
-              },
-              message.text.includes('updated') // Determine if update based on message
-            );
+                message.text.includes('updated') // Determine if update based on message
+              );
+            } else {
+              console.warn('Site for chat message not found in state:', siteFromMessage.id);
+            }
           }
         }}
         onSiteSelected={(site) => {
-          console.log('Site selected:', site);
+          // Handle site selection logic, e.g., set selectedSite state
+          console.log("Site selected in Dashboard:", site);
+          // Example: setSelectedSite(site);
         }}
+        currentUser={currentUser} // Pass currentUser to Sites component
       />
     </div>
   );

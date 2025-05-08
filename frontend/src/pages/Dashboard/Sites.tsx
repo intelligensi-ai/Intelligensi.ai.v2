@@ -1,6 +1,7 @@
 import NewSiteForm from '../../components/Sites/NewSiteForm';
 import React, { useState } from 'react';
 import { ISite } from '../../types/sites';
+import { User } from 'firebase/auth'; // Import User type
 import axios from 'axios';
 
 // Define the props interfaces for the content components
@@ -16,9 +17,6 @@ interface ContentVectorizeProps {
   onComplete?: (result: { objectsCreated: number; siteName: string }) => void;
   onError?: (error: Error) => void;
 }
-
-
-type VectorizeProps = ContentVectorizeProps;
 
 // Dynamically import the components with type assertions
 const ContentPreview = React.lazy(() =>
@@ -89,6 +87,7 @@ interface SitesProps {
     };
   }) => void;
   onSiteSelected: (siteId: number) => void;
+  currentUser: User | null; // Add currentUser to SitesProps
 }
 
 const Sites: React.FC<SitesProps> = ({ 
@@ -96,7 +95,8 @@ const Sites: React.FC<SitesProps> = ({
   onSiteAdded, 
   onSiteUpdated,
   onAddChatMessage,
-  onSiteSelected 
+  onSiteSelected,
+  currentUser // Add currentUser to SitesProps
 }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<ISite | null>(null);
@@ -143,125 +143,39 @@ const Sites: React.FC<SitesProps> = ({
     setCurrentSite(null);
   };
 
-  const createSchema = async (site: ISite) => {
-    try {
-      console.log('Creating schema for site:', {
-        id: site.id,
-        name: site.site_name,
-        cms: site.cms,
-        full_site: site
-      });
-      
-      // Validate site ID
-      if (!site.id || typeof site.id !== 'number') {
-        throw new Error(`Invalid site ID: ${site.id}. Site might not be properly saved in the database.`);
-      }
-
-      // Example payload based on WordPress/Drupal common content structure
-      const examplePayload = {
-        title: "Sample Content",
-        content: "Main content body text",
-        excerpt: "Short description",
-        author: {
-          id: 1,
-          name: "Author Name",
-          email: "author@example.com"
-        },
-        status: "published",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        meta: {
-          seo_title: "SEO Title",
-          seo_description: "SEO Description",
-          keywords: ["keyword1", "keyword2"]
-        },
-        categories: ["category1", "category2"],
-        tags: ["tag1", "tag2"]
-      };
-
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const endpoint = `${apiUrl}/intelligensi-ai-v2/us-central1/createSchema`;
-      
-      console.log('Making request to:', endpoint);
-      const requestPayload = {
-        site_id: site.id,
-        schema_name: "content",
-        example_payload: examplePayload
-      };
-      console.log('Request payload:', requestPayload);
-
-      const response = await axios.post(
-        endpoint,
-        requestPayload,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      console.log('Schema creation response:', response.data);
-
-      if (response.data.success) {
-        console.log('Schema created/updated successfully:', response.data);
-        return true;
-      } else {
-        const errorMsg = response.data.error || 'Failed to create schema';
-        console.error('Schema creation failed:', errorMsg);
-        setSchemaError(errorMsg);
-        return false;
-      }
-    } catch (error) {
-      console.error('Schema creation error:', error);
-      if (axios.isAxiosError(error)) {
-        const errorMsg = error.response?.data?.error || error.message;
-        console.error('Axios error details:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
-        });
-        setSchemaError(`Schema creation failed: ${errorMsg}`);
-      } else {
-        const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
-        console.error('Non-Axios error:', errorMsg);
-        setSchemaError(errorMsg);
-      }
-      return false;
-    }
-  };
-
   const handleVectorizeClick = async (site: ISite) => {
-    if (!site || !site.id || typeof site.id !== 'number' || site.id > 1000000) {
-      setSchemaError('Invalid site ID. Please ensure the site is properly saved in the database.');
-      console.error('Invalid site data:', site);
+    if (!site || !site.id || typeof site.id !== "number" || site.id > 1000000) {
+      setSchemaError("Invalid site ID. Please ensure the site is properly saved in the database.");
+      console.error("Invalid site data:", site);
       return;
     }
+    // Ensure site.schema_id exists, otherwise schema is not yet created.
+    if (!site.schema_id) {
+        setSchemaError(`The site "${site.site_name}" does not have an associated schema. Vectorization cannot proceed. Please ensure a schema was created when the site was added or try re-adding the site if it's a Drupal site.`);
+        console.warn(`Vectorization attempt for site "${site.site_name}" (ID: ${site.id}) which has no schema_id.`);
+        setVectorizeStatus('error'); // Set status to error as we can't proceed
+        return;
+    }
 
-    console.log('Starting vectorization for site:', {
+    console.log("Starting vectorization for site:", {
       id: site.id,
       name: site.site_name,
-      cms: site.cms.name
+      cms: site.cms.name,
+      schema_id: site.schema_id
     });
-    setVectorizeStatus('processing');
-    setSchemaError(null);
+    setVectorizeStatus("processing");
+    setSchemaError(null); // Clear previous schema errors
 
     try {
-      // First create/update the schema
-      const schemaCreated = await createSchema(site);
-      console.log('Schema creation result:', schemaCreated);
-      
-      if (!schemaCreated) {
-        console.error('Schema creation failed');
-        setVectorizeStatus('error');
-        return;
-      }
+      // Schema is now assumed to be created when the site was added.
+      // No longer calling local createSchema function.
+      console.log(`Proceeding with vectorization for site ${site.id} as schema_id ${site.schema_id} exists.`);
+      setShowContentVectorize(true); // Directly proceed to vectorization UI
 
-      // If schema is created successfully, proceed with vectorization
-      setShowContentVectorize(true);
-    } catch (error) {
-      console.error('Vectorization error:', error);
-      setVectorizeStatus('error');
-      setSchemaError(error instanceof Error ? error.message : 'An error occurred during vectorization');
+    } catch (error) { // This catch block might be for other errors during setup, not schema creation itself
+      console.error("Error in vectorize click handler (before showing vectorize component):", error);
+      setVectorizeStatus("error");
+      setSchemaError(error instanceof Error ? error.message : "An unexpected error occurred before vectorization.");
     }
   };
 
@@ -357,15 +271,9 @@ const Sites: React.FC<SitesProps> = ({
             <div className="mt-3 space-y-2">
               <button 
                 onClick={() => setShowContentPreview(true)}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
               >
                 Preview Content
-              </button>
-              <button 
-                onClick={() => console.log('Migrate site', selectedSite.id)}
-                className="w-full bg-purple-600 hover:bg-purple-500 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-              >
-                Migrate
               </button>
               <button 
                 onClick={() => handleVectorizeClick(selectedSite)}
@@ -374,7 +282,7 @@ const Sites: React.FC<SitesProps> = ({
                     ? 'bg-yellow-600' 
                     : vectorizeStatus === 'error' 
                     ? 'bg-red-600 hover:bg-red-500' 
-                    : 'bg-green-600 hover:bg-green-500'
+                    : 'bg-teal-700 hover:bg-teal-800'
                 } text-white py-1 px-3 rounded text-sm font-medium transition-colors`}
                 disabled={vectorizeStatus === 'processing'}
               >
@@ -382,8 +290,21 @@ const Sites: React.FC<SitesProps> = ({
                   ? 'Processing...' 
                   : vectorizeStatus === 'error' 
                   ? 'Retry Vectorize' 
-                  : 'Vectorize'}
+                  : 'Add to AI Database'}
               </button>
+              <button 
+                onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
+                className="w-full bg-teal-800 hover:bg-teal-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+              >
+                AI Prompt
+              </button>
+              <button 
+                onClick={() => console.log('Migrate site', selectedSite.id)}
+                className="w-full bg-purple-800 hover:bg-purple-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+              >
+                Migrate
+              </button>
+            
 
               {/* Site details */}
               <div className="mt-4 text-sm text-gray-300">
@@ -404,6 +325,7 @@ const Sites: React.FC<SitesProps> = ({
         onClose={() => setIsFormOpen(false)}
         onSave={handleSave}
         initialData={currentSite}
+        currentUser={currentUser} // Pass currentUser to NewSiteForm
       />
 
       {/* Content Preview Modal */}
