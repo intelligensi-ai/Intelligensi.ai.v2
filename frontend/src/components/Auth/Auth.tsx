@@ -50,10 +50,10 @@ const Auth: React.FC = () => {
       <div className="text-center mb-6">
         <h1 className="text-4xl font-light text-white mb-1">Intelligensi.ai</h1>
         <p className="text-gray-300 text-lg">
-          Smarter Content. Stronger Connections.
+        The Future of AI is not just smart,<br></br> Its Intelligensi.ai
         </p>
         <p className="text-gray-400 mt-1 text-sm">
-          Enhance search, automation, and retrieval with AI-driven optimization.
+        Lets build smarter, faster, together.
         </p>
       </div>
 
