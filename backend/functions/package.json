@@ -17,6 +17,7 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@aws-sdk/client-lightsail": "^3.810.0",
     "@supabase/supabase-js": "^2.49.2",
     "@types/firebase": "^2.4.32",
     "@types/jsonwebtoken": "^9.0.9",

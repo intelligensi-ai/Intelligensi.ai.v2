@@ -9,6 +9,8 @@ import { fetchusers, updateuser, fetchuser } from "./routes/userRoutes";
 import drupal7Router from "./migrations/drupal7Migrations";
 import { checkWeaviate, writeSchema, writeWeaviate } from "./routes/weaviateRoutes";
 import { createSchema } from "./routes/schemaRoutes";
+import { deleteSite } from "./routes/siteRoutes"; // <-- Import new function
+import { createDrupalSite } from "./routes/windsailRoutes";
 
 // New routes/imports from ea22d36
 import authRouter from "./routes/authRoutes";
@@ -54,4 +56,6 @@ export {
   writeSchema,
   writeWeaviate,
   createSchema,
+  deleteSite, // <-- Export new function
+  createDrupalSite,
 };

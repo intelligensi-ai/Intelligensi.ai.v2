@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
@@ -36,6 +38,7 @@ const App: React.FC = () => {
 
   return (
     <Router>
+      <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
       <Routes>
         {/* ✅ Redirect to Dashboard if authenticated */}
         <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Auth />} />
