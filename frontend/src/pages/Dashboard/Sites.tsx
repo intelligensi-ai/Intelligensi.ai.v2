@@ -107,8 +107,15 @@ const Sites: React.FC<SitesProps> = ({
   const [schemaError, setSchemaError] = useState<string | null>(null);
 
   const handleSiteSelect = (siteId: number) => {
-    setSelectedSiteId(siteId);
-    onSiteSelected(siteId);
+    if (selectedSiteId === siteId) {
+      // If the clicked site is already selected, deselect it
+      setSelectedSiteId(null);
+      onSiteSelected(null as any); // Pass null, or handle this in DashboardPage if needed
+    } else {
+      // Otherwise, select the new site
+      setSelectedSiteId(siteId);
+      onSiteSelected(siteId);
+    }
   };
 
   const handleEditClick = (site: ISite) => {

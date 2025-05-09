@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useVoiceRecognition } from "../../components/Utils/VoiceRecogition";
+import { MicrophoneButton } from "../../components/Utils/MicrophoneButton";
 
 interface PromptProps {
   onSend: (query: string) => Promise<void>;
@@ -12,8 +14,8 @@ const Prompt: React.FC<PromptProps> = ({ onSend, disabled, error: parentError, s
   const [internalError, setInternalError] = useState<string | null>(null);
   const [internalSuccess, setInternalSuccess] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const localHandleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setInternalError(null);
     setInternalSuccess(null);
 
@@ -25,42 +27,56 @@ const Prompt: React.FC<PromptProps> = ({ onSend, disabled, error: parentError, s
     }
   };
 
+  const {
+    isListening,
+    startListening,
+    stopListening
+  } = useVoiceRecognition({
+    setQuery,
+    handleSubmit: localHandleSubmit,
+  });
+
+  const handleMicrophoneClick = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
   return (
-    <div className="bg-[#2D3748] p-6 rounded-lg shadow-md mb-8">
-      <h2 className="text-xl font-bold mb-4">AI Assistant</h2>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex items-center">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask something or trigger a migration..."
-            className="flex-1 px-4 py-2 rounded-l bg-gray-700 text-white placeholder-gray-400 focus:outline-none"
-            disabled={disabled}
-          />
-          <button
-            type="submit"
-            className={`bg-teal-500 hover:bg-teal-600 text-white px-6 py-2 rounded-r ${
-              disabled ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-            disabled={disabled}
-          >
-            {disabled ? "Sending..." : "Submit"}
-          </button>
-        </div>
-        
-        {(parentError || internalError) && (
-          <div className="text-red-500 text-sm mt-2">
-            {parentError || internalError}
-          </div>
-        )}
-        
-        {(parentSuccess || internalSuccess) && (
-          <div className="text-green-500 text-sm mt-2">
-            {parentSuccess || internalSuccess}
-          </div>
-        )}
+    <div className="bg-[#1C1F2B] p-4 rounded-md">
+      <form onSubmit={localHandleSubmit} className="flex items-center gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Please ask a question to intelligensi.ai"
+          className="flex-1 px-4 py-3 rounded-full text-sm text-gray-500 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50"
+          disabled={disabled || isListening}
+        />
+        <MicrophoneButton
+          isListening={isListening}
+          onClick={handleMicrophoneClick}
+          className="w-10 h-10"
+        />
+        <button
+          type="submit"
+          className={`px-4 py-2 bg-teal-400 text-white rounded-full hover:bg-teal-500 transition ${
+            (disabled || isListening) ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+          disabled={disabled || isListening}
+        >
+          Send
+        </button>
       </form>
+
+      {(parentError || internalError) && (
+        <div className="text-red-500 text-sm mt-2">{parentError || internalError}</div>
+      )}
+      {(parentSuccess || internalSuccess) && (
+        <div className="text-green-500 text-sm mt-2">{parentSuccess || internalSuccess}</div>
+      )}
     </div>
   );
 };

@@ -30,8 +30,14 @@ const Header: React.FC = () => {
 
     setLoading(true);
     try {
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
+      if (!apiBaseUrl) {
+        console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
+        setLoading(false);
+        return;
+      }
       const response = await fetch(
-        `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchuser?email=${auth.currentUser.email}`
+        `${apiBaseUrl}/fetchuser?email=${auth.currentUser.email}`
       );
       const data = await response.json();
       if (data.success) {

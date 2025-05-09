@@ -17,7 +17,14 @@ const Registration: React.FC = () => {
       const firebaseUser: User = userCredential.user;
 
       // Store in Supabase
-      const { data } = await axios.post('http://localhost:5001/intelligensi-ai-v2/us-central1/updateuser', {
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
+      if (!apiBaseUrl) {
+        console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
+        setError("Application configuration error: API endpoint is missing. User registration cannot complete.");
+        // Potentially, you might want to revert Firebase user creation or notify the user more formally.
+        return;
+      }
+      const { data } = await axios.post(`${apiBaseUrl}/updateuser`, {
         uid: firebaseUser.uid,
         displayName: name,
         email: firebaseUser.email,

@@ -12,8 +12,14 @@ const Auth: React.FC = () => {
 
   const handleLogin = async () => {
     try {
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
+      if (!apiBaseUrl) {
+        console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
+        setError("Application configuration error: API endpoint is missing. Please contact support.");
+        return;
+      }
       const { data } = await axios.get(
-        `http://localhost:5001/intelligensi-ai-v2/us-central1/fetchuser?email=${email}`
+        `${apiBaseUrl}/fetchuser?email=${email}`
       );
 
       if (!data.success || !data.data.is_active) {

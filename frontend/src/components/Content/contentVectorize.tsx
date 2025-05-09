@@ -96,8 +96,17 @@ const Vectorize: React.FC<VectorizeProps> = ({ site, onComplete, onError, onClos
           try {
             const payload = preparePayload([node]);
             
+            const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
+            if (!apiBaseUrl) {
+              console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined. Ensure it is set in your .env file for the frontend.");
+              setError('Application configuration error: API endpoint is missing.');
+              setLoading(false);
+              // Optionally, you could throw an error here or break the loop
+              return; // Stop the vectorization process if the base URL isn't set
+            }
+
             await axios.post(
-              'http://localhost:5001/intelligensi-ai-v2/us-central1/writeWeaviate',
+              `${apiBaseUrl}/writeWeaviate`,
               payload,
               {
                 headers: {
