@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
-import { auth } from "../../components/Config/firebaseConfig";
+import { auth } from '../../firebase';
 
 // ✅ Interface for user data
 interface UserData {

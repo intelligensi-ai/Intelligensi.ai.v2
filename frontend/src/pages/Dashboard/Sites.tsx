@@ -1,8 +1,11 @@
 import NewSiteForm from '../../components/Sites/NewSiteForm';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ISite } from '../../types/sites';
-import { User } from 'firebase/auth'; // Import User type
-import axios from 'axios';
+import { User } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, auth, functions } from '../../firebase'; // Corrected path
+
+import { PencilIcon, TrashIcon, ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 // Define the props interfaces for the content components
 interface ContentPreviewProps {
@@ -71,6 +74,7 @@ interface SitesProps {
   sites: ISite[];
   onSiteAdded: (newSite: ISite) => void;
   onSiteUpdated: (updatedSite: ISite) => void;
+  onSiteDeleted?: (siteId: number) => void; // Add optional delete handler
   onAddChatMessage: (message: {
     text: string;
     type?: 'site' | 'vectorization';
@@ -83,27 +87,39 @@ interface SitesProps {
     };
     vectorizationResults?: {
       objectsCreated: number;
-      siteId: number;
+      siteId: number | null;
     };
   }) => void;
   onSiteSelected: (siteId: number) => void;
   currentUser: User | null; // Add currentUser to SitesProps
+  selectedSiteId?: number | null;
+  userId?: string;
 }
 
 const Sites: React.FC<SitesProps> = ({ 
-  sites, 
-  onSiteAdded, 
+  sites,
+  onSiteAdded,
   onSiteUpdated,
+  onSiteDeleted,
   onAddChatMessage,
   onSiteSelected,
-  currentUser // Add currentUser to SitesProps
+  currentUser,
+  selectedSiteId: propSelectedSiteId,
+  userId: propUserId,
 }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [sitesInput, setSitesInput] = useState<ISite[]>(sites || []);
+
+  // Update sitesInput when sites prop changes
+  useEffect(() => {
+    setSitesInput(sites || []);
+  }, [sites]);
+  // Removed duplicate selectedSite state
   const [currentSite, setCurrentSite] = useState<ISite | null>(null);
-  const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<number | null>(propSelectedSiteId || null);
   const [showContentPreview, setShowContentPreview] = useState(false);
   const [showContentVectorize, setShowContentVectorize] = useState(false);
-  const [vectorizeStatus, setVectorizeStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle');
+  const [vectorizeStatus, setVectorizeStatus] = useState<'processing' | 'complete' | 'error' | null>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
 
   const handleSiteSelect = (siteId: number) => {
@@ -121,6 +137,73 @@ const Sites: React.FC<SitesProps> = ({
   const handleEditClick = (site: ISite) => {
     setCurrentSite(site);
     setIsFormOpen(true);
+  };
+
+  const handleSiteAdded = (newSite: ISite) => {
+    setIsFormOpen(false);
+    onSiteAdded(newSite);
+    
+    // Update local sites state
+    setSitesInput(prevSites => [...prevSites, newSite]);
+  };
+
+  const functions = getFunctions(app);
+const callDeleteSite = httpsCallable(functions, 'deleteSite');
+
+  const handleDeleteSite = async (site: ISite) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete the site: ${site.site_name}?`);
+    if (confirmDelete) {
+      try {
+        // Call the Firebase Function
+        const result = await callDeleteSite({ siteId: site.id });
+        console.log('Delete site result:', result.data);
+
+        if ((result.data as any).success) {
+          // Call onSiteDeleted prop to update parent state if it exists
+          if (onSiteDeleted) {
+            onSiteDeleted(site.id);
+          }
+
+          // Reset selected site if the deleted site was selected
+          if (selectedSiteId === site.id) {
+            setSelectedSiteId(null);
+            if (onSiteSelected) {
+                onSiteSelected(null as any); // Or pass a more specific null/undefined marker if your handler expects it
+            }
+          }
+
+          // Remove the site from local sitesInput state
+          setSitesInput(prevSites => prevSites.filter(s => s.id !== site.id));
+
+        // Add a chat message about site deletion
+        if (onAddChatMessage) {
+          onAddChatMessage({
+            text: `Successfully deleted site: ${site.site_name}`,
+            type: 'site', // Keep type as site
+            // Removed site object to prevent rendering the site card
+          });
+        }
+      } else { // This closes the if ((result.data as any).success) block
+          // Handle function error (e.g., show a message to the user)
+          console.error("Failed to delete site:", (result.data as any).message);
+          if (onAddChatMessage) {
+            onAddChatMessage({
+              text: `Error deleting site ${site.site_name}: ${(result.data as any).message}`,
+              type: 'site',
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error calling deleteSite function:", error);
+        // Handle network or other errors (e.g., show a message to the user)
+        if (onAddChatMessage) {
+          onAddChatMessage({
+            text: `Error deleting site ${site.site_name}. Please try again.`,
+            type: 'site',
+          });
+        }
+      }
+    }
   };
 
   const handleSave = (siteData: ISite) => {
@@ -186,27 +269,33 @@ const Sites: React.FC<SitesProps> = ({
     }
   };
 
+  const handleVectorizeCancel = () => {
+    setShowContentVectorize(false);
+    setVectorizeStatus(null);
+  };
+
   const handleVectorizeComplete = (result: { objectsCreated: number; siteName: string }) => {
+    console.log(`Vectorization complete for ${result.siteName}: ${result.objectsCreated} objects created`);
+    setShowContentVectorize(false);
     setVectorizeStatus('complete');
     if (selectedSiteId) {
-      const selectedSite = sites.find(s => s.id === selectedSiteId);
+      const vectorizedSite = sitesInput.find(s => s.id === selectedSiteId);
       onAddChatMessage({
         text: `${result.objectsCreated} objects have been vectorized`,
         type: 'vectorization',
-        site: {
-          id: selectedSiteId,
-          name: selectedSite?.site_name || '',
-          url: selectedSite?.site_url || '',
-          cms: selectedSite?.cms.name || '',
-          description: `${result.objectsCreated} objects were successfully vectorized and are now ready for use with AI.`
-        },
+        site: vectorizedSite ? {
+          id: vectorizedSite.id,
+          name: vectorizedSite.site_name,
+          url: vectorizedSite.site_url,
+          cms: vectorizedSite.cms.name,
+          description: vectorizedSite.description
+        } : undefined,
         vectorizationResults: {
           objectsCreated: result.objectsCreated,
           siteId: selectedSiteId
         }
       });
     }
-    setTimeout(() => setShowContentVectorize(false), 1500);
   };
 
   const handleVectorizeError = (error: Error) => {
@@ -216,7 +305,7 @@ const Sites: React.FC<SitesProps> = ({
   };
 
   // Get the selected site
-  const selectedSite = sites.find(s => s.id === selectedSiteId);
+  const selectedSite = sitesInput.find(s => s.id === selectedSiteId);
 
   return (
     <div className="bg-[#2D3748] p-4 border-t border-gray-700 relative">
@@ -235,12 +324,12 @@ const Sites: React.FC<SitesProps> = ({
       {/* Sites Display */}
       <div className="flex pl-40 bg-[#2D3748]"> 
         <div className="flex overflow-x-auto flex-1 bg-[#344054] py-3 rounded-lg ml-4 border border-gray-600 shadow-sm">
-          {sites.length === 0 ? (
+          {sitesInput.length === 0 ? (
             <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">
               No sites connected
             </div>
           ) : (
-            sites.map((site) => (
+            sitesInput.map((site) => (
               <div 
                 key={site.id} 
                 className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
@@ -250,13 +339,30 @@ const Sites: React.FC<SitesProps> = ({
                   className={`relative p-1 rounded-lg transition-all duration-200 ${
                     selectedSiteId === site.id ? 'ring-2 ring-teal-400' : ''
                   }`}
-                  onDoubleClick={() => handleEditClick(site)}
                 >
                   <img 
                     src={getSiteIcon(site.cms.name)} 
-                    alt={`${site.cms.name} Logo`}
-                    className="w-15 h-14 object-contain group-hover:scale-110 transition-transform duration-200"
+                    alt={`${site.cms.name} icon`}
+                    className="w-20 h-20 object-contain group-hover:scale-110 transition-transform duration-200"
                   />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditClick(site);
+                    }}
+                    className="text-gray-400 hover:text-gray-200 transition-colors"
+                  >
+                    <PencilIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSite(site);
+                    }}
+                    className="text-red-500 hover:text-red-300 transition-colors ml-2"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
                 </div>
                 <span className={`text-xs mt-1 font-bold transition-colors ${
                   selectedSiteId === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'
@@ -272,7 +378,7 @@ const Sites: React.FC<SitesProps> = ({
         <div className="bg-[#2D3748] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm min-w-[200px]">
           <h3 className="font-semibold mb-1 text-gray-100">Connected Sites</h3>
           <div className="text-sm text-teal-400 font-medium">
-            {sites.length} site{sites.length !== 1 ? 's' : ''} connected
+            {sitesInput.length} site{sitesInput.length !== 1 ? 's' : ''} connected
           </div>
           {selectedSite && (
             <div className="mt-3 space-y-2">
@@ -287,17 +393,37 @@ const Sites: React.FC<SitesProps> = ({
                 className={`w-full ${
                   vectorizeStatus === 'processing' 
                     ? 'bg-yellow-600' 
+                    : vectorizeStatus === 'complete' 
+                    ? 'bg-green-600' 
                     : vectorizeStatus === 'error' 
                     ? 'bg-red-600 hover:bg-red-500' 
                     : 'bg-teal-700 hover:bg-teal-800'
                 } text-white py-1 px-3 rounded text-sm font-medium transition-colors`}
                 disabled={vectorizeStatus === 'processing'}
               >
-                {vectorizeStatus === 'processing' 
-                  ? 'Processing...' 
-                  : vectorizeStatus === 'error' 
-                  ? 'Retry Vectorize' 
-                  : 'Add to AI Database'}
+                {vectorizeStatus === 'processing' && (
+                  <div className="text-yellow-500 flex items-center">
+                    <ArrowPathIcon className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </div>
+                )}
+                {vectorizeStatus === 'complete' && (
+                  <div className="text-green-500 flex items-center">
+                    <CheckCircleIcon className="w-4 h-4 mr-2" />
+                    Vectorization Complete
+                  </div>
+                )}
+                {vectorizeStatus === 'error' && (
+                  <div className="text-red-500 flex items-center">
+                    <ExclamationTriangleIcon className="w-4 h-4 mr-2" />
+                    Vectorization Failed
+                  </div>
+                )}
+                {vectorizeStatus !== 'processing' && vectorizeStatus !== 'complete' && vectorizeStatus !== 'error' && (
+                  <div>
+                    Add to AI Database
+                  </div>
+                )}
               </button>
               <button 
                 onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
@@ -306,7 +432,7 @@ const Sites: React.FC<SitesProps> = ({
                 AI Prompt
               </button>
               <button 
-                onClick={() => console.log('Migrate site', selectedSite.id)}
+// ...
                 className="w-full bg-purple-800 hover:bg-purple-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
               >
                 Migrate

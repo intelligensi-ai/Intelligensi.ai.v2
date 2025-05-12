@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../components/Config/firebaseConfig';
+import { auth } from '../../firebase';
 
 interface User {
   display_name: string;

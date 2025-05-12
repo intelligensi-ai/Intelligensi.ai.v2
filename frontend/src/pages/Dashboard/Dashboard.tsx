@@ -170,6 +170,9 @@ export const Dashboard: React.FC = () => {
     // and includes schema_id if available.
     console.log("Adding new site to dashboard state:", newSite);
     setSites(prev => [newSite, ...prev]); // Add to the beginning of the list
+    
+    // Add the chat message with the site card
+    addSiteChatMessage(newSite, false); 
   };
 
   // Handle updating an existing site
@@ -205,15 +208,6 @@ export const Dashboard: React.FC = () => {
       <main className="flex-1 flex flex-col relative">
         {/* Chat Content Area */}
         <div className="flex-1 overflow-y-auto p-4 relative">
-          {/* Initial welcome message when no messages exist */}
-          <AnimatePresence>
-            {messages.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <InitialDisplay show={true} />
-              </div>
-            )}
-          </AnimatePresence>
-          
           {/* Chat Messages */}
           <Chat messages={messages} />
           

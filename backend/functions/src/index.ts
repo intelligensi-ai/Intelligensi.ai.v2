@@ -9,6 +9,7 @@ import { fetchusers, updateuser, fetchuser } from "./routes/userRoutes";
 import drupal7Router from "./migrations/drupal7Migrations";
 import { checkWeaviate, writeSchema, writeWeaviate } from "./routes/weaviateRoutes";
 import { createSchema } from "./routes/schemaRoutes";
+import { deleteSite } from "./routes/siteRoutes"; // Add this import
 
 // New routes/imports from ea22d36
 import authRouter from "./routes/authRoutes";
@@ -54,4 +55,5 @@ export {
   writeSchema,
   writeWeaviate,
   createSchema,
+  deleteSite, // Add this export
 };

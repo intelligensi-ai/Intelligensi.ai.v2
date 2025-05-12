@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { onAuthStateChanged, User } from 'firebase/auth';
 
 // ✅ Import Firebase instance
-import { auth } from './components/Config/firebaseConfig';
+import { auth } from './firebase';
 
 // ✅ Import Pages
 import Auth from './components/Auth/Auth';

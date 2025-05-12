@@ -24,6 +24,7 @@ export interface ISite {
     is_active?: boolean;
     is_selected?: boolean; // New property to track selection state
     schema_id?: number | null; // <<< ADDED schema_id
+    vectorization_status?: 'processing' | 'complete' | 'error' | null;
     created_at?: Date | string;
     updated_at?: Date | string;
 }
