@@ -1,11 +1,13 @@
+import ConfirmationModal from '../../components/ConfirmationModal';
 import NewSiteForm from '../../components/Sites/NewSiteForm';
 import React, { useState, useEffect } from 'react';
 import { ISite } from '../../types/sites';
 import { User } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app, auth, functions } from '../../firebase'; // Corrected path
+import { app, functions } from '../../firebase'; // Restore app and functions import
+// import { auth } from '../../firebase'; // Keep auth commented/removed
 
-import { PencilIcon, TrashIcon, ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 // Define the props interfaces for the content components
 interface ContentPreviewProps {
@@ -122,6 +124,14 @@ const Sites: React.FC<SitesProps> = ({
   const [vectorizeStatus, setVectorizeStatus] = useState<'processing' | 'complete' | 'error' | null>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
 
+  // State for remove confirmation modal
+  const [isRemoveConfirmModalOpen, setIsRemoveConfirmModalOpen] = useState(false);
+  const [sitePendingRemoval, setSitePendingRemoval] = useState<ISite | null>(null);
+
+  // Define functions instance and callable function once on component mount
+  const callDeleteSite = httpsCallable(functions, 'deleteSite'); 
+
+
   const handleSiteSelect = (siteId: number) => {
     if (selectedSiteId === siteId) {
       // If the clicked site is already selected, deselect it
@@ -134,76 +144,81 @@ const Sites: React.FC<SitesProps> = ({
     }
   };
 
-  const handleEditClick = (site: ISite) => {
-    setCurrentSite(site);
-    setIsFormOpen(true);
+
+  // Step 1: Initiate removal confirmation
+  const handleAttemptRemoveSite = (site: ISite) => {
+    setSitePendingRemoval(site);
+    setIsRemoveConfirmModalOpen(true);
   };
 
-  const handleSiteAdded = (newSite: ISite) => {
-    setIsFormOpen(false);
-    onSiteAdded(newSite);
-    
-    // Update local sites state
-    setSitesInput(prevSites => [...prevSites, newSite]);
-  };
+  // Step 2: Execute removal after confirmation
+  const executeSiteRemoval = async () => {
+    console.log("Attempting to execute site removal...");
+    if (!sitePendingRemoval) {
+      console.error("executeSiteRemoval called with no sitePendingRemoval.");
+      return; 
+    }
 
-  const functions = getFunctions(app);
-const callDeleteSite = httpsCallable(functions, 'deleteSite');
+    const siteToRemove = sitePendingRemoval;
+    console.log(`Site to remove: ${siteToRemove.site_name} (ID: ${siteToRemove.id})`);
 
-  const handleDeleteSite = async (site: ISite) => {
-    const confirmDelete = window.confirm(`Are you sure you want to delete the site: ${site.site_name}?`);
-    if (confirmDelete) {
-      try {
-        // Call the Firebase Function
-        const result = await callDeleteSite({ siteId: site.id });
-        console.log('Delete site result:', result.data);
+    setIsRemoveConfirmModalOpen(false); 
+    setSitePendingRemoval(null);
 
-        if ((result.data as any).success) {
-          // Call onSiteDeleted prop to update parent state if it exists
-          if (onSiteDeleted) {
-            onSiteDeleted(site.id);
+    try {
+      console.log("Calling Firebase function 'deleteSite' (using top-level instance)..."); // Log before call
+      const result = await callDeleteSite({ siteId: siteToRemove.id }); 
+      console.log('Firebase function result:', result.data);
+
+      if ((result.data as any).success) {
+        console.log("Site removal successful according to backend.");
+        // Call onSiteDeleted prop to update parent state if it exists
+        if (onSiteDeleted) {
+          console.log("Calling onSiteDeleted prop...");
+          onSiteDeleted(siteToRemove.id);
+        }
+
+        // Reset selected site if the removed site was selected
+        if (selectedSiteId === siteToRemove.id) {
+          console.log("Resetting selectedSiteId...");
+          setSelectedSiteId(null);
+          if (onSiteSelected) {
+            onSiteSelected(null as any); // Or pass a more specific null/undefined marker if your handler expects it
           }
+        }
 
-          // Reset selected site if the deleted site was selected
-          if (selectedSiteId === site.id) {
-            setSelectedSiteId(null);
-            if (onSiteSelected) {
-                onSiteSelected(null as any); // Or pass a more specific null/undefined marker if your handler expects it
-            }
-          }
+        // Remove the site from local sitesInput state
+        console.log("Updating local sitesInput state...");
+        setSitesInput(prevSites => prevSites.filter(s => s.id !== siteToRemove.id));
 
-          // Remove the site from local sitesInput state
-          setSitesInput(prevSites => prevSites.filter(s => s.id !== site.id));
-
-        // Add a chat message about site deletion
+        // Add a chat message about site removal
         if (onAddChatMessage) {
+          console.log("Adding chat message...");
           onAddChatMessage({
-            text: `Successfully deleted site: ${site.site_name}`,
-            type: 'site', // Keep type as site
-            // Removed site object to prevent rendering the site card
+            text: `Successfully removed site: ${siteToRemove.site_name}`,
+            type: 'site', 
           });
         }
-      } else { // This closes the if ((result.data as any).success) block
-          // Handle function error (e.g., show a message to the user)
-          console.error("Failed to delete site:", (result.data as any).message);
-          if (onAddChatMessage) {
-            onAddChatMessage({
-              text: `Error deleting site ${site.site_name}: ${(result.data as any).message}`,
-              type: 'site',
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error calling deleteSite function:", error);
-        // Handle network or other errors (e.g., show a message to the user)
+      } else {
+        // Handle function error (e.g., show a message to the user)
+        console.error("Firebase function reported failure:", (result.data as any).message);
         if (onAddChatMessage) {
           onAddChatMessage({
-            text: `Error deleting site ${site.site_name}. Please try again.`,
+            text: `Error removing site ${siteToRemove.site_name}: ${(result.data as any).message}`,
             type: 'site',
           });
         }
       }
-    }
+    } catch (error) {
+      console.error("Error calling remove site function (catch block):", error);
+      // Handle network or other errors (e.g., show a message to the user)
+      if (onAddChatMessage) {
+        onAddChatMessage({
+          text: `Error removing site ${siteToRemove.site_name}. Please try again.`,
+          type: 'site',
+        });
+      }
+    } 
   };
 
   const handleSave = (siteData: ISite) => {
@@ -269,11 +284,6 @@ const callDeleteSite = httpsCallable(functions, 'deleteSite');
     }
   };
 
-  const handleVectorizeCancel = () => {
-    setShowContentVectorize(false);
-    setVectorizeStatus(null);
-  };
-
   const handleVectorizeComplete = (result: { objectsCreated: number; siteName: string }) => {
     console.log(`Vectorization complete for ${result.siteName}: ${result.objectsCreated} objects created`);
     setShowContentVectorize(false);
@@ -332,37 +342,18 @@ const callDeleteSite = httpsCallable(functions, 'deleteSite');
             sitesInput.map((site) => (
               <div 
                 key={site.id} 
-                className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
-                onClick={() => handleSiteSelect(site.id!)}
+                className={`flex py-1 flex-col items-center min-w-[90px] group cursor-pointer ${selectedSiteId === site.id ? 'rounded-lg' : ''}`}
+                onClick={() => handleSiteSelect(site.id)}
+                onDoubleClick={() => handleSiteSelect(site.id)}
               >
                 <div 
-                  className={`relative p-1 rounded-lg transition-all duration-200 ${
-                    selectedSiteId === site.id ? 'ring-2 ring-teal-400' : ''
-                  }`}
+                  className={`relative p-1 rounded-lg transition-all duration-200 border-2 border-transparent`}
                 >
                   <img 
                     src={getSiteIcon(site.cms.name)} 
                     alt={`${site.cms.name} icon`}
-                    className="w-20 h-20 object-contain group-hover:scale-110 transition-transform duration-200"
+                    className={`w-20 h-20 object-contain group-hover:scale-110 transition-transform duration-200 ${selectedSiteId === site.id ? 'drop-shadow-[0_0px_8px_rgba(50,205,205,0.7)]' : ''}`}
                   />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditClick(site);
-                    }}
-                    className="text-gray-400 hover:text-gray-200 transition-colors"
-                  >
-                    <PencilIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteSite(site);
-                    }}
-                    className="text-red-500 hover:text-red-300 transition-colors ml-2"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
                 </div>
                 <span className={`text-xs mt-1 font-bold transition-colors ${
                   selectedSiteId === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'
@@ -381,7 +372,8 @@ const callDeleteSite = httpsCallable(functions, 'deleteSite');
             {sitesInput.length} site{sitesInput.length !== 1 ? 's' : ''} connected
           </div>
           {selectedSite && (
-            <div className="mt-3 space-y-2">
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-2">
               <button 
                 onClick={() => setShowContentPreview(true)}
                 className="w-full bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
@@ -397,7 +389,7 @@ const callDeleteSite = httpsCallable(functions, 'deleteSite');
                     ? 'bg-green-600' 
                     : vectorizeStatus === 'error' 
                     ? 'bg-red-600 hover:bg-red-500' 
-                    : 'bg-teal-700 hover:bg-teal-800'
+                    : 'bg-teal-600 hover:bg-teal-700'
                 } text-white py-1 px-3 rounded text-sm font-medium transition-colors`}
                 disabled={vectorizeStatus === 'processing'}
               >
@@ -408,7 +400,7 @@ const callDeleteSite = httpsCallable(functions, 'deleteSite');
                   </div>
                 )}
                 {vectorizeStatus === 'complete' && (
-                  <div className="text-green-500 flex items-center">
+                  <div className="text--600 flex items-center">
                     <CheckCircleIcon className="w-4 h-4 mr-2" />
                     Vectorization Complete
                   </div>
@@ -432,22 +424,28 @@ const callDeleteSite = httpsCallable(functions, 'deleteSite');
                 AI Prompt
               </button>
               <button 
-// ...
-                className="w-full bg-purple-800 hover:bg-purple-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+                className="w-full bg-teal-800 hover:bg-teal-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
               >
                 Migrate
               </button>
-            
-
-              {/* Site details */}
-              <div className="mt-4 text-sm text-gray-300">
-                <p><span className="text-gray-400">Name:</span> {selectedSite.site_name}</p>
-                <p><span className="text-gray-400">CMS:</span> {selectedSite.cms.name}</p>
-                {selectedSite.description && (
-                  <p><span className="text-gray-400">Description:</span> {selectedSite.description}</p>
-                )}
-              </div>
+              <button 
+                onClick={() => {
+                  const siteToDel = sitesInput.find(s => s.id === selectedSiteId);
+                  if (siteToDel) handleAttemptRemoveSite(siteToDel);
+                }}
+                className="w-full bg-red-800 hover:bg-red-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors mt-2"
+              >
+                Remove Site
+              </button>
             </div>
+            <div className="mt-4 pt-4 border-t border-gray-600 text-sm">
+              <p><span className="font-semibold text-gray-400 mr-2">Name:</span> <span className="text-gray-200">{selectedSite.site_name}</span></p>
+              <p><span className="font-semibold text-gray-400 mr-2">CMS:</span> <span className="text-gray-200">{selectedSite.cms.name}</span></p>
+              {selectedSite.description && (
+                <p><span className="font-semibold text-gray-400 mr-2">Description:</span> <span className="text-gray-200">{selectedSite.description}</span></p>
+              )}
+            </div>
+            </>
           )}
         </div>
       </div>
@@ -470,6 +468,17 @@ const callDeleteSite = httpsCallable(functions, 'deleteSite');
           />
         </React.Suspense>
       )}
+
+      {/* Confirmation Modal for Removal */}
+      <ConfirmationModal
+        isOpen={isRemoveConfirmModalOpen}
+        onClose={() => setIsRemoveConfirmModalOpen(false)}
+        onConfirm={executeSiteRemoval}
+        title="Confirm Site Removal"
+        messageBody={<>Are you sure you want to remove the site: <strong>{sitePendingRemoval?.site_name}</strong>?</>}
+        confirmButtonText="Remove"
+        cancelButtonText="Cancel"
+      />
 
       {/* Content Vectorize Modal */}
       {showContentVectorize && selectedSite && (

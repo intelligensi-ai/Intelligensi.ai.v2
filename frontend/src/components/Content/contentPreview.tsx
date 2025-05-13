@@ -152,20 +152,32 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
                   key={node.nid} 
                   className="bg-[#344054] p-4 rounded-lg border border-gray-600 transition-colors hover:border-gray-500"
                 >
-                  <h3 className="font-bold text-lg text-teal-400 mb-1">{node.title}</h3>
-                  <div className="text-xs text-gray-400 mb-2">
-                    {formatDate(node.created)} | {node.type} | {node.status === "1" ? "Published" : "Unpublished"}
-                  </div>
-                  <div className="text-gray-300 whitespace-pre-line">
-                    {getPreviewText(node.body, node.nid)}
-                  </div>
-                  {cleanBodyText(node.body).split('\n').length > 3 && (
-                    <button
-                      onClick={() => toggleExpand(node.nid)}
-                      className="mt-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
-                    >
-                      {expandedNodes.has(node.nid) ? 'Show less' : 'Read more...'}
-                    </button>
+                  <h3 
+                    onClick={() => toggleExpand(node.nid)}
+                    className="font-bold text-lg text-teal-400 mb-1 cursor-pointer flex justify-between items-center"
+                  >
+                    <span>{node.title}</span>
+                    <div className="flex items-center">
+                      <span className="text-xs text-gray-500 mr-2">
+                        {formatDate(node.created)} | {node.type} | {node.status === "1" ? "Published" : "Unpublished"}
+                      </span>
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transform transition-transform duration-200 ${expandedNodes.has(node.nid) ? 'rotate-180' : 'rotate-0'}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </h3>
+                  {expandedNodes.has(node.nid) && (
+                    <>
+                      {/* Metadata div is removed from here */}
+                      <div className="bg-[#2A3342] p-3 mt-2 rounded-md border border-gray-600 max-h-60 overflow-y-auto text-gray-300 whitespace-pre-line">
+                        {cleanBodyText(node.body)}
+                      </div>
+                    </>
                   )}
                 </div>
               ))}
