@@ -326,7 +326,7 @@ const Sites: React.FC<SitesProps> = ({
           )}
         </div>
         
-        <div className="bg-[#2D3748] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm min-w-[200px]">
+        <div className="bg-[#2D3748] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm min-w-[500px] min-h-[230px]">
           <h3 className="font-semibold mb-1 text-gray-100">Connected CMS</h3>
           <div className="text-sm text-teal-400 font-medium">
             {sites.length} site{sites.length !== 1 ? 's' : ''} connected
@@ -347,7 +347,7 @@ const Sites: React.FC<SitesProps> = ({
                      ? 'bg-gray-500 cursor-not-allowed'
                      : vectorizeStatus === 'error'
                      ? 'bg-red-500 hover:bg-red-600'
-                     : 'bg-teal-700 hover:bg-blue-700'
+                     : 'bg-teal-600 hover:bg-teal-700'
                  } text-white py-1 px-3 rounded text-sm font-medium transition-colors`}
                  disabled={vectorizeStatus === 'processing' || vectorizeStatus === 'complete'}
                >
@@ -355,7 +355,7 @@ const Sites: React.FC<SitesProps> = ({
                    ? 'Processing...'
                    : vectorizeStatus === 'error'
                    ? 'Retry Vectorize'
-                   : 'Add to Memory'}
+                   : 'Add to AI Memory'}
                </button>
                <button 
                  onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
@@ -365,13 +365,13 @@ const Sites: React.FC<SitesProps> = ({
                </button>
                <button 
                  onClick={() => setShowCreateDrupalSiteForm(true)}
-                 className="w-full bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+                 className="w-full bg-teal-800 hover:bg-teal-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
                >
                  Create Drupal Site
                </button>
                <button 
                  onClick={() => console.log('Migrate site', selectedSite.id)}
-                 className="w-full bg-purple-800 hover:bg-purple-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+                 className="w-full bg-teal-900 hover:bg-teal-800 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
                >
                  Migrate
                </button>
