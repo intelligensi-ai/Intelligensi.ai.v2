@@ -1,5 +1,5 @@
 import NewSiteForm from '../../components/Sites/NewSiteForm';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import CreateDrupalSiteForm from '../../components/Sites/CreateDrupalSiteForm';
@@ -7,10 +7,11 @@ import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, BoltIcon } from '@heroicons/r
 import axios from "axios";
 import { User } from "firebase/auth";
 import { ISite, ICMS } from "../../types/sites";
-// import AddSiteModal from "../../components/Modals/AddSiteModal";
-// import ContentPreviewModal from "../../components/Modals/ContentPreviewModal";
-// import VectorizeContentModal from "../../components/Modals/VectorizeContentModal";
 import { getSiteIcon, getSiteDisplayName } from '../../utils/siteHelpers';
+
+// Dynamic imports for components that might not be used immediately
+const ContentPreview = React.lazy(() => import('../../components/Content/contentPreview'));
+const Vectorize = React.lazy(() => import('../../components/Content/contentVectorize'));
 
 interface SitesProps {
   sites: ISite[];
@@ -38,60 +39,98 @@ const Sites: React.FC<SitesProps> = ({
   const [sites, setSites] = useState<ISite[]>(sitesInput);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<ISite | null>(null);
-  const [selectedSiteIdState, setSelectedSiteIdState] = useState<number | null>(selectedSiteId); 
+  const [selectedSiteIdState, setSelectedSiteIdState] = useState<number | null>(selectedSiteId);
   const [showContentPreview, setShowContentPreview] = useState(false);
   const [showContentVectorize, setShowContentVectorize] = useState(false);
   const [vectorizeStatus, setVectorizeStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle');
   const [schemaError, setSchemaError] = useState<string | null>(null);
-
-  // State for remove confirmation
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState<boolean>(false);
   const [siteToRemove, setSiteToRemove] = useState<ISite | null>(null);
   const [isRemovingSite, setIsRemovingSite] = useState<boolean>(false);
   const [removeSiteError, setRemoveSiteError] = useState<string | null>(null);
   const [showCreateDrupalSiteForm, setShowCreateDrupalSiteForm] = useState(false);
+  
+  // Derive selectedSite from selectedSiteIdState
+  const selectedSite = sites.find(site => site.id === selectedSiteIdState) || null;
+
+  const handleSiteClick = (site: ISite) => {
+    onSiteSelected(site.id);
+  };
+
+  const handleSiteDoubleClick = (site: ISite) => {
+    setCurrentSite(site);
+    setIsFormOpen(true);
+  };
+  // Interface for vectorization result
+  interface VectorizeResult {
+    objectsCreated: number;
+    siteName: string;
+  }
+
+  // State for remove confirmation - moved to top with other state declarations
 
   useEffect(() => {
     setSites(sitesInput);
   }, [sitesInput]);
   
   // Function to refresh sites list
-  const fetchSites = () => {
+  const fetchSites = useCallback(() => {
     // In a real implementation, this would make an API call
     // For now, we'll just use the existing sites input
     setSites(sitesInput);
-  }; 
+  }, [sitesInput]); 
 
-  const handleSiteSelect = (siteId: number) => {
+  const handleSiteSelect = useCallback((siteId: number) => {
     if (selectedSiteIdState === siteId) {
       setSelectedSiteIdState(null);
-      onSiteSelected(null as any); 
+      onSiteSelected(null);
     } else {
       setSelectedSiteIdState(siteId);
       onSiteSelected(siteId);
     }
-  };
+  }, [selectedSiteIdState, onSiteSelected]);
+
+  const handlePreviewClose = useCallback(() => {
+    setShowContentPreview(false);
+  }, []);
+
+
 
   const handleEditClick = (site: ISite) => {
     setCurrentSite(site);
     setIsFormOpen(true);
   };
 
-  const handleSave = (siteData: ISite) => {
-    const isUpdate = !!currentSite;
-    
-    if (isUpdate) {
-      onSiteUpdated({ ...currentSite, ...siteData });
-    } else {
-      onSiteAdded(siteData);
-    }
+  const handleSave = async (siteData: ISite) => {
+    try {
+      const isUpdate = !!currentSite;
+      
+      // If it's an update, merge with existing data to preserve any fields not in the form
+      const updatedSite = isUpdate 
+        ? { ...currentSite, ...siteData }
+        : siteData;
 
-    if (siteData.id && typeof siteData.id === 'number') {
-      onSiteSelected(siteData.id);
-    }
+      // Call the appropriate callback
+      if (isUpdate) {
+        onSiteUpdated(updatedSite);
+        toast.success('Site updated successfully');
+      } else {
+        onSiteAdded(updatedSite);
+        toast.success('Site added successfully');
+      }
 
-    setIsFormOpen(false);
-    setCurrentSite(null);
+      // If we have a valid ID, select the site
+      if (updatedSite.id && typeof updatedSite.id === 'number') {
+        onSiteSelected(updatedSite.id);
+      }
+
+      // Close the form and reset
+      setIsFormOpen(false);
+      setCurrentSite(null);
+    } catch (error) {
+      console.error('Error saving site:', error);
+      toast.error(`Failed to save site: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const handleVectorizeClick = async (site: ISite) => {
@@ -127,7 +166,7 @@ const Sites: React.FC<SitesProps> = ({
     }
   };
 
-  const handleVectorizeComplete = (result: { objectsCreated: number; siteName: string }) => {
+  const handleVectorizeComplete = (result: VectorizeResult) => {
     setVectorizeStatus('complete');
     if (selectedSiteIdState) {
       const selectedSite = sites.find(s => s.id === selectedSiteIdState);
@@ -136,10 +175,12 @@ const Sites: React.FC<SitesProps> = ({
     setTimeout(() => setShowContentVectorize(false), 1500);
   };
 
-  const handleVectorizeError = (error: Error) => {
+  const handleVectorizeError = useCallback((error: string | Error) => {
     setVectorizeStatus('error');
-    console.error('Vectorization error:', error);
-  };
+    const errorMessage = typeof error === 'string' ? error : error.message;
+    console.error('Vectorization error:', errorMessage);
+    toast.error(`Vectorization failed: ${errorMessage}`);
+  }, []);
 
   const handleOpenRemoveModal = (site: ISite) => {
     setSiteToRemove(site);
@@ -206,8 +247,6 @@ const Sites: React.FC<SitesProps> = ({
     }
   };
 
-  const selectedSite = sites.find(s => s.id === selectedSiteIdState);
-
   return (
     <div className="bg-[#2D3748] p-4 border-t border-gray-700 relative">
       <button 
@@ -241,31 +280,49 @@ const Sites: React.FC<SitesProps> = ({
               No sites connected
             </div>
           ) : (
-            sites.map((site) => (
-              <div 
-                key={site.id} 
-                className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
-                onClick={() => handleSiteSelect(site.id!)}
-              >
+            sites.map((site) => {
+              // Handle both click and double-click
+              let clickTimeout: NodeJS.Timeout;
+              const handleClick = (e: React.MouseEvent, siteId: number) => {
+                e.stopPropagation();
+                clearTimeout(clickTimeout);
+                clickTimeout = setTimeout(() => {
+                  handleSiteSelect(siteId);
+                }, 200);
+              };
+
+              const handleDoubleClick = (e: React.MouseEvent, site: ISite) => {
+                e.stopPropagation();
+                clearTimeout(clickTimeout);
+                handleEditClick(site);
+              };
+
+              return (
                 <div 
-                  className={`relative p-1 rounded-lg transition-all duration-200 ${
-                    selectedSiteIdState === site.id ? 'ring-2 ring-teal-400' : ''
-                  }`}
-                  onDoubleClick={() => handleEditClick(site)}
+                  key={site.id} 
+                  className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
+                  onClick={(e) => handleClick(e, site.id!)}
                 >
-                  <img
-                    src={getSiteIcon(site.cms?.name)}
-                    alt={`${site.cms?.name || 'Default'} Logo`}
-                    className="w-15 h-14 object-contain group-hover:scale-110 transition-transform duration-200"
-                  />
+                  <div 
+                    className={`relative p-1 rounded-lg transition-all duration-200 ${
+                      selectedSiteIdState === site.id ? 'ring-2 ring-teal-400' : ''
+                    }`}
+                    onDoubleClick={(e) => handleDoubleClick(e, site)}
+                  >
+                    <img
+                      src={getSiteIcon(site.cms?.name)}
+                      alt={`${site.cms?.name || 'Default'} Logo`}
+                      className="w-15 h-14 object-contain group-hover:scale-110 transition-transform duration-200"
+                    />
+                  </div>
+                  <span className={`text-xs mt-1 font-bold transition-colors ${
+                    selectedSiteIdState === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'
+                  }`}>
+                    {getSiteDisplayName(site)}
+                  </span>
                 </div>
-                <span className={`text-xs mt-1 font-bold transition-colors ${
-                  selectedSiteIdState === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'
-                }`}>
-                  {getSiteDisplayName(site)}
-                </span>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
         
@@ -276,58 +333,59 @@ const Sites: React.FC<SitesProps> = ({
           </div>
           {selectedSite && (
             <div className="mt-3 space-y-2">
-              <button 
-                onClick={() => setShowContentPreview(true)}
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-              >
-                Preview CMS Content
-              </button>
-              <button
-                onClick={() => handleVectorizeClick(selectedSite)}
-                className={`w-full ${
-                  vectorizeStatus === 'processing' || vectorizeStatus === 'complete'
-                    ? 'bg-gray-500 cursor-not-allowed'
-                    : vectorizeStatus === 'error'
-                    ? 'bg-red-500 hover:bg-red-600'
-                    : 'bg-teal-700 hover:bg-blue-700'
-                } text-white py-1 px-3 rounded text-sm font-medium transition-colors`}
-                disabled={vectorizeStatus === 'processing' || vectorizeStatus === 'complete'}
-              >
-                {vectorizeStatus === 'processing'
-                  ? 'Processing...'
-                  : vectorizeStatus === 'error'
-                  ? 'Retry Vectorize'
-                  : 'Add to Memory'}
-              </button>
-           
-              <button 
-                onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
-                className="w-full bg-teal-800 hover:bg-teal-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-              >
-                AI Prompt
-              </button>
-              <button 
-                onClick={() => setShowCreateDrupalSiteForm(true)}
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-              >
-                Create Drupal Site
-              </button>
-              <button 
-                onClick={() => console.log('Migrate site', selectedSite.id)}
-                className="w-full bg-purple-800 hover:bg-purple-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-              >
-                Migrate
-              </button>
-              <button
-                onClick={() => {
-                  if (selectedSite) {
-                    handleOpenRemoveModal(selectedSite);
-                  }
-                }}
-                className="w-full bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-              >
-                Remove Site
-              </button>
+             <div className="grid grid-cols-2 gap-2">
+               <button 
+                 onClick={() => setShowContentPreview(true)}
+                 className="w-full bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+               >
+                 Preview CMS Content
+               </button>
+               <button
+                 onClick={() => handleVectorizeClick(selectedSite)}
+                 className={`w-full ${
+                   vectorizeStatus === 'processing' || vectorizeStatus === 'complete'
+                     ? 'bg-gray-500 cursor-not-allowed'
+                     : vectorizeStatus === 'error'
+                     ? 'bg-red-500 hover:bg-red-600'
+                     : 'bg-teal-700 hover:bg-blue-700'
+                 } text-white py-1 px-3 rounded text-sm font-medium transition-colors`}
+                 disabled={vectorizeStatus === 'processing' || vectorizeStatus === 'complete'}
+               >
+                 {vectorizeStatus === 'processing'
+                   ? 'Processing...'
+                   : vectorizeStatus === 'error'
+                   ? 'Retry Vectorize'
+                   : 'Add to Memory'}
+               </button>
+               <button 
+                 onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
+                 className="w-full bg-teal-800 hover:bg-teal-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+               >
+                 AI Prompt
+               </button>
+               <button 
+                 onClick={() => setShowCreateDrupalSiteForm(true)}
+                 className="w-full bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+               >
+                 Create Drupal Site
+               </button>
+               <button 
+                 onClick={() => console.log('Migrate site', selectedSite.id)}
+                 className="w-full bg-purple-800 hover:bg-purple-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+               >
+                 Migrate
+               </button>
+               <button
+                 onClick={() => {
+                   if (selectedSite) {
+                     handleOpenRemoveModal(selectedSite);
+                   }
+                 }}
+                 className="w-full bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
+               >
+                 Remove Site
+               </button>
+             </div>
             
 
               <div className="mt-4 text-sm text-gray-300">
@@ -344,7 +402,10 @@ const Sites: React.FC<SitesProps> = ({
 
       <NewSiteForm 
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          setIsFormOpen(false);
+          setCurrentSite(null); // Reset current site when closing
+        }}
         onSave={handleSave}
         initialData={currentSite}
         currentUser={currentUser} 
@@ -358,9 +419,25 @@ const Sites: React.FC<SitesProps> = ({
           toast.success('Drupal site creation initiated successfully!');
           // Refresh the sites list
           fetchSites();
-          // In a real implementation, you might want to wait a moment and then fetch sites
         }}
       />
+
+      <React.Suspense fallback={null}>
+        {selectedSite && showContentPreview && (
+          <ContentPreview
+            onClose={handlePreviewClose}
+            site={selectedSite}
+          />
+        )}
+        {selectedSite && showContentVectorize && (
+          <Vectorize
+            onClose={() => setShowContentVectorize(false)}
+            onComplete={handleVectorizeComplete}
+            onError={handleVectorizeError}
+            site={selectedSite}
+          />
+        )}
+      </React.Suspense>
 
       {showRemoveConfirmModal && siteToRemove && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
