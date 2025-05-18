@@ -274,8 +274,8 @@ const Sites: React.FC<SitesProps> = ({
       </button>
 
       <div className="flex pl-40 bg-[#2D3748] gap-4"> 
-        {/* Left side - Site Icons */}
-        <div className="w-2/5 bg-[#344054] py-3 rounded-lg border border-gray-600 shadow-sm ml-4">
+        {/* Left side - Site Icons - Reduced from 2/5 (40%) to ~32% */}
+        <div className="w-[32%] bg-[#344054] py-3 rounded-lg border border-gray-600 shadow-sm ml-4">
           <div className="flex overflow-x-auto pb-2">
             {sites.length === 0 ? (
               <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">
@@ -326,8 +326,8 @@ const Sites: React.FC<SitesProps> = ({
         
         {/* Right side - Buttons and Info */}
         <div className="flex-1 flex gap-4">
-          {/* Buttons Card */}
-          <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-1/2">
+          {/* Buttons Card - Slightly reduced width to make room for info */}
+          <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-[45%]">
             <h3 className="font-semibold mb-3 text-gray-100">Site Actions</h3>
             {selectedSite && (
               <div className="grid grid-cols-2 gap-2">
@@ -382,9 +382,9 @@ const Sites: React.FC<SitesProps> = ({
             )}
           </div>
           
-          {/* Site Info Card */}
+          {/* Site Info Card - Increased width from 1/2 to 55% */}
           {selectedSite && (
-            <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-1/2">
+            <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-[55%]">
               <h3 className="font-semibold mb-3 text-gray-100">Site Information</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-3">
