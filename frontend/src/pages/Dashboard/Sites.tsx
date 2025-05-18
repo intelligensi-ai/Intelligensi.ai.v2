@@ -379,7 +379,7 @@ const Sites: React.FC<SitesProps> = ({
                  onClick={() => setShowCreateDrupalSiteForm(true)}
                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
                >
-                 Create Drupal Site
+                 Create New CMS
                </button>
                <button 
                  onClick={() => console.log('Migrate site', selectedSite.id)}
