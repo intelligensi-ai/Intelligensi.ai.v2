@@ -304,16 +304,28 @@ const Sites: React.FC<SitesProps> = ({
                   onClick={(e) => handleClick(e, site.id!)}
                 >
                   <div 
-                    className={`relative p-1 rounded-lg transition-all duration-200 ${
-                      selectedSiteIdState === site.id ? 'ring-2 ring-teal-400' : ''
-                    }`}
+                    className="relative p-1.5 rounded-lg group/icon"
                     onDoubleClick={(e) => handleDoubleClick(e, site)}
                   >
-                    <img
-                      src={getSiteIcon(site.cms?.name)}
-                      alt={`${site.cms?.name || 'Default'} Logo`}
-                      className="w-15 h-14 object-contain group-hover:scale-110 transition-transform duration-200"
-                    />
+                    {/* Selection indicator - invisible but maintains layout */}
+                    <div className={`absolute inset-0 rounded-lg transition-all duration-300 ${
+                      selectedSiteIdState === site.id 
+                        ? 'opacity-0' 
+                        : 'group-hover:bg-teal-900/10'
+                    }`}></div>
+                    
+                    {/* Image container with consistent sizing */}
+                    <div className="relative w-18 h-[4.2rem] flex items-center justify-center">
+                      <img
+                        src={getSiteIcon(site.cms?.name)}
+                        alt={`${site.cms?.name || 'Default'} Logo`}
+                        className={`w-full h-full object-contain transition-all duration-300 ${
+                          selectedSiteIdState === site.id 
+                            ? 'drop-shadow-[0_0_12px_rgba(45,212,191,0.8)]' 
+                            : 'group-hover/icon:drop-shadow-[0_0_6px_rgba(45,212,191,0.4)]'
+                        }`}
+                      />
+                    </div>
                   </div>
                   <span className={`text-xs mt-1 font-bold transition-colors ${
                     selectedSiteIdState === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'

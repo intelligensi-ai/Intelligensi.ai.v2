@@ -36,7 +36,7 @@ export const fetchusers = onRequest(
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from("users")
-          .select("display_name, id, uid, email, company_id, is_active");
+          .select("display_name, id, uid, email, company_id, is_active, account_type");
 
         if (error) throw new HttpsError("internal", error.message);
 
@@ -49,6 +49,7 @@ export const fetchusers = onRequest(
             email: user.email,
             companyId: user.company_id,
             isActive: user.is_active,
+            accountType: user.account_type || "basic",
           })),
         });
       } catch (error) {
@@ -95,16 +96,31 @@ export const updateuser = onRequest(
         }
 
         const supabase = getSupabaseClient();
+        // First check if user exists
+        const { data: existingUser } = await supabase
+          .from("users")
+          .select("id")
+          .eq("uid", uid)
+          .single();
+
+        const userData = {
+          uid,
+          display_name: displayName,
+          email,
+          company_id: companyId,
+          is_active: isActive,
+          updated_at: new Date().toISOString(),
+          ...(req.body.accountType && { account_type: req.body.accountType }),
+        };
+
+        // Only set created_at for new users
+        if (!existingUser) {
+          userData.created_at = new Date().toISOString();
+        }
+
         const { data, error } = await supabase
           .from("users")
-          .upsert({
-            uid,
-            display_name: displayName,
-            email,
-            company_id: companyId,
-            is_active: isActive,
-            updated_at: new Date().toISOString(),
-          })
+          .upsert(userData)
           .select();
 
         if (error) throw new HttpsError("internal", error.message);
@@ -154,7 +170,7 @@ export const fetchuser = onRequest(
         let query = supabase
           .from("users")
           .select(
-            "display_name, id, uid, email, company_id, is_active, created_at, updated_at",
+            "display_name, id, uid, email, company_id, is_active, account_type, created_at, updated_at",
           );
 
         if (email) query = query.eq("email", email as string);
