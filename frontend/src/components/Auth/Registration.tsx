@@ -31,7 +31,7 @@ const accountTypes: AccountType[] = [
     name: 'Enterprise',
     description: 'For large organizations',
     price: 'Custom',
-    features: ['20 Sites', '24/7 Support', '1TB Storage', 'Dedicated Account Manager', 'Custom Integrations']
+    features: ['20 Sites', '24/7 Support', '1TB Storage', 'Custom Integrations']
   }
 ];
 
@@ -141,15 +141,28 @@ const Registration: React.FC = () => {
                 }`}
               >
                 <div className="text-center mb-4">
-                  <div className="w-16 h-4 bg-teal-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <span className="text-2xl">
-                      {plan.id === 'basic' ? '🚀' : plan.id === 'premium' ? '✨' : '🏢'}
-                    </span>
+                  <div className="w-16 h-16 rounded-full bg-teal-500/10 flex items-center justify-center mx-auto mb-1 p-2">
+                    <img 
+                      src={`/images/plans/${plan.id}.png`} 
+                      alt={`${plan.name} plan`}
+                      className="w-10 h-10 object-contain"
+                      onError={(e) => {
+                        // Fallback to text if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallback = document.createElement('div');
+                        fallback.className = 'text-2xl';
+                        fallback.textContent = 
+                          plan.id === 'basic' ? '🚀' : 
+                          plan.id === 'premium' ? '✨' : '🏢';
+                        target.parentNode?.insertBefore(fallback, target.nextSibling);
+                      }}
+                    />
                   </div>
                   <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                  <p className="text-teal-400 text-2xl font-bold my-2">{plan.price}</p>
-                  <p className="text-gray-400 text-sm mb-4">{plan.description}</p>
-                  <ul className="text-left space-y-2 mt-4 mb-6">
+                  <p className="text-teal-400 text-2xl font-bold ">{plan.price}</p>
+                  <p className="text-gray-400 text-sm">{plan.description}</p>
+                  <ul className="text-left space-y-1 mt-4 ">
                     {plan.features.map((feature, index) => (
                       <li key={index} className="flex items-center text-gray-300 text-sm">
                         <svg className="w-4 h- mr-2 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -164,7 +177,7 @@ const Registration: React.FC = () => {
             ))}
           </div>
 
-          <div className="bg-[#2D3748] p-6 rounded-2xl shadow-xl  max-w-sm mx-auto">
+          <div className="bg-[#1d242f5d] p-6 rounded-2xl shadow-xl  max-w-sm mx-auto">
             <h3 className="text-xl font-bold text-white text-center mb-6">Create Your Account</h3>
             
             <div className="space-y-6">
@@ -234,8 +247,7 @@ const Registration: React.FC = () => {
 
         {/* Footer Branding */}
         <div className="mt-12 text-center text-gray-500 text-sm space-y-1">
-          <p>Intelligensi AI - Cloud Firestore</p>
-          <p>Intelligensi AI – Authentication</p>
+          (c) 2025 intelligensi.ai. All rights reserved.
         </div>
       </div>
     </div>
