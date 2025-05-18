@@ -273,48 +273,34 @@ const Sites: React.FC<SitesProps> = ({
         <span>Connect CMS</span>
       </button>
 
-      <div className="flex pl-40 bg-[#2D3748]"> 
-        <div className="flex overflow-x-auto flex-1 bg-[#344054] py-3 rounded-lg ml-4 border border-gray-600 shadow-sm">
-          {sites.length === 0 ? (
-            <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">
-              No sites connected
-            </div>
-          ) : (
-            sites.map((site) => {
-              // Handle both click and double-click
-              let clickTimeout: NodeJS.Timeout;
-              const handleClick = (e: React.MouseEvent, siteId: number) => {
-                e.stopPropagation();
-                clearTimeout(clickTimeout);
-                clickTimeout = setTimeout(() => {
-                  handleSiteSelect(siteId);
-                }, 200);
-              };
-
-              const handleDoubleClick = (e: React.MouseEvent, site: ISite) => {
-                e.stopPropagation();
-                clearTimeout(clickTimeout);
-                handleEditClick(site);
-              };
-
-              return (
+      <div className="flex pl-40 bg-[#2D3748] gap-4"> 
+        {/* Left side - Site Icons */}
+        <div className="w-2/5 bg-[#344054] py-3 rounded-lg border border-gray-600 shadow-sm ml-4">
+          <div className="flex overflow-x-auto pb-2">
+            {sites.length === 0 ? (
+              <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">
+                No sites connected
+              </div>
+            ) : (
+              sites.map((site) => (
                 <div 
                   key={site.id} 
-                  className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer"
-                  onClick={(e) => handleClick(e, site.id!)}
+                  className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer px-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSiteSelect(site.id!);
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    handleEditClick(site);
+                  }}
                 >
-                  <div 
-                    className="relative p-1.5 rounded-lg group/icon"
-                    onDoubleClick={(e) => handleDoubleClick(e, site)}
-                  >
-                    {/* Selection indicator - invisible but maintains layout */}
+                  <div className="relative p-1.5 rounded-lg group/icon">
                     <div className={`absolute inset-0 rounded-lg transition-all duration-300 ${
                       selectedSiteIdState === site.id 
                         ? 'opacity-0' 
                         : 'group-hover:bg-teal-900/10'
                     }`}></div>
-                    
-                    {/* Image container with consistent sizing */}
                     <div className="relative w-18 h-[4.2rem] flex items-center justify-center">
                       <img
                         src={getSiteIcon(site.cms?.name)}
@@ -333,78 +319,91 @@ const Sites: React.FC<SitesProps> = ({
                     {getSiteDisplayName(site)}
                   </span>
                 </div>
-              );
-            })
-          )}
+              ))
+            )}
+          </div>
         </div>
         
-        <div className="bg-[#2D3748] px-4 py-2 rounded-lg ml-4 border border-gray-600 shadow-sm min-w-[500px] min-h-[230px]">
-          <h3 className="font-semibold mb-1 text-gray-100">Connected CMS</h3>
-          <div className="text-sm text-teal-400 font-medium">
-            {sites.length} site{sites.length !== 1 ? 's' : ''} connected
+        {/* Right side - Buttons and Info */}
+        <div className="flex-1 flex gap-4">
+          {/* Buttons Card */}
+          <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-1/2">
+            <h3 className="font-semibold mb-3 text-gray-100">Site Actions</h3>
+            {selectedSite && (
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={() => setShowContentPreview(true)}
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
+                >
+                  Preview CMS Content
+                </button>
+                <button
+                  onClick={() => handleVectorizeClick(selectedSite)}
+                  className={`w-full py-2 px-3 rounded text-sm font-medium transition-colors ${
+                    vectorizeStatus === 'processing' || vectorizeStatus === 'complete'
+                      ? 'bg-gray-500 cursor-not-allowed'
+                      : vectorizeStatus === 'error'
+                      ? 'bg-red-500 hover:bg-red-600'
+                      : 'bg-teal-600 hover:bg-teal-700'
+                  } text-white`}
+                  disabled={vectorizeStatus === 'processing' || vectorizeStatus === 'complete'}
+                >
+                  {vectorizeStatus === 'processing'
+                    ? 'Processing...'
+                    : vectorizeStatus === 'error'
+                    ? 'Retry Vectorize'
+                    : 'Add to AI Memory'}
+                </button>
+                <button 
+                  onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
+                >
+                  AI Prompt
+                </button>
+                <button 
+                  onClick={() => setShowCreateDrupalSiteForm(true)}
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
+                >
+                  Create New CMS
+                </button>
+                <button 
+                  onClick={() => console.log('Migrate site', selectedSite.id)}
+                  className="w-full bg-teal-900 hover:bg-teal-800 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
+                >
+                  Migrate
+                </button>
+                <button
+                  onClick={() => handleOpenRemoveModal(selectedSite)}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
+                >
+                  Remove Site
+                </button>
+              </div>
+            )}
           </div>
+          
+          {/* Site Info Card */}
           {selectedSite && (
-            <div className="mt-3 space-y-2">
-             <div className="grid grid-cols-2 gap-2">
-               <button 
-                 onClick={() => setShowContentPreview(true)}
-                 className="w-full bg-teal-600 hover:bg-teal-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-               >
-                 Preview CMS Content
-               </button>
-               <button
-                 onClick={() => handleVectorizeClick(selectedSite)}
-                 className={`w-full ${
-                   vectorizeStatus === 'processing' || vectorizeStatus === 'complete'
-                     ? 'bg-gray-500 cursor-not-allowed'
-                     : vectorizeStatus === 'error'
-                     ? 'bg-red-500 hover:bg-red-600'
-                     : 'bg-teal-600 hover:bg-teal-700'
-                 } text-white py-1 px-3 rounded text-sm font-medium transition-colors`}
-                 disabled={vectorizeStatus === 'processing' || vectorizeStatus === 'complete'}
-               >
-                 {vectorizeStatus === 'processing'
-                   ? 'Processing...'
-                   : vectorizeStatus === 'error'
-                   ? 'Retry Vectorize'
-                   : 'Add to AI Memory'}
-               </button>
-               <button 
-                 onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
-                 className="w-full bg-teal-800 hover:bg-teal-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-               >
-                 AI Prompt
-               </button>
-               <button 
-                 onClick={() => setShowCreateDrupalSiteForm(true)}
-                 className="w-full bg-teal-800 hover:bg-teal-900 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-               >
-                 Create New CMS
-               </button>
-               <button 
-                 onClick={() => console.log('Migrate site', selectedSite.id)}
-                 className="w-full bg-teal-900 hover:bg-teal-800 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-               >
-                 Migrate
-               </button>
-               <button
-                 onClick={() => {
-                   if (selectedSite) {
-                     handleOpenRemoveModal(selectedSite);
-                   }
-                 }}
-                 className="w-full bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded text-sm font-medium transition-colors"
-               >
-                 Remove Site
-               </button>
-             </div>
-            
-
-              <div className="mt-4 text-sm text-gray-300">
-                <p><span className="text-gray-400">Name:</span> {selectedSite.site_name}</p>
-                <p><span className="text-gray-400">CMS:</span> {selectedSite.cms.name}</p>
+            <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-1/2">
+              <h3 className="font-semibold mb-3 text-gray-100">Site Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Name</p>
+                    <p className="text-sm text-gray-200">{selectedSite.site_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">CMS</p>
+                    <p className="text-sm text-gray-200">{selectedSite.cms?.name || 'N/A'}</p>
+                  </div>
+                </div>
                 {selectedSite.description && (
-                  <p><span className="text-gray-400">Description:</span> {selectedSite.description}</p>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">Description</p>
+                      <p className="text-sm text-gray-200">{selectedSite.description}</p>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
