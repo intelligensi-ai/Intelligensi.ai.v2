@@ -36,9 +36,20 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#1A202C] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden z-0">
+        <img 
+          src="/images/tech-bg.jpg" 
+          alt="" 
+          className="w-full h-full object-cover"
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0F172A]/90 via-[#0F172A]/80 to-[#0F172A]/90" />
+      </div>
+
       {/* Logo at the very top */}
-      <div className="mb-2">
+      <div className="mb-2 relative z-10">
         <img 
           src="/logocutout.png" 
           alt="Intelligensi Logo" 
@@ -47,18 +58,18 @@ const Auth: React.FC = () => {
       </div>
 
       {/* Header Section */}
-      <div className="text-center mb-6">
+      <div className="text-center mb-6 relative z-10">
         <h1 className="text-4xl font-light text-white mb-1">Intelligensi.ai</h1>
         <p className="text-gray-300 text-lg">
-        The Future of AI is not just smart,<br></br> Its Intelligensi.ai
+        Let's build smarter, faster, together.
         </p>
         <p className="text-gray-400 mt-1 text-sm">
-        Lets build smarter, faster, together.
+          {/* Let's build smarter, faster, together. */}
         </p>
       </div>
 
       {/* Login Card with curved design */}
-      <div className="bg-[#2D3748] p-8 rounded-2xl shadow-xl w-full max-w-md">
+      <div className="bg-[#1d242f5d] p-8 rounded-2xl shadow-xl w-full max-w-md relative z-10 backdrop-blur-sm">
         <h2 className="text-2xl font-bold text-white mb-6 text-center">Login</h2>
         
         <div className="space-y-4">
@@ -122,9 +133,8 @@ const Auth: React.FC = () => {
       </div>
 
       {/* Footer Branding */}
-      <div className="mt-12 text-center text-gray-500 text-sm space-y-1">
-        <p>Intelligensi AI - Cloud Firestore</p>
-        <p>Intelligensi AI – Authentication</p>
+      <div className="mt-12 text-center text-gray-500 text-sm relative z-10">
+        <p>© 2025 intelligensi.ai. All rights reserved.</p>
       </div>
     </div>
   );
