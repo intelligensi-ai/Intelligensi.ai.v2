@@ -201,10 +201,16 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#1A202C] text-white flex flex-col">
       <Header />
-      
       <main className="flex-1 flex flex-col relative">
-        {/* Chat Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 relative">
+        <div className="flex-1 overflow-y-auto p-4" style={{
+          backgroundImage: "url('/images/plans/tech-bg-dashboard.jpg')", 
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
+        }}>
+          
+          {/* Chat Content Area */}
           {/* Initial welcome message when no messages exist */}
           <AnimatePresence>
             {messages.length === 0 && (
