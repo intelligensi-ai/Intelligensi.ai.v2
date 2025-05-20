@@ -203,7 +203,7 @@ export const Dashboard: React.FC = () => {
       <Header />
       <main className="flex-1 flex flex-col relative">
         <div className="flex-1 overflow-y-auto p-4" style={{
-          backgroundImage: "url('/images/plans/tech-bg-dashboard.jpg')", 
+          backgroundImage: `linear-gradient(to bottom, rgba(0, 20, 20, 0.91), rgba(45, 55, 72, 0.96)), url('/images/plans/tech-bg-dashboard.jpg')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',

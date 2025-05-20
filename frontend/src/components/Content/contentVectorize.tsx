@@ -181,7 +181,7 @@ const Vectorize: React.FC<VectorizeProps> = ({ site, onComplete, onError, onClos
     <div className="bg-[#2D3748] rounded-lg  max-w-4xl">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-white">
-          Vectorize Content from {site.site_name}
+          Adding to AI memory content from {site.site_name}
         </h2>
         <button 
           onClick={onClose}
