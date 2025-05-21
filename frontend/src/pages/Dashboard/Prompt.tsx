@@ -45,8 +45,8 @@ const Prompt: React.FC<PromptProps> = ({ onSend, disabled, error: parentError, s
   };
 
   return (
-    <div className="bg-[#1C1F2B] p-4 rounded-md">
-      <form onSubmit={localHandleSubmit} className="flex items-center gap-2">
+    <div className="bg-[#1C1F2B] p-1 pt-1 rounded-md flex flex-col gap-2">
+      <form onSubmit={localHandleSubmit} className="flex flex-row items-center gap-2 flex-1">
         <input
           type="text"
           value={query}

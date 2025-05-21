@@ -58,7 +58,7 @@ const CreateDrupalSiteForm: React.FC<CreateDrupalSiteFormProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-800 rounded-lg p-6 pt-8 w-full max-w-md">
         <h2 className="text-xl font-semibold text-white mb-4">Create New Drupal Site</h2>
         
         <form onSubmit={handleSubmit}>

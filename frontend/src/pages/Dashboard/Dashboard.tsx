@@ -241,7 +241,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Prompt Input Section */}
-        <div className="bg-[#2D3748] rounded-lg m-4 mt-0 p-4">
+        <div className="bg-[#083633] rounded-lg m-4 ">
           <Prompt onSend={handleSend} disabled={isLoading} />
           {error && (
             <div className="text-red-400 text-sm mt-2">
