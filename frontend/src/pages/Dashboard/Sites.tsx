@@ -248,41 +248,66 @@ const Sites: React.FC<SitesProps> = ({
   };
 
   return (
-    <div className="bg-[#2D3748] p-4 border-t border-gray-700 relative">
-      <button 
-        onClick={() => {
-          setCurrentSite(null);
-          setIsFormOpen(true);
-        }}
-        className="absolute top-4 left-4 px-4 py-5 border-teal-200 border-2 font-extrabold bg-teal-500 hover:bg-teal-400 text-white rounded-md text-1xl flex items-center transition-colors duration-200 shadow-md"
-      >
-        <svg 
-          className="w-4 h-4 mr-1" 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            strokeWidth={2} 
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6" 
-          />
-        </svg>
-        <span>Connect CMS</span>
-      </button>
+    <div className="bg-[#2D3748] h-[190px] p-4 border-t border-gray-700">
+      <div className="flex gap-4">
+        {/* Leftmost column - CMS Management Buttons */}
+        <div className="w-[200px] flex flex-col gap-4">
+          <button 
+            onClick={() => {
+              setCurrentSite(null);
+              setIsFormOpen(true);
+            }}
+            className="w-full h-[60px] px-4 py-2 border-teal-200 border-2 font-extrabold bg-teal-500 hover:bg-teal-400 text-white rounded-md text-1xl flex items-center justify-center transition-colors duration-200 shadow-md"
+          >
+            <svg 
+              className="w-4 h-4 mr-2" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24" 
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6" 
+              />
+            </svg>
+            <span>Connect CMS</span>
+          </button>
+          
+          <button 
+            onClick={() => setShowCreateDrupalSiteForm(true)}
+            className="w-full h-[60px] px-4 py-2 border-teal-200 border-2 font-extrabold bg-teal-600 hover:bg-teal-500 text-white rounded-md text-1xl flex items-center justify-center transition-colors duration-200 shadow-md"
+          >
+            <svg 
+              className="w-4 h-5 mr-2" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24" 
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6" 
+              />
+            </svg>
+            <span>Create New CMS</span>
+          </button>
+        </div>
 
-      <div className="flex pl-40 bg-[#2D3748] gap-4"> 
-        {/* Left side - Site Icons - Reduced from 2/5 (40%) to ~32% */}
-        <div className="w-[32%] bg-[#344054] py-3 rounded-lg border border-gray-600 shadow-sm ml-4">
-          <div className="flex overflow-x-auto pb-2">
+        {/* Middle column - Site Icons */}
+        <div className="bg-[#344054] py-3 rounded-lg border border-gray-600 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto px-2">
             {sites.length === 0 ? (
-              <div className="flex flex-1 justify-center px-2 text-gray-400 italic font-bold items-center">
+              <div className="flex justify-center items-center w-full h-24 text-gray-400 italic font-bold">
                 No sites connected
               </div>
             ) : (
-              sites.map((site) => (
+              <div className="flex space-x-4 w-max">
+                {sites.map((site) => (
                 <div 
                   key={site.id} 
                   className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer px-2"
@@ -319,7 +344,8 @@ const Sites: React.FC<SitesProps> = ({
                     {getSiteDisplayName(site)}
                   </span>
                 </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -328,7 +354,6 @@ const Sites: React.FC<SitesProps> = ({
         <div className="flex-1 flex gap-4">
           {/* Buttons Card - Slightly reduced width to make room for info */}
           <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-[45%]">
-            <h3 className="font-semibold mb-3 text-gray-100">Site Actions</h3>
             {selectedSite && (
               <div className="grid grid-cols-2 gap-2">
                 <button 
@@ -360,12 +385,7 @@ const Sites: React.FC<SitesProps> = ({
                 >
                   AI Prompt
                 </button>
-                <button 
-                  onClick={() => setShowCreateDrupalSiteForm(true)}
-                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
-                >
-                  Create New CMS
-                </button>
+                {/* Create New CMS button moved to left column */}
                 <button 
                   onClick={() => console.log('Migrate site', selectedSite.id)}
                   className="w-full bg-teal-900 hover:bg-teal-800 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
