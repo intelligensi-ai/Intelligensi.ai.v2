@@ -360,7 +360,7 @@ const Sites: React.FC<SitesProps> = ({
                   onClick={() => setShowContentPreview(true)}
                   className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
                 >
-                  Preview CMS Content
+                  Preview Content
                 </button>
                 <button
                   onClick={() => handleVectorizeClick(selectedSite)}
