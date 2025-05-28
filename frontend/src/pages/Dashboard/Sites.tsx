@@ -248,7 +248,7 @@ const Sites: React.FC<SitesProps> = ({
   };
 
   return (
-    <div className="bg-[#2D3748] h-[190px] p-4 border-t border-gray-700">
+    <div className="bg-[#2D3748] h-[210px] p-4 border-t border-gray-700">
       <div className="flex gap-4">
         {/* Leftmost column - CMS Management Buttons */}
         <div className="w-[200px] flex flex-col gap-4">
@@ -404,7 +404,7 @@ const Sites: React.FC<SitesProps> = ({
           
           {/* Site Info Card - Increased width from 1/2 to 55% */}
           {selectedSite && (
-            <div className="bg-[#2D3748] px-10rounded-lg border border-gray-600 shadow-sm w-[55%]">
+            <div className="bg-[#2D3748] px-10rounded-lg border rounded border-gray-600 shadow-sm w-[55%]">
               <h2 className="text-sm font-semibold px-4  text-gray-100 tracking-wider mb-3 pb-1 border-b border-gray-600">Site Information</h2>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2 px-4">
