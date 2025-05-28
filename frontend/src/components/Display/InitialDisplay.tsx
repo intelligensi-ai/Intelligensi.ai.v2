@@ -47,7 +47,7 @@ const InitialDisplay: React.FC<InitialDisplayProps> = ({ show }) => {
             repeat: Infinity,
             ease: "easeInOut"
           }}
-          className="text-1xl font-light text-white"
+          className="text-xl font-light text-white"
         >
           Welcome to Intelligensi.ai
         </motion.h1>

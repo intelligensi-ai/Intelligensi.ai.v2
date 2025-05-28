@@ -273,7 +273,7 @@ const Sites: React.FC<SitesProps> = ({
                 d="M12 6v6m0 0v6m0-6h6m-6 0H6" 
               />
             </svg>
-            <span>Connect CMS</span>
+            <span>Connect</span>
           </button>
           
           <button 
@@ -294,7 +294,7 @@ const Sites: React.FC<SitesProps> = ({
                 d="M12 6v6m0 0v6m0-6h6m-6 0H6" 
               />
             </svg>
-            <span>Create New CMS</span>
+            <span>Create</span>
           </button>
         </div>
 
@@ -404,23 +404,23 @@ const Sites: React.FC<SitesProps> = ({
           
           {/* Site Info Card - Increased width from 1/2 to 55% */}
           {selectedSite && (
-            <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-[55%]">
-              <h3 className="font-semibold mb-3 text-gray-100">Site Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-3">
+            <div className="bg-[#2D3748] px-10rounded-lg border border-gray-600 shadow-sm w-[55%]">
+              <h2 className="text-sm font-semibold px-4  text-gray-100 tracking-wider mb-3 pb-1 border-b border-gray-600">Site Information</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2 px-4">
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">Name</p>
+                    <p className="text-xs text-gray-400 mb-0.5">Name</p>
                     <p className="text-sm text-gray-200">{selectedSite.site_name}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">CMS</p>
+                    <p className="text-xs text-gray-400 mb-0.5">CMS</p>
                     <p className="text-sm text-gray-200">{selectedSite.cms?.name || 'N/A'}</p>
                   </div>
                 </div>
                 {selectedSite.description && (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div>
-                      <p className="text-xs text-gray-400 mb-1">Description</p>
+                      <p className="text-xs text-gray-400 mb-0.5">Description</p>
                       <p className="text-sm text-gray-200">{selectedSite.description}</p>
                     </div>
                   </div>

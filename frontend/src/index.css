@@ -1,17 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Base styles */
+html {
+  font-size: 15px;
 }
 
+body {
+  font-family: 'Poppins', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #111827;
+  font-size: 0.9rem !important; /* Base font size */
+  line-height: 1.5;
+}
+
+/* Explicit font sizes */
+.text-xs { font-size: 0.75rem !important; }
+.text-sm { font-size: 0.85rem !important; }
+.text-base { font-size: 0.9rem !important; }
+.text-lg { font-size: 1rem !important; }
+.text-xl { font-size: 1.1rem !important; }
+.text-2xl { font-size: 1.25rem !important; }
+.text-3xl { font-size: 1.5rem !important; }
+.text-4xl { font-size: 1.75rem !important; }
+.text-5xl { font-size: 2rem !important; }
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 300 !important;
+  letter-spacing: -0.025em;
+  margin: 0.5em 0;
+}
+
+h1 { font-size: 1.75rem !important; }
+h2 { font-size: 1.5rem !important; }
+h3 { font-size: 1.25rem !important; }
+h4 { font-size: 1.1rem !important; }
+h5 { font-size: 1rem !important; }
+h6 { font-size: 0.9rem !important; }
+
+/* Base styles for elements that need explicit styling */
+button, .btn {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Custom utility classes */
+.font-light {
+  font-weight: 300;
+}
+
+/* Ensure code blocks are readable */
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
 }

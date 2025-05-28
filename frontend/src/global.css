@@ -1,0 +1,37 @@
+/* Global Styles */
+:root {
+  --font-size-base: 1.0625rem; /* 17px */
+}
+
+/* Apply base font size to all elements */
+* {
+  font-size: var(--font-size-base) !important;
+}
+
+/* Set base font size on html */
+html {
+  font-size: var(--font-size-base) !important;
+}
+
+/* Set font family and other base styles */
+body {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
+
+/* Ensure text elements inherit the base font size */
+p, span, div, button, input, textarea, select, label, a {
+  font-size: inherit !important;
+}
+
+/* Adjust heading sizes proportionally */
+h1 { font-size: 2.5em !important; }
+h2 { font-size: 2em !important; }
+h3 { font-size: 1.75em !important; }
+h4 { font-size: 1.5em !important; }
+h5 { font-size: 1.25em !important; }
+h6 { font-size: 1.1em !important; }
