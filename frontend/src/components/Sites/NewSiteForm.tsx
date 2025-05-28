@@ -235,6 +235,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         company_id: formData.company_id,
         site_name: formData.site_name.trim(),
         site_url: siteUrl,
+        description: formData.description, // Include description field
         mysql_file_url: formData.mysql_file_url,
         status: initialData?.id ? formData.status : 'pending', // Initial status for new sites
         migration_ids: formData.migration_ids,
