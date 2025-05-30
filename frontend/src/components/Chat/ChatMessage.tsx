@@ -9,7 +9,7 @@ interface ChatMessageProps {
 // Helper function to get CMS icon path
 const getCmsIcon = (cmsName: string): string => {
   const icons: Record<string, string> = {
-    'drupal': '/icons/drupal7.png',
+    'drupal': '/icons/drupal.png',
     'wordpress': '/icons/wordpress.png',
     'joomla': '/icons/joomla.png',
   };

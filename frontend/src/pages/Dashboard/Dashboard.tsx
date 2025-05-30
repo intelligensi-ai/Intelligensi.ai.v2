@@ -169,14 +169,23 @@ export const Dashboard: React.FC = () => {
     // Ensure the newSite object being added to state has the CMS object structured correctly
     // and includes schema_id if available.
     console.log("Adding new site to dashboard state:", newSite);
-    setSites(prev => [newSite, ...prev]); // Add to the beginning of the list
+    setSites(prev => {
+      const updatedSites = [newSite, ...prev];
+      console.log('Updated sites list:', updatedSites);
+      return updatedSites;
+    });
   };
 
   // Handle updating an existing site
   const handleUpdateSite = (updatedSite: ISite) => {
-    setSites(prev => prev.map(site => 
-      site.id === updatedSite.id ? updatedSite : site
-    ));
+    console.log('Updating site:', updatedSite);
+    setSites(prev => {
+      const updatedSites = prev.map(site => 
+        site.id === updatedSite.id ? updatedSite : site
+      );
+      console.log('Sites after update:', updatedSites);
+      return updatedSites;
+    });
   };
 
   // Helper function to add site-related chat messages
@@ -256,14 +265,29 @@ export const Dashboard: React.FC = () => {
         sites={sites} 
         onSiteAdded={handleAddSite} 
         onSiteUpdated={handleUpdateSite}
+        onSiteRemoved={(siteId) => {
+          console.log('Removing site with ID:', siteId);
+          setSites(prevSites => {
+            const updatedSites = prevSites.filter(site => site.id !== siteId);
+            console.log('Sites after removal:', updatedSites);
+            return updatedSites;
+          });
+        }}
         onAddChatMessage={(message) => {
+          console.log('Received chat message in Dashboard:', message);
+          
           // message.site might be a partial site object or just contain an ID
           // We need to find the full site from our state to get all details
           const siteFromMessage = message.site;
+          console.log('Site from message:', siteFromMessage);
+          
           if (siteFromMessage && siteFromMessage.id !== undefined) {
+            console.log('Looking for site with ID:', siteFromMessage.id, 'in sites:', sites);
             const fullSite = sites.find(s => s.id === siteFromMessage.id);
+            console.log('Found site:', fullSite);
 
             if (fullSite) {
+              console.log('Creating chat message for site:', fullSite);
               addSiteChatMessage(
                 {
                   // Construct the payload using data from fullSite
@@ -284,7 +308,29 @@ export const Dashboard: React.FC = () => {
               );
             } else {
               console.warn('Site for chat message not found in state:', siteFromMessage.id);
+              // Try to use the site data from the message if available
+              if (siteFromMessage.site_name) {
+                console.log('Using site data from message');
+                addSiteChatMessage(
+                  {
+                    id: siteFromMessage.id,
+                    user_id: siteFromMessage.user_id || currentUser?.uid || '',
+                    site_name: siteFromMessage.site_name,
+                    site_url: siteFromMessage.site_url,
+                    cms: {
+                      id: siteFromMessage.cms?.id || 0,
+                      name: siteFromMessage.cms?.name || 'Unknown CMS',
+                      user_id: siteFromMessage.cms?.user_id || siteFromMessage.user_id || currentUser?.uid || ''
+                    },
+                    description: siteFromMessage.description || '',
+                    schema_id: siteFromMessage.schema_id || null,
+                  },
+                  message.text.includes('updated')
+                );
+              }
             }
+          } else {
+            console.warn('No site ID in message:', message);
           }
         }}
         onSiteSelected={(site) => {

@@ -117,6 +117,31 @@ const Sites: React.FC<SitesProps> = ({
       } else {
         onSiteAdded(updatedSite);
         toast.success('Site added successfully');
+        
+        // Add chat message for new site
+        if (onAddChatMessage) {
+          const chatMessage = {
+            site: {
+              id: updatedSite.id || Date.now(),
+              site_name: updatedSite.site_name,
+              site_url: updatedSite.site_url,
+              cms: {
+                name: updatedSite.cms?.name || 'Unknown',
+                id: updatedSite.cms?.id || 0,
+                user_id: updatedSite.user_id || ''
+              },
+              description: updatedSite.description,
+              schema_id: updatedSite.schema_id || null,
+              user_id: updatedSite.user_id || ''
+            },
+            text: `Site "${updatedSite.site_name}" has been connected`
+          };
+          
+          console.log('Sending chat message:', chatMessage);
+          onAddChatMessage(chatMessage);
+        } else {
+          console.warn('onAddChatMessage is not defined');
+        }
       }
 
       // If we have a valid ID, select the site
@@ -196,16 +221,21 @@ const Sites: React.FC<SitesProps> = ({
   };
 
   const handleConfirmRemoveSite = async () => {
-    if (!siteToRemove) return;
+    if (!siteToRemove) {
+      console.error('No site to remove');
+      return;
+    }
 
+    console.log('Starting site removal for ID:', siteToRemove.id);
     setIsRemovingSite(true);
     setRemoveSiteError(null);
 
     try {
       const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
       if (!apiBaseUrl) {
-        console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
-        setRemoveSiteError("Configuration error. Please contact support."); 
+        const errorMsg = "CRITICAL: REACT_APP_API_BASE_URL is not defined.";
+        console.error(errorMsg);
+        setRemoveSiteError("Configuration error. Please contact support.");
         setIsRemovingSite(false);
         return;
       }
@@ -216,22 +246,40 @@ const Sites: React.FC<SitesProps> = ({
         siteId: siteToRemove.id,
       });
 
+      console.log('Delete site response:', response.data);
+
       if (response.data.success) {
         console.log(`Site ${siteToRemove.id} successfully deleted from backend.`);
-        setSites(prevSites => prevSites.filter(s => s.id !== siteToRemove.id));
+        
+        // Update local state
+        setSites(prevSites => {
+          const updatedSites = prevSites.filter(s => s.id !== siteToRemove.id);
+          console.log('Updated sites after removal:', updatedSites);
+          return updatedSites;
+        });
 
         if (selectedSiteIdState === siteToRemove.id) {
+          console.log('Deselecting removed site:', selectedSiteIdState);
           onSiteSelected(null);
-          setSelectedSiteIdState(null); 
+          setSelectedSiteIdState(null);
+        } else {
+          console.log('No need to deselect, current selection:', selectedSiteIdState);
         }
 
-        onSiteRemoved?.(siteToRemove.id);
+        // Call the onSiteRemoved callback if provided
+        if (onSiteRemoved) {
+          console.log('Calling onSiteRemoved with ID:', siteToRemove.id);
+          onSiteRemoved(siteToRemove.id);
+        } else {
+          console.warn('onSiteRemoved callback is not defined');
+        }
         
         handleCloseRemoveModal();
         console.log("Site removal UI updated and modal closed.");
       } else {
-        console.error("Backend failed to delete site:", response.data.error);
-        throw new Error(response.data.error || "Failed to delete site from server.");
+        const errorMsg = response.data.error || "Failed to delete site from server.";
+        console.error("Backend failed to delete site:", errorMsg);
+        throw new Error(errorMsg);
       }
 
     } catch (error: any) {
@@ -451,6 +499,7 @@ const Sites: React.FC<SitesProps> = ({
           // Refresh the sites list
           fetchSites();
         }}
+        onAddChatMessage={onAddChatMessage}
       />
 
       <React.Suspense fallback={null}>

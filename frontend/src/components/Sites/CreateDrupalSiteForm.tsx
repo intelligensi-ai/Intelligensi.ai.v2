@@ -1,17 +1,28 @@
 import React, { useState } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFunctions, httpsCallable, HttpsCallableResult } from 'firebase/functions';
 import { toast } from 'react-toastify';
+
+interface DrupalSiteData {
+  id?: string | number;
+  siteName?: string;
+  name?: string;
+  url?: string;
+  siteUrl?: string;
+  // Add any other properties that might be returned by the createDrupalSite function
+}
 
 interface CreateDrupalSiteFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (data: any) => void;
+  onAddChatMessage?: (message: any) => void;
 }
 
 const CreateDrupalSiteForm: React.FC<CreateDrupalSiteFormProps> = ({
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
+  onAddChatMessage
 }) => {
   const [siteName, setSiteName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +43,10 @@ const CreateDrupalSiteForm: React.FC<CreateDrupalSiteFormProps> = ({
 
     try {
       const functions = getFunctions();
-      const createDrupalSite = httpsCallable(functions, 'createDrupalSite');
+      const createDrupalSite = httpsCallable<{ customName: string }, DrupalSiteData>(
+        functions, 
+        'createDrupalSite'
+      );
       
       const result = await createDrupalSite({
         customName: siteName.trim()
@@ -40,10 +54,39 @@ const CreateDrupalSiteForm: React.FC<CreateDrupalSiteFormProps> = ({
       
       console.log('Create Drupal Site result:', result.data);
       
+      const siteData = result.data;
+      const siteNameDisplay = siteData.siteName || siteData.name || 'New Drupal Site';
+      const siteId = siteData.id || Date.now();
+      const siteUrl = siteData.url || siteData.siteUrl || '#';
+      
       toast.success('Drupal site creation initiated successfully!');
       
+      // Add chat message with site details
+      if (onAddChatMessage) {
+        const siteIdNum = typeof siteId === 'string' ? parseInt(siteId, 10) : siteId;
+        onAddChatMessage({
+          id: Date.now().toString(),
+          text: `Drupal site "${siteNameDisplay}" has been created`,
+          sender: 'assistant',
+          status: 'sent',
+          timestamp: new Date(),
+          site: {
+            id: siteIdNum,
+            site_name: siteNameDisplay,
+            site_url: siteUrl,
+            cms: {
+              id: 1, // Assuming 1 is the ID for Drupal in your CMS table
+              name: 'Drupal',
+              user_id: '' // This will be filled in by the Dashboard component
+            },
+            description: 'New Drupal site',
+            schema_id: null
+          }
+        });
+      }
+      
       if (onSuccess) {
-        onSuccess(result.data);
+        onSuccess(siteData);
       }
       
       onClose();
