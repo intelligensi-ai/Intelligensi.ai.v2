@@ -159,7 +159,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
                   key={node.nid} 
                   className="bg-[#344054] p-4 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors"
                 >
-                  <h3 className="font-bold text-teal-400 truncate">{node.title}</h3>
+                  <h3 className="font-bold text-sm text-teal-400 truncate">{node.title}</h3>
                   <div className="text-xs text-gray-400 mb-2">
                     {formatDate(node.created)} | {node.type} | {node.status === "1" ? "Published" : "Unpublished"}
                   </div>

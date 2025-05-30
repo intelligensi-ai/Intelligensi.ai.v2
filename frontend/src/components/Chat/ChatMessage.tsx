@@ -39,7 +39,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         
         {/* Site card if present */}
         {message.site && (
-          <div className={`mt-2 ${message.type === 'vectorization' ? 'bg-blue-700 border border-blue-500' : 'bg-white bg-opacity-10'} p-3 rounded-md relative`}>
+          <div className={`mt-2 ${message.type === 'vectorization' ? 'bg-blue-700 border border-blue-500' : 'bg-teal-900/30 border border-teal-800/50'} p-3 rounded-md relative`}>
             {/* Large top-right CMS Icon */}
             <div className="absolute top-2 right-2">
               <img 

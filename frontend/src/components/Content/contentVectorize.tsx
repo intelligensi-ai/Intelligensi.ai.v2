@@ -209,7 +209,7 @@ const Vectorize: React.FC<VectorizeProps> = ({ site, onComplete, onError, onClos
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-h-96 overflow-y-auto">
         {content.slice(0, 6).map((node) => (
           <div key={node.nid} className="bg-[#344054] p-3 rounded border border-gray-600">
-            <h3 className="font-bold text-teal-400 truncate">{node.title}</h3>
+            <h3 className="font-bold text-sm text-teal-400 truncate">{node.title}</h3>
             <p className="text-gray-300 text-sm line-clamp-2">
               {cleanBodyText(node.body)}
             </p>
