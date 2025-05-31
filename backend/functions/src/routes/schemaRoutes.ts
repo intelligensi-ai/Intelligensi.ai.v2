@@ -44,7 +44,12 @@ function inferZodSchemaFromObject(obj: Record<string, unknown>): z.ZodObject<Rec
   const shape: Record<string, z.ZodTypeAny> = {};
 
   // Common optional fields in Drupal
-  const OPTIONAL_FIELDS = [
+  type OptionalField =
+    | "field_image" | "field_tags" | "field_category" | "field_body" | "field_summary"
+    | "field_media" | "field_date" | "field_link" | "field_reference" | "field_boolean"
+    | "field_paragraph" | "field_entity_reference" | "field_taxonomy" | "field_terms";
+
+  const OPTIONAL_FIELDS: readonly OptionalField[] = [
     "field_image", "field_tags", "field_category", "field_body", "field_summary",
     "field_media", "field_date", "field_link", "field_reference", "field_boolean",
     "field_paragraph", "field_entity_reference", "field_taxonomy", "field_terms",
@@ -65,9 +70,8 @@ function inferZodSchemaFromObject(obj: Record<string, unknown>): z.ZodObject<Rec
     // Explicitly handle numeric fields
     if (NUMERIC_FIELDS.includes(key as NumericField)) {
       fieldSchema = z.coerce.number();
-    }
-    // Handle common Drupal fields
-    else if (key.startsWith("field_")) {
+    } else if (key.startsWith("field_")) {
+      // Handle common Drupal fields
       if (OPTIONAL_OBJECT_FIELDS.some((prefix: string) => key.startsWith(prefix))) {
         // Handle object fields (images, media, etc.)
         fieldSchema = z.record(z.unknown()).optional();
@@ -81,14 +85,13 @@ function inferZodSchemaFromObject(obj: Record<string, unknown>): z.ZodObject<Rec
         // Default for other field_* fields
         fieldSchema = z.unknown().optional();
       }
-    }
-    // Handle standard fields
-    else {
+    } else {
+      // Handle standard fields
       // Pass the key to inferFieldType for better type inference
       fieldSchema = inferFieldType(value, key);
 
       // Make common optional fields optional
-      if (OPTIONAL_FIELDS.includes(key as any) || key.endsWith("_value") || key.endsWith("_format")) {
+      if ((OPTIONAL_FIELDS as readonly string[]).includes(key) || key.endsWith("_value") || key.endsWith("_format")) {
         fieldSchema = fieldSchema.optional();
       }
     }
@@ -102,7 +105,6 @@ function inferZodSchemaFromObject(obj: Record<string, unknown>): z.ZodObject<Rec
 // Common numeric fields in Drupal that should be coerced to numbers
 type NumericField = "nid" | "created" | "changed" | "uid" | "vid" | "revision_id" | "revision_uid";
 const NUMERIC_FIELDS: NumericField[] = ["nid", "created", "changed", "uid", "vid", "revision_id", "revision_uid"];
-
 
 
 /**
@@ -151,14 +153,14 @@ function inferFieldType(value: unknown, key?: string): z.ZodTypeAny {
 
   // Handle other primitive types
   switch (typeof value) {
-    case "string":
-      return z.string();
-    case "number":
-      return z.number();
-    case "boolean":
-      return z.boolean();
-    default:
-      return z.unknown();
+  case "string":
+    return z.string();
+  case "number":
+    return z.number();
+  case "boolean":
+    return z.boolean();
+  default:
+    return z.unknown();
   }
 }
 

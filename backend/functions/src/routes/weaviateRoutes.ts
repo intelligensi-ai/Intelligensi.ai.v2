@@ -116,19 +116,25 @@ export const writeWeaviate = onRequest(async (req, res) => {
 
     const results = [];
     for (const obj of objectsToCreate) {
+      const requestBody = {
+        class: obj.class || "intelligensiAi", // Default class if not specified
+        properties: obj.properties
+      };
+      
+      console.log('Sending to Weaviate:', JSON.stringify(requestBody, null, 2));
+      
       const response = await axios.post(
         `${weaviateUrl}/v1/objects`,
-        {
-          class: obj.class || "intelligensiAi", // Default class if not specified
-          properties: obj.properties,
-        },
+        requestBody,
         {
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${weaviateApiKey}`,
             "X-OpenAI-Api-Key": openAiKey,
+            "X-OpenAI-BaseURL": "https://api.openai.com/v1"
           },
-          timeout: 10000,
+          timeout: 30000, // Increased timeout for vectorization
+          validateStatus: () => true // Don't throw on HTTP error status codes
         }
       );
       results.push({

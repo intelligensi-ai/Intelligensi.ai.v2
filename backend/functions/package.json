@@ -29,6 +29,7 @@
     "firebase-functions": "^6.0.1",
     "jsonwebtoken": "^9.0.2",
     "weaviate-client": "^3.5.1",
+    "weaviate-ts-client": "^2.2.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {

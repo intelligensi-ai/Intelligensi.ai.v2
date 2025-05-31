@@ -56,6 +56,6 @@ export {
   writeSchema,
   writeWeaviate,
   createSchema,
-  deleteSite, // <-- Export new function
+  deleteSite,
   createDrupalSite,
 };
