@@ -23,13 +23,26 @@ setGlobalOptions({
   maxInstances: 10,
 });
 
-// Drupal 7 Express app (from HEAD)
+// Drupal 7 Express app
 const drupal7App = express();
+drupal7App.use(express.json());
+drupal7App.use(cors({ origin: true }));
 drupal7App.use("/", drupal7Router);
+
+// Add health check endpoint for Cloud Run
+drupal7App.get("/healthz", (req, res) => {
+  res.status(200).send("ok");
+});
+
+// Export the drupal7 function with proper configuration for Cloud Run
 export const drupal7 = onRequest({
   region: "us-central1",
   memory: "1GiB",
   timeoutSeconds: 60,
+  minInstances: 0,
+  maxInstances: 10,
+  concurrency: 80,
+  cpu: 1,
 }, drupal7App);
 
 // Auth Express app (incorporating from ea22d36)

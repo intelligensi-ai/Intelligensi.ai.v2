@@ -12,7 +12,7 @@ const client = weaviate.client({
   host: "o8rpm9n6tz69qo7mrhl1a.c0.europe-west3.gcp.weaviate.cloud",
   apiKey: new ApiKey("pqb7M3NvwICXPvO4Cf72knOhrplAqWNiKRy4"),
   headers: {
-    "X-OpenAI-Api-Key": process.env.OPENAI_API_KEY as string
+    "X-OpenAI-Api-Key": process.env.OPENAI_API_KEY as string,
   },
 });
 
@@ -40,17 +40,18 @@ export const simpleSearch = onRequest(async (req, res) => {
   }
   try {
     // Parse the request body if it exists
-    let query, limit;
-    
-    if (req.method === 'POST' && req.headers['content-type'] === 'application/json') {
+    let query;
+    let prompt;
+
+    if (req.method === "POST" && req.headers["content-type"] === "application/json") {
       // Get from request body for POST requests
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
       query = body.query;
-      limit = body.limit || 10;
+      prompt = body.prompt;
     } else {
       // Get from query parameters for GET requests
       query = req.query.query;
-      limit = req.query.limit || 10;
+      prompt = req.query.prompt as string | undefined;
     }
 
     // Validate query parameter
@@ -59,22 +60,39 @@ export const simpleSearch = onRequest(async (req, res) => {
       return;
     }
 
-    // Execute the search
+    // Execute the search with text generation
     const result = await client.graphql
       .get()
       .withClassName("IntelligensiAi")
       .withFields(`
-        _additional {
-          certainty
-        }
         title
         body
-        nid
+        _additional {
+          generate(
+            singleResult: {
+              prompt: "${
+  prompt ||
+                `Transform this article into a captivating read about ${query}.\n` +
+                "Follow this structure:\n" +
+                "1. Start with a surprising fact or question to hook readers.\n" +
+                "2. Simplify technical terms for a general audience.\n" +
+                "3. End with an intriguing thought about future discoveries.\n\n" +
+                "Title: {title}\n" +
+                "Content: {body}"
+}"
+            }
+          ) {
+            singleResult
+            error
+          }
+          certainty
+        }
       `)
       .withNearText({
-        concepts: ["can you find a poem"]
+        concepts: [query as string],
+        certainty: 0.72,
       })
-      .withLimit(Number(limit))
+      .withLimit(1)
       .do();
 
     // Send results
