@@ -1,11 +1,16 @@
+import * as dotenv from "dotenv";
 import { onRequest } from "firebase-functions/v2/https";
 import weaviate, { WeaviateClient, ApiKey } from "weaviate-client";
 import axios, { isAxiosError } from "axios";
 
+// Load environment variables from .env file
+dotenv.config({ path: `${process.cwd()}/.env` });
+
 // Environment variables
 const weaviateUrl = process.env.WEAVIATE_URL as string;
 const weaviateApiKey = process.env.WEAVIATE_API_KEY as string;
-const openAiKey = process.env.OPENAI_API_KEY as string;
+
+console.log("Weaviate URL:", weaviateUrl);
 
 /**
  * Initializes the Weaviate client and logs readiness.
@@ -15,6 +20,7 @@ async function initializeWeaviateClient(): Promise<WeaviateClient> {
     weaviateUrl,
     {
       authCredentials: new ApiKey(weaviateApiKey),
+      // No OpenAI headers needed
     }
   );
 
@@ -41,7 +47,7 @@ export const checkWeaviate = onRequest(async function(req, res) {
 /**
  * Firebase HTTPS function to write schema to Weaviate.
  */
-export const writeSchema = onRequest(async function(req, res) {
+export const writeSchema = onRequest(async (req, res) => {
   try {
     const classSchema = {
       class: "intelligensiAi",
@@ -118,11 +124,11 @@ export const writeWeaviate = onRequest(async (req, res) => {
     for (const obj of objectsToCreate) {
       const requestBody = {
         class: obj.class || "intelligensiAi", // Default class if not specified
-        properties: obj.properties
+        properties: obj.properties,
       };
-      
-      console.log('Sending to Weaviate:', JSON.stringify(requestBody, null, 2));
-      
+
+      console.log("Sending to Weaviate:", JSON.stringify(requestBody, null, 2));
+
       const response = await axios.post(
         `${weaviateUrl}/v1/objects`,
         requestBody,
@@ -130,11 +136,10 @@ export const writeWeaviate = onRequest(async (req, res) => {
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${weaviateApiKey}`,
-            "X-OpenAI-Api-Key": openAiKey,
-            "X-OpenAI-BaseURL": "https://api.openai.com/v1"
+
           },
           timeout: 30000, // Increased timeout for vectorization
-          validateStatus: () => true // Don't throw on HTTP error status codes
+          validateStatus: () => true, // Don't throw on HTTP error status codes
         }
       );
       results.push({
