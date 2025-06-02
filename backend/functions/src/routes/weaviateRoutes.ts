@@ -1,6 +1,6 @@
 import * as dotenv from "dotenv";
 import { onRequest } from "firebase-functions/v2/https";
-import weaviate, { WeaviateClient, ApiKey } from "weaviate-client";
+import weaviate, { ApiKey } from "weaviate-ts-client";
 import axios, { isAxiosError } from "axios";
 
 // Load environment variables from .env file
@@ -15,18 +15,21 @@ console.log("Weaviate URL:", weaviateUrl);
 /**
  * Initializes the Weaviate client and logs readiness.
  */
-async function initializeWeaviateClient(): Promise<WeaviateClient> {
-  const client: WeaviateClient = await weaviate.connectToWeaviateCloud(
-    weaviateUrl,
-    {
-      authCredentials: new ApiKey(weaviateApiKey),
-      // No OpenAI headers needed
-    }
-  );
+async function initializeWeaviateClient() {
+  const client = weaviate.client({
+    scheme: "https",
+    host: weaviateUrl.replace(/^https?:\/\//, ""), // Remove http:// or https:// from URL
+    apiKey: new ApiKey(weaviateApiKey),
+  });
 
-  const clientReadiness = await client.isReady();
-  console.log("Weaviate client ready:", clientReadiness);
-  return client;
+  try {
+    const isReady = await client.misc.metaGetter().do();
+    console.log("Weaviate client ready:", isReady);
+    return client;
+  } catch (error) {
+    console.error("Failed to connect to Weaviate:", error);
+    throw error;
+  }
 }
 
 /**
@@ -34,9 +37,8 @@ async function initializeWeaviateClient(): Promise<WeaviateClient> {
  */
 export const checkWeaviate = onRequest(async function(req, res) {
   try {
-    const client = await initializeWeaviateClient();
+    await initializeWeaviateClient();
     res.status(200).send("Weaviate is ready.");
-    client.close();
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error("❌ Weaviate init error:", errorMsg);

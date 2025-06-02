@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import CreateDrupalSiteForm from '../../components/Sites/CreateDrupalSiteForm';
-import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, BoltIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import axios from "axios";
 import { User } from "firebase/auth";
 import { ISite, ICMS } from "../../types/sites";
@@ -49,6 +49,11 @@ const Sites: React.FC<SitesProps> = ({
   const [isRemovingSite, setIsRemovingSite] = useState<boolean>(false);
   const [removeSiteError, setRemoveSiteError] = useState<string | null>(null);
   const [showCreateDrupalSiteForm, setShowCreateDrupalSiteForm] = useState(false);
+  const [showAIPrompt, setShowAIPrompt] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState('');
   
   // Derive selectedSite from selectedSiteIdState
   const selectedSite = sites.find(site => site.id === selectedSiteIdState) || null;
@@ -428,7 +433,7 @@ const Sites: React.FC<SitesProps> = ({
                     : 'Add to AI Memory'}
                 </button>
                 <button 
-                  onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
+                  onClick={() => setShowAIPrompt(true)}
                   className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
                 >
                   AI Prompt
@@ -489,6 +494,139 @@ const Sites: React.FC<SitesProps> = ({
         initialData={currentSite}
         currentUser={currentUser} 
       />
+
+      {/* AI Prompt Modal */}
+      {showAIPrompt && selectedSite && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#2D3748] rounded-lg shadow-xl w-full max-w-2xl border border-teal-600">
+            <div className="flex justify-between items-center p-4 border-b border-gray-600">
+              <h3 className="text-lg font-semibold text-white">AI Content Generator</h3>
+              <button 
+                onClick={() => {
+                  setShowAIPrompt(false);
+                  setSearchResult('');
+                  setAiQuery('');
+                  setAiPrompt('');
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Search Query
+                </label>
+                <input
+                  type="text"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  className="w-full bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  placeholder="Enter your search query..."
+                  disabled={isSearching}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Custom Prompt (optional)
+                </label>
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  className="w-full h-32 bg-gray-700 text-white px-3 py-2 rounded-md border border-gray-600 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  placeholder="Customize how the AI should process the results..."
+                  disabled={isSearching}
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Default: Transform the content into a captivating article
+                </p>
+              </div>
+
+              <input type="hidden" name="certainty" value="0.72" />
+
+              {searchResult && (
+                <div className="mt-4 p-4 bg-gray-800 rounded-md">
+                  <h4 className="font-medium text-teal-400 mb-2">Generated Content:</h4>
+                  <div className="prose prose-invert max-w-none">
+                    {searchResult.split('\n').map((paragraph, i) => (
+                      <p key={i} className="text-gray-200">{paragraph}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowAIPrompt(false);
+                    setSearchResult('');
+                    setAiQuery('');
+                    setAiPrompt('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-md hover:bg-gray-600"
+                  disabled={isSearching}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!aiQuery.trim()) {
+                      toast.error('Please enter a search query');
+                      return;
+                    }
+
+                    setIsSearching(true);
+                    setSearchResult('');
+
+                    try {
+                      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
+                      const response = await fetch(`${apiBaseUrl}/simpleSearch`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          query: aiQuery,
+                          prompt: aiPrompt,
+                          certainty: 0.72
+                        }),
+                      });
+
+                      const data = await response.json();
+                      
+                      if (response.ok) {
+                        setSearchResult(data.generated || 'No content generated');
+                      } else {
+                        throw new Error(data.error || 'Failed to generate content');
+                      }
+                    } catch (error) {
+                      console.error('Error generating content:', error);
+                      toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    } finally {
+                      setIsSearching(false);
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:opacity-50 flex items-center"
+                  disabled={isSearching || !aiQuery.trim()}
+                >
+                  {isSearching ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Generating...
+                    </>
+                  ) : 'Generate Content'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <CreateDrupalSiteForm
         isOpen={showCreateDrupalSiteForm}
