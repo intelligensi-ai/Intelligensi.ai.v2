@@ -54,6 +54,23 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
   const [activeContent, setActiveContent] = useState<DrupalContentNode | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
+  // Group content by type for navigation
+  const contentTypes = useMemo(() => {
+    const types = new Set<string>(['Home']);
+    content.forEach(item => {
+      if (item.type) {
+        types.add(item.type);
+      }
+    });
+    return Array.from(types);
+  }, [content]);
+
+  // Get content for the current type
+  const currentTypeContent = useMemo(() => {
+    if (!activeContent?.type) return [];
+    return content.filter(item => item.type === activeContent.type);
+  }, [content, activeContent?.type]);
+
   // Fetch content when component mounts
   useEffect(() => {
     const loadContent = async () => {
@@ -150,10 +167,10 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
   // Render loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-background-primary">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
-          <p className="mt-4 text-lg text-text-secondary">Loading content...</p>
+          <p className="mt-4 text-lg text-text-primary">Loading content...</p>
         </div>
       </div>
     );
@@ -162,13 +179,13 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
   // Render error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center text-red-600">
-          <p className="text-xl font-medium">Error loading content</p>
-          <p className="mt-2">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-background-primary">
+        <div className="text-center">
+          <p className="text-xl font-semibold text-red-400 mb-2">Error loading content</p>
+          <p className="text-text-primary mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
           >
             Try Again
           </button>
@@ -180,12 +197,12 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
   // Render empty state
   if (content.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-background-primary">
         <div className="text-center">
-          <p className="text-lg text-text-secondary">No content available for {siteProp.name || 'this site'}</p>
+          <p className="text-lg text-text-primary mb-4">No content available for {siteProp.name || 'this site'}</p>
           <button
             onClick={onClose}
-            className="mt-4 px-4 py-2 bg-primary-100 text-primary-700 rounded-md hover:bg-primary-200 transition-colors"
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
           >
             Go Back
           </button>
@@ -196,47 +213,116 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
 
   // Main content render
   return (
-    <div className="min-h-screen bg-background-primary">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-border-default">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-text-primary">
-                {siteProp.name || 'Website Preview'}
-              </h1>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* Banner */}
+      <div className="bg-indigo-700 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold">{siteProp.name || 'Website Preview'}</h1>
+              <p className="mt-2 text-indigo-100">Previewing your website content</p>
             </div>
-            <div className="flex items-center">
-              <button
-                onClick={onClose}
-                className="ml-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
-              >
-                Close Preview
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 transition-colors"
+            >
+              Exit Preview
+            </button>
           </div>
         </div>
-      </header>
+      </div>
+
+      {/* Navigation */}
+      <nav className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-8">
+            {contentTypes.map(type => (
+              <button
+                key={type}
+                onClick={() => {
+                  const firstOfType = content.find(item => item.type === type);
+                  if (firstOfType) setActiveContent(firstOfType);
+                }}
+                className={`px-3 py-4 text-sm font-medium ${
+                  activeContent?.type === type
+                    ? 'border-b-2 border-indigo-500 text-indigo-600'
+                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="border border-border-default rounded-lg p-6 bg-white shadow-sm">
-            <h2 className="text-2xl font-semibold text-text-primary mb-4">
-              {typeof activeContent?.title === 'string' 
-                ? activeContent.title 
-                : (activeContent?.title as { value?: string })?.value || 'No Title'}
-            </h2>
-            <div className="prose max-w-none text-text-secondary">
-              {activeContent?.body ? (
-                <div dangerouslySetInnerHTML={{ __html: getBodyHtml(activeContent.body) }} className="text-text-primary" />
-              ) : (
-                <p className="text-text-muted">No content available</p>
-              )}
+      <div className="flex-1">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Sidebar */}
+            <div className="w-full md:w-64 flex-shrink-0">
+              <div className="bg-white p-4 rounded-lg shadow">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  {activeContent?.type ? `${activeContent.type}s` : 'Pages'}
+                </h3>
+                <nav className="space-y-1">
+                  {currentTypeContent.map((item) => (
+                    <button
+                      key={item.nid}
+                      onClick={() => setActiveContent(item)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-md ${
+                        activeContent?.nid === item.nid
+                          ? 'bg-indigo-50 text-indigo-700'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {item.title || `Untitled ${item.type}`}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1">
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  {typeof activeContent?.title === 'string' 
+                    ? activeContent.title 
+                    : (activeContent?.title as { value?: string })?.value || 'No Title'}
+                </h2>
+                <div className="prose max-w-none">
+                  {activeContent?.body ? (
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: getBodyHtml(activeContent.body) }} 
+                      className="text-gray-700" 
+                    />
+                  ) : (
+                    <p className="text-gray-500">No content available</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </main>
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="text-sm text-gray-500">
+              &copy; {new Date().getFullYear()} {siteProp.name || 'Website Preview'}. All rights reserved.
+            </div>
+            <div className="mt-4 md:mt-0">
+              <p className="text-sm text-gray-500">
+                Preview Mode
+              </p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

@@ -8,7 +8,7 @@ export const websitePreviewTheme = {
     },
     // Background colors
     background: {
-      primary: '#ffffff', // white
+      primary: '#000000', // white
       secondary: '#f9fafb', // gray-50
       accent: '#f3f4f6', // gray-100
     },
