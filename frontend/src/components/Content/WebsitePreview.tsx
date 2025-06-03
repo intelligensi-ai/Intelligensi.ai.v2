@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { fetchDrupalContent, ContentNode as DrupalContentNode } from '../Lib/fetchDrupalContent';
 import { ISite } from '../../types/sites';
+// Using text fallbacks for icons to avoid type issues
 
 type WebsitePreviewProps = {
   site: {
@@ -12,64 +13,30 @@ type WebsitePreviewProps = {
   onClose: () => void;
 };
 
-// Helper function to safely get content node type
-const getNodeType = (node: DrupalContentNode): string => {
-  return node.type || 'other';
-};
-
 // Helper function to get HTML from content body
 const getBodyHtml = (body: unknown): string => {
   if (!body) return '';
-  if (typeof body === 'string') return body;
-  if (Array.isArray(body)) {
-    return body.map(item => getBodyHtml(item)).join('');
-  }
-  if (typeof body === 'object' && body !== null) {
-    return Object.values(body as Record<string, unknown>)
-      .map(val => getBodyHtml(val))
-      .join('');
-  }
-  return String(body);
-};
-
-// Format date from timestamp
-const formatDate = (timestamp: string): string => {
+  
   try {
-    return new Date(parseInt(timestamp) * 1000).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return 'Invalid date';
+    if (typeof body === 'string') return body;
+    if (typeof body === 'object' && body !== null && 'value' in body) {
+      return String(body.value);
+    }
+    return JSON.stringify(body);
+  } catch (err) {
+    console.error('Error parsing body content:', err);
+    return '';
   }
 };
 
 const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose }) => {
+  // State management
   const [content, setContent] = useState<DrupalContentNode[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeContent, setActiveContent] = useState<DrupalContentNode | null>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
-  // Group content by type for navigation
-  const contentTypes = useMemo(() => {
-    const types = new Set<string>(['Home']);
-    content.forEach(item => {
-      if (item.type) {
-        types.add(item.type);
-      }
-    });
-    return Array.from(types);
-  }, [content]);
-
-  // Get content for the current type
-  const currentTypeContent = useMemo(() => {
-    if (!activeContent?.type) return [];
-    return content.filter(item => item.type === activeContent.type);
-  }, [content, activeContent?.type]);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Fetch content when component mounts
   useEffect(() => {
@@ -131,40 +98,54 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
     }, {});
   }, [content]);
 
-  // Clean HTML from body text
-  const cleanBodyText = (html: string): string => {
-    if (!html) return '';
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
+  // Get preview text for content items
+  const getPreviewText = (body: unknown): string => {
+    const text = getBodyHtml(body);
+    if (!text) return '';
+    
+    // Simple text extraction without DOM manipulation
+    const cleanText = String(text)
+      .replace(/<[^>]*>?/gm, '') // Remove HTML tags
+      .replace(/\s+/g, ' ')      // Collapse whitespace
+      .trim();
+      
+    return cleanText.length > 150
+      ? `${cleanText.substring(0, 150).trim()}...`
+      : cleanText;
   };
 
-  // Get preview text with optional length limit
-  const getPreviewText = (html: string, maxLength: number = 200): string => {
-    const text = cleanBodyText(html);
-    return text.length > maxLength 
-      ? text.substring(0, maxLength) + '...' 
-      : text;
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+      setIsFullscreen(true);
+    } else if (document.exitFullscreen) {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
   };
 
-  // Set first content as active if none is selected
+  // Set first content item as active when content loads
   useEffect(() => {
     if (content.length > 0 && !activeContent) {
       setActiveContent(content[0]);
     }
   }, [content, activeContent]);
+  
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
 
-  // Toggle mobile menu
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
-  // Handle content selection
-  const handleContentSelect = (contentItem: DrupalContentNode) => {
-    setActiveContent(contentItem);
-  };
-
-  // Render loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background-primary">
@@ -211,45 +192,102 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
     );
   }
 
+
+
   // Main content render
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Banner */}
-      <div className="bg-indigo-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold">{siteProp.name || 'Website Preview'}</h1>
-              <p className="mt-2 text-indigo-100">Previewing your website content</p>
+      {/* Control Panel */}
+      <div className="bg-gray-800 text-white p-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center">
+              <span className="text-blue-400 mr-2 text-lg">🌐</span>
+              <span className="font-medium">{siteProp.name || 'Website Preview'}</span>
             </div>
+            <div className="hidden md:flex items-center text-sm text-gray-300">
+              <span className="mr-2 text-blue-400 text-lg">📦</span>
+              <span>Drupal 7</span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 rounded-md hover:bg-gray-700 transition-colors"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            >
+              <span className="text-lg">{isFullscreen ? '⤵️' : '⤴️'}</span>
+            </button>
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 transition-colors"
+              className="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 rounded-md text-sm font-medium transition-colors"
             >
-              Exit Preview
+              <span className="mr-1 text-base">✕</span>
+              <span className="hidden sm:inline">Exit Preview</span>
             </button>
           </div>
         </div>
       </div>
 
+      {/* Website Preview Content */}
+      <div className={`flex-1 overflow-auto ${isFullscreen ? 'h-[calc(100vh-48px)]' : ''}`}>
+        {/* Hero Section with Pasta Banner */}
+        <div className="relative h-96 overflow-hidden">
+          <div 
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: 'url(/images/PreviewImages/PastaBanner.jpg)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
+            }}
+          >
+            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+              <div className="text-center text-white px-4">
+                <h1 className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
+                  {siteProp.name || 'Your Restaurant'}
+                </h1>
+                <p className="text-xl md:text-2xl mb-6 drop-shadow-md">
+                  Discover our authentic Italian cuisine
+                </p>
+                <button className="px-8 py-3 bg-white text-indigo-700 font-semibold rounded-full hover:bg-indigo-50 transition-colors">
+                  View Our Menu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Site Header */}
+        <div className="bg-white shadow-md">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {siteProp.name || 'Website Preview'}
+                </h2>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       {/* Navigation */}
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
-            {contentTypes.map(type => (
+            {Array.from(new Set(content.map(item => item.type))).map((type) => (
               <button
                 key={type}
                 onClick={() => {
-                  const firstOfType = content.find(item => item.type === type);
-                  if (firstOfType) setActiveContent(firstOfType);
+                  const typeContent = content.filter(item => item.type === type);
+                  if (typeContent.length > 0) {
+                    setActiveContent(typeContent[0]);
+                  }
                 }}
-                className={`px-3 py-4 text-sm font-medium ${
-                  activeContent?.type === type
-                    ? 'border-b-2 border-indigo-500 text-indigo-600'
-                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`px-4 py-2 text-sm font-medium rounded-md ${activeContent?.type === type ? 'bg-primary-100 text-primary-700' : 'text-gray-700 hover:bg-gray-100'}`}
               >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
+                {type}
               </button>
             ))}
           </div>
@@ -267,19 +305,26 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
                   {activeContent?.type ? `${activeContent.type}s` : 'Pages'}
                 </h3>
                 <nav className="space-y-1">
-                  {currentTypeContent.map((item) => (
-                    <button
-                      key={item.nid}
-                      onClick={() => setActiveContent(item)}
-                      className={`w-full text-left px-3 py-2 text-sm rounded-md ${
-                        activeContent?.nid === item.nid
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {item.title || `Untitled ${item.type}`}
-                    </button>
-                  ))}
+                  {content
+                    .filter(item => activeContent?.type ? item.type === activeContent.type : true)
+                    .map((item) => (
+                      <div
+                        key={item.nid}
+                        onClick={() => setActiveContent(item)}
+                        className={`p-3 rounded-md cursor-pointer ${
+                          activeContent?.nid === item.nid ? 'bg-gray-100' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <h4 className="font-medium text-gray-900">
+                          {item.title || 'Untitled'}
+                        </h4>
+                        {item.body && (
+                          <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                            {getPreviewText(item.body)}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                 </nav>
               </div>
             </div>
@@ -288,9 +333,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
             <div className="flex-1">
               <div className="bg-white p-6 rounded-lg shadow">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  {typeof activeContent?.title === 'string' 
-                    ? activeContent.title 
-                    : (activeContent?.title as { value?: string })?.value || 'No Title'}
+                  {activeContent?.title || 'No Title'}
                 </h2>
                 <div className="prose max-w-none">
                   {activeContent?.body ? (
