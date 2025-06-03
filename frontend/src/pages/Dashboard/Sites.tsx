@@ -10,7 +10,7 @@ import { ISite, ICMS } from "../../types/sites";
 import { getSiteIcon, getSiteDisplayName } from '../../utils/siteHelpers';
 
 // Dynamic imports for components that might not be used immediately
-const ContentPreview = React.lazy(() => import('../../components/Content/contentPreview'));
+const WebsitePreview = React.lazy(() => import('../../components/Content/WebsitePreview'));
 const Vectorize = React.lazy(() => import('../../components/Content/contentVectorize'));
 
 interface SitesProps {
@@ -40,7 +40,7 @@ const Sites: React.FC<SitesProps> = ({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<ISite | null>(null);
   const [selectedSiteIdState, setSelectedSiteIdState] = useState<number | null>(selectedSiteId);
-  const [showContentPreview, setShowContentPreview] = useState(false);
+  const [showWebsitePreview, setShowWebsitePreview] = useState(false);
   const [showContentVectorize, setShowContentVectorize] = useState(false);
   const [vectorizeStatus, setVectorizeStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle');
   const [schemaError, setSchemaError] = useState<string | null>(null);
@@ -91,7 +91,7 @@ const Sites: React.FC<SitesProps> = ({
   }, [selectedSiteIdState, onSiteSelected]);
 
   const handlePreviewClose = useCallback(() => {
-    setShowContentPreview(false);
+    setShowWebsitePreview(false);
   }, []);
 
 
@@ -405,7 +405,7 @@ const Sites: React.FC<SitesProps> = ({
             {selectedSite && (
               <div className="grid grid-cols-2 gap-2">
                 <button 
-                  onClick={() => setShowContentPreview(true)}
+                  onClick={() => setShowWebsitePreview(true)}
                   className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
                 >
                   Preview Content
@@ -503,9 +503,9 @@ const Sites: React.FC<SitesProps> = ({
       />
 
       <React.Suspense fallback={null}>
-        {selectedSite && showContentPreview && (
+        {selectedSite && showWebsitePreview && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <ContentPreview
+            <WebsitePreview
               onClose={handlePreviewClose}
               site={selectedSite}
             />
