@@ -196,70 +196,71 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
 
   // Main content render
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Compact Control Panel */}
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Modern Header */}
+      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-12 items-center">
-            {/* Left side - Menu button for mobile */}
-            <div className="flex-shrink-0 flex items-center">
+          <div className="flex justify-between h-16 items-center">
+            <div className="flex items-center space-x-4">
               <button
                 onClick={toggleFullscreen}
-                className="p-1.5 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-all duration-200 hover:scale-105"
                 title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
               >
                 <span className="text-lg">{isFullscreen ? '⤵️' : '⤴️'}</span>
               </button>
+              <span className="text-sm font-medium text-gray-500 hidden sm:block">
+                Previewing: <span className="text-gray-900">{siteProp.name}</span>
+              </span>
             </div>
             
-            {/* Right side - Actions */}
-            <div className="ml-4 flex items-center">
-              <button
-                onClick={onClose}
-                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-              >
-                <span className="mr-1">✕</span>
-                <span className="hidden sm:inline">Exit Preview</span>
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full shadow-sm text-white bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition-all duration-200 hover:shadow-md"
+            >
+              <span className="mr-2">✕</span>
+              <span className="hidden sm:inline">Exit Preview</span>
+            </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Website Preview Content */}
-      <div className={`flex-1 overflow-auto`}>
-        {/* Hero Section with Pasta Banner */}
-        <div className="relative h-96 overflow-hidden">
-          <div 
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: 'url(/images/PreviewImages/spaceBanner.jpg)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat'
-            }}
-          >
-            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-              <div className="text-center text-white px-4">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
-                  {siteProp.name || 'Your Restaurant'}
-                </h1>
-                <p className="text-xl md:text-2xl mb-6 drop-shadow-md">
-                  Discover the world of space science
-                </p>
-                <button className="px-8 py-3 bg-white text-indigo-700 font-semibold rounded-full hover:bg-indigo-50 transition-colors">
-                  Onwards
-                </button>
-              </div>
+      {/* Hero Section with Gradient Overlay */}
+      <div className="relative h-80 md:h-96 overflow-hidden bg-gradient-to-r from-indigo-900 to-purple-800">
+        <div 
+          className="absolute inset-0 bg-cover bg-center transform transition-transform duration-1000 hover:scale-105"
+          style={{
+            backgroundImage: 'url(/images/PreviewImages/spaceBanner.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: 0.7
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent">
+          <div className="h-full flex flex-col justify-end pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 animate-fade-in-up">
+              {siteProp.name || 'Your Website'}
+            </h1>
+            <p className="text-lg md:text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
+              Welcome to your modern website preview. Explore the content below.
+            </p>
+            <div className="flex justify-center space-x-4">
+              <button className="px-6 py-3 bg-white text-indigo-700 font-medium rounded-full hover:bg-indigo-50 transition-all duration-200 hover:shadow-lg transform hover:-translate-y-0.5">
+                Get Started
+              </button>
+              <button className="px-6 py-3 border-2 border-white text-white font-medium rounded-full hover:bg-white/10 transition-all duration-200">
+                Learn More
+              </button>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Navigation Tabs */}
-      <div className="bg-slate-200 border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-1 py-2 overflow-x-auto">
+      {/* Navigation Tabs with Glass Effect */}
+      <div className="relative z-10 -mt-6 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex space-x-2 p-1 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 overflow-x-auto">
             {Array.from(new Set(content.map(item => item.type))).map((type) => (
               <button
                 key={type}
@@ -269,10 +270,10 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
                     setActiveContent(typeContent[0]);
                   }
                 }}
-                className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap ${
+                className={`px-4 py-2.5 text-sm font-medium rounded-lg whitespace-nowrap transition-all duration-200 ${
                   activeContent?.type === type 
-                    ? 'bg-primary-50 text-primary-700 border border-primary-200' 
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-indigo-600 text-white shadow-md' 
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
                 {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -283,27 +284,33 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
       </div>
 
       {/* Main Content */}
-      <div className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col md:flex-row gap-6">
+      <main className="flex-1 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar */}
-            <div className="w-full md:w-64 flex-shrink-0">
-              <div className="bg-white p-4 rounded-lg shadow">
-                <p className="text-[10px] font-light text-gray-900 mb-4">
-                  {activeContent?.type ? `${activeContent.type}s` : 'Pages'}
-                </p>
-                <nav className="space-y-1">
+            <div className="w-full lg:w-72 flex-shrink-0">
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-200 hover:shadow-md">
+                <div className="p-4 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {activeContent?.type ? `${activeContent.type}s` : 'Content Pages'}
+                  </p>
+                </div>
+                <nav className="divide-y divide-gray-100">
                   {content
                     .filter(item => activeContent?.type ? item.type === activeContent.type : true)
                     .map((item) => (
                       <div
                         key={item.nid}
                         onClick={() => setActiveContent(item)}
-                        className={`p-3 rounded-md cursor-pointer ${
-                          activeContent?.nid === item.nid ? 'bg-gray-100' : 'hover:bg-gray-50'
+                        className={`p-4 cursor-pointer transition-all duration-150 ${
+                          activeContent?.nid === item.nid 
+                            ? 'bg-indigo-50/50 border-l-4 border-indigo-500' 
+                            : 'hover:bg-gray-50/50'
                         }`}
                       >
-                        <h4 className="font-medium text-gray-900">
+                        <h4 className={`font-medium ${
+                          activeContent?.nid === item.nid ? 'text-indigo-700' : 'text-gray-800'
+                        }`}>
                           {item.title || 'Untitled'}
                         </h4>
                         {item.body && (
@@ -319,38 +326,87 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
 
             {/* Content Area */}
             <div className="flex-1">
-              <div className="bg-white p-6 rounded-lg shadow">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  {activeContent?.title || 'No Title'}
-                </h2>
-                <div className="prose max-w-none">
-                  {activeContent?.body ? (
-                    <div 
-                      dangerouslySetInnerHTML={{ __html: getBodyHtml(activeContent.body) }} 
-                      className="text-gray-700" 
-                    />
-                  ) : (
-                    <p className="text-gray-500">No content available</p>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-200 hover:shadow-md">
+                <div className="p-6 md:p-8">
+                  {activeContent?.title && (
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-100">
+                      {activeContent.title}
+                    </h2>
                   )}
+                  <div className="prose max-w-none">
+                    {activeContent?.body ? (
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: getBodyHtml(activeContent.body) }} 
+                        className="text-gray-700" 
+                      />
+                    ) : (
+                      <div className="text-center py-12">
+                        <div className="text-gray-400 mb-4">
+                          <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-700">No content available</h3>
+                        <p className="mt-1 text-gray-500">Select an item from the sidebar to view its content</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="text-sm text-gray-500">
-              &copy; {new Date().getFullYear()} {siteProp.name || 'Website Preview'}. All rights reserved.
-            </div>
-            <div className="mt-4 md:mt-0">
-              <p className="text-sm text-gray-500">
-                Preview Mode
+      {/* Modern Footer */}
+      <footer className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="col-span-1 md:col-span-2">
+              <h3 className="text-xl font-bold mb-4">{siteProp.name || 'Website Preview'}</h3>
+              <p className="text-gray-300 text-sm">
+                This is a preview of your website. All content is for demonstration purposes only.
               </p>
             </div>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Quick Links</h4>
+              <ul className="space-y-2">
+                {content.slice(0, 4).map((item) => (
+                  <li key={item.nid}>
+                    <a 
+                      href="#" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setActiveContent(item);
+                      }}
+                      className="text-gray-400 hover:text-white text-sm transition-colors duration-200"
+                    >
+                      {item.title || 'Untitled'}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Preview</h4>
+              <p className="text-sm text-gray-400 mb-4">
+                You're currently viewing a preview of your website.
+              </p>
+              <button
+                onClick={onClose}
+                className="text-sm font-medium text-white hover:text-indigo-300 transition-colors duration-200 flex items-center"
+              >
+                Exit Preview Mode
+                <svg className="ml-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="mt-12 pt-8 border-t border-gray-800">
+            <p className="text-xs text-gray-400 text-center">
+              &copy; {new Date().getFullYear()} {siteProp.name || 'Website Preview'}. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
