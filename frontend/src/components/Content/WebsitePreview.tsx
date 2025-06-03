@@ -227,7 +227,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
       </div>
 
       {/* Website Preview Content */}
-      <div className={`flex-1 overflow-auto ${isFullscreen ? 'h-[calc(100vh-48px)]' : ''}`}>
+      <div className={`flex-1 overflow-auto`}>
         {/* Hero Section with Pasta Banner */}
         <div className="relative h-96 overflow-hidden">
           <div 
@@ -245,24 +245,11 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
                   {siteProp.name || 'Your Restaurant'}
                 </h1>
                 <p className="text-xl md:text-2xl mb-6 drop-shadow-md">
-                  Discover our authentic Italian cuisine
+                  Discover the world of space science
                 </p>
                 <button className="px-8 py-3 bg-white text-indigo-700 font-semibold rounded-full hover:bg-indigo-50 transition-colors">
-                  View Our Menu
+                  Onwards
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Site Header */}
-        <div className="bg-white shadow-md">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {siteProp.name || 'Website Preview'}
-                </h2>
               </div>
             </div>
           </div>
@@ -270,7 +257,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
       </div>
       
       {/* Navigation Tabs */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-slate-200 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-1 py-2 overflow-x-auto">
             {Array.from(new Set(content.map(item => item.type))).map((type) => (
@@ -302,9 +289,9 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
             {/* Sidebar */}
             <div className="w-full md:w-64 flex-shrink-0">
               <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                <p className="text-[10px] font-light text-gray-900 mb-4">
                   {activeContent?.type ? `${activeContent.type}s` : 'Pages'}
-                </h3>
+                </p>
                 <nav className="space-y-1">
                   {content
                     .filter(item => activeContent?.type ? item.type === activeContent.type : true)
