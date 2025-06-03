@@ -197,34 +197,31 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
   // Main content render
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Control Panel */}
-      <div className="bg-gray-800 text-white p-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center">
-              <span className="text-blue-400 mr-2 text-lg">🌐</span>
-              <span className="font-medium">{siteProp.name || 'Website Preview'}</span>
+      {/* Compact Control Panel */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-12 items-center">
+            {/* Left side - Menu button for mobile */}
+            <div className="flex-shrink-0 flex items-center">
+              <button
+                onClick={toggleFullscreen}
+                className="p-1.5 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              >
+                <span className="text-lg">{isFullscreen ? '⤵️' : '⤴️'}</span>
+              </button>
             </div>
-            <div className="hidden md:flex items-center text-sm text-gray-300">
-              <span className="mr-2 text-blue-400 text-lg">📦</span>
-              <span>Drupal 7</span>
+            
+            {/* Right side - Actions */}
+            <div className="ml-4 flex items-center">
+              <button
+                onClick={onClose}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+              >
+                <span className="mr-1">✕</span>
+                <span className="hidden sm:inline">Exit Preview</span>
+              </button>
             </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={toggleFullscreen}
-              className="p-2 rounded-md hover:bg-gray-700 transition-colors"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            >
-              <span className="text-lg">{isFullscreen ? '⤵️' : '⤴️'}</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 rounded-md text-sm font-medium transition-colors"
-            >
-              <span className="mr-1 text-base">✕</span>
-              <span className="hidden sm:inline">Exit Preview</span>
-            </button>
           </div>
         </div>
       </div>
@@ -236,7 +233,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
           <div 
             className="absolute inset-0 bg-cover bg-center"
             style={{
-              backgroundImage: 'url(/images/PreviewImages/PastaBanner.jpg)',
+              backgroundImage: 'url(/images/PreviewImages/spaceBanner.jpg)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat'
@@ -272,10 +269,10 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
         </div>
       </div>
       
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
+      {/* Navigation Tabs */}
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
+          <div className="flex space-x-1 py-2 overflow-x-auto">
             {Array.from(new Set(content.map(item => item.type))).map((type) => (
               <button
                 key={type}
@@ -285,14 +282,18 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
                     setActiveContent(typeContent[0]);
                   }
                 }}
-                className={`px-4 py-2 text-sm font-medium rounded-md ${activeContent?.type === type ? 'bg-primary-100 text-primary-700' : 'text-gray-700 hover:bg-gray-100'}`}
+                className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap ${
+                  activeContent?.type === type 
+                    ? 'bg-primary-50 text-primary-700 border border-primary-200' 
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
               >
-                {type}
+                {type.charAt(0).toUpperCase() + type.slice(1)}
               </button>
             ))}
           </div>
         </div>
-      </nav>
+      </div>
 
       {/* Main Content */}
       <div className="flex-1">
