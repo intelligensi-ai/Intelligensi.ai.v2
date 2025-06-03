@@ -8,6 +8,7 @@ import axios from "axios";
 import { User } from "firebase/auth";
 import { ISite, ICMS } from "../../types/sites";
 import { getSiteIcon, getSiteDisplayName } from '../../utils/siteHelpers';
+import WebsitePreview from '../../components/Content/WebsitePreview';
 
 // Dynamic imports for components that might not be used immediately
 const ContentPreview = React.lazy(() => import('../../components/Content/contentPreview'));
@@ -49,6 +50,7 @@ const Sites: React.FC<SitesProps> = ({
   const [isRemovingSite, setIsRemovingSite] = useState<boolean>(false);
   const [removeSiteError, setRemoveSiteError] = useState<string | null>(null);
   const [showCreateDrupalSiteForm, setShowCreateDrupalSiteForm] = useState(false);
+  const [showWebsitePreview, setShowWebsitePreview] = useState(false);
   
   // Derive selectedSite from selectedSiteIdState
   const selectedSite = sites.find(site => site.id === selectedSiteIdState) || null;
@@ -405,10 +407,10 @@ const Sites: React.FC<SitesProps> = ({
             {selectedSite && (
               <div className="grid grid-cols-2 gap-2">
                 <button 
-                  onClick={() => setShowContentPreview(true)}
+                  onClick={() => setShowWebsitePreview(true)}
                   className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
                 >
-                  Preview Content
+                  Preview
                 </button>
                 <button
                   onClick={() => handleVectorizeClick(selectedSite)}
@@ -570,6 +572,28 @@ const Sites: React.FC<SitesProps> = ({
       {schemaError && (
         <div className="mt-2 text-red-500 text-sm">
           {schemaError}
+        </div>
+      )}
+
+      {/* Website Preview Modal */}
+      {showWebsitePreview && selectedSite && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true" onClick={() => setShowWebsitePreview(false)}>
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+              <WebsitePreview 
+                site={{
+                  id: selectedSite.id?.toString() || '',
+                  name: selectedSite.site_name || 'Website Preview',
+                  url: selectedSite.site_url || ''
+                }} 
+                onClose={() => setShowWebsitePreview(false)} 
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
