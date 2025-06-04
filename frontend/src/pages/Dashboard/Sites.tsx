@@ -307,7 +307,7 @@ const Sites: React.FC<SitesProps> = ({
               setCurrentSite(null);
               setIsFormOpen(true);
             }}
-            className="w-full h-[60px] px-4 py-2 border-teal-200 border-2 font-extrabold bg-teal-500 hover:bg-teal-400 text-white rounded-md text-1xl flex items-center justify-center transition-colors duration-200 shadow-md"
+            className="w-[200px] h-[60px] px-4 py-2 border-teal-200 border-2 font-extrabold bg-teal-500 hover:bg-teal-400 text-white rounded-md text-1xl flex items-center justify-center transition-colors duration-200 shadow-md"
           >
             <svg 
               className="w-4 h-4 mr-2" 
