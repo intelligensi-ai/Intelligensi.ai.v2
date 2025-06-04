@@ -298,7 +298,7 @@ const Sites: React.FC<SitesProps> = ({
   };
 
   return (
-    <div className="bg-[#2D3748] h-[210px] p-4 border-t border-gray-700">
+    <div className="bg-[#2D3748] min-h-[210px] p-4 border-t border-gray-700">
       <div className="flex gap-4">
         {/*  CMS Management Buttons */}
         <div className="w-[140px] flex flex-col gap-4">
@@ -356,11 +356,11 @@ const Sites: React.FC<SitesProps> = ({
                 No sites connected
               </div>
             ) : (
-              <div className="flex space-x-4 w-max">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:space-x-4 gap-2 lg:gap-0 w-full lg:w-max">
                 {sites.map((site) => (
                 <div 
                   key={site.id} 
-                  className="flex py-1 flex-col items-center min-w-[90px] group cursor-pointer px-2"
+                  className="flex py-1 flex-col items-center w-full min-w-[90px] group cursor-pointer px-2"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleSiteSelect(site.id!);
@@ -376,7 +376,7 @@ const Sites: React.FC<SitesProps> = ({
                         ? 'opacity-0' 
                         : 'group-hover:bg-teal-900/10'
                     }`}></div>
-                    <div className="relative w-18 h-[4.2rem] flex items-center justify-center">
+                    <div className="relative w-16 sm:w-16 lg:w-18 h-[3.8rem] sm:h-[4.2rem] flex items-center justify-center">
                       <img
                         src={getSiteIcon(site.cms?.name)}
                         alt={`${site.cms?.name || 'Default'} Logo`}
@@ -403,14 +403,14 @@ const Sites: React.FC<SitesProps> = ({
         {/* Right side - Buttons and Info */}
         <div className="flex-1 flex gap-4">
           {/* Buttons Card - Slightly reduced width to make room for info */}
-          <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-[45%]">
+          <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-full md:w-[45%]">
             {selectedSite && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <button 
                   onClick={() => setShowWebsitePreview(true)}
                   className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
@@ -429,7 +429,7 @@ const Sites: React.FC<SitesProps> = ({
                 >
                   {vectorizeStatus === 'processing' ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-1 h-4 w-4 text-white hidden sm:inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -437,14 +437,14 @@ const Sites: React.FC<SitesProps> = ({
                     </>
                   ) : vectorizeStatus === 'error' ? (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       <span>Retry</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                       </svg>
                       <span>Memory</span>
@@ -455,7 +455,7 @@ const Sites: React.FC<SitesProps> = ({
                   onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
                   className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                   </svg>
                   <span>AI Prompt</span>
@@ -464,7 +464,7 @@ const Sites: React.FC<SitesProps> = ({
                   onClick={() => console.log('Theme Capture button clicked for site ID:', selectedSite.id)}
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
                   </svg>
                   Theme
@@ -474,7 +474,7 @@ const Sites: React.FC<SitesProps> = ({
                   onClick={() => console.log('Migrate site', selectedSite.id)}
                   className="w-full bg-teal-900 hover:bg-teal-800 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
                   <span>Migrate</span>
@@ -483,7 +483,7 @@ const Sites: React.FC<SitesProps> = ({
                   onClick={() => handleOpenRemoveModal(selectedSite)}
                   className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                   <span>Remove</span>
@@ -492,9 +492,9 @@ const Sites: React.FC<SitesProps> = ({
             )}
           </div>
           
-          {/* Site Info Card - Increased width from 1/2 to 55% */}
+          {/* Site Info Card */}
           {selectedSite && (
-            <div className="bg-[#2D3748] px-10rounded-lg border rounded border-gray-600 shadow-sm w-[55%]">
+            <div className="hidden md:block bg-[#2D3748] px-4 rounded-lg border border-gray-600 shadow-sm w-full md:w-[55%]">
               <h2 className="text-sm font-semibold px-4  text-gray-100 tracking-wider mb-3 pb-1 border-b border-gray-600">Site Information</h2>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2 px-4">
