@@ -388,11 +388,13 @@ const Sites: React.FC<SitesProps> = ({
                       />
                     </div>
                   </div>
-                  <span className={`text-xs mt-1 font-bold transition-colors ${
-                    selectedSiteIdState === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'
-                  }`}>
-                    {getSiteDisplayName(site)}
-                  </span>
+                  <div className="w-full text-center">
+                    <span className={`text-xs mt-1 font-bold transition-colors inline-block w-full text-center ${
+                      selectedSiteIdState === site.id ? 'text-teal-400' : 'text-gray-300 group-hover:text-white'
+                    }`}>
+                      {getSiteDisplayName(site)}
+                    </span>
+                  </div>
                 </div>
                 ))}
               </div>
@@ -408,7 +410,7 @@ const Sites: React.FC<SitesProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <button 
                   onClick={() => setShowWebsitePreview(true)}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -418,7 +420,7 @@ const Sites: React.FC<SitesProps> = ({
                 </button>
                 <button
                   onClick={() => handleVectorizeClick(selectedSite)}
-                  className={`w-full py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                  className={`w-full py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10 ${
                     vectorizeStatus === 'processing' || vectorizeStatus === 'complete'
                       ? 'bg-gray-500 cursor-not-allowed'
                       : vectorizeStatus === 'error'
@@ -453,16 +455,16 @@ const Sites: React.FC<SitesProps> = ({
                 </button>
                 <button 
                   onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
-                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                   </svg>
-                  <span>AI Prompt</span>
+                  <span>Prompt</span>
                 </button>
                 <button 
                   onClick={() => console.log('Theme Capture button clicked for site ID:', selectedSite.id)}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
@@ -472,7 +474,7 @@ const Sites: React.FC<SitesProps> = ({
                 {/* Create New CMS button moved to left column */}
                 <button 
                   onClick={() => console.log('Migrate site', selectedSite.id)}
-                  className="w-full bg-teal-900 hover:bg-teal-800 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                  className="w-full bg-teal-900 hover:bg-teal-800 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -481,7 +483,7 @@ const Sites: React.FC<SitesProps> = ({
                 </button>
                 <button
                   onClick={() => handleOpenRemoveModal(selectedSite)}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
