@@ -13,21 +13,64 @@ type WebsitePreviewProps = {
   onClose: () => void;
 };
 
+// Helper function to format text with paragraph breaks after every 100 words following full stops
+const formatTextWithBreaks = (text: string): string => {
+  if (!text) return '';
+  
+  // Extract text content from HTML if needed
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = text;
+  const plainText = tempDiv.textContent || text;
+  
+  // Split into sentences
+  const sentences = plainText.split(/(?<=\.)/g);
+  let result = '';
+  let wordCount = 0;
+  let currentParagraph = '';
+  
+  for (const sentence of sentences) {
+    const words = sentence.trim().split(/\s+/);
+    wordCount += words.length;
+    currentParagraph += sentence;
+    
+    // Add paragraph break after ~100 words at sentence boundaries
+    if (wordCount >= 100 && /[.!?]\s*$/.test(sentence)) {
+      result += currentParagraph.trim() + '\n\n';
+      currentParagraph = '';
+      wordCount = 0;
+    }
+  }
+  
+  // Add any remaining content
+  if (currentParagraph.trim()) {
+    result += currentParagraph.trim();
+  }
+  
+  return result;
+};
+
 // Helper function to get HTML from content body
 const getBodyHtml = (body: unknown): string => {
   if (!body) return '';
   
   try {
-    if (typeof body === 'string') return body;
+    if (typeof body === 'string') return formatTextWithBreaks(body);
     if (typeof body === 'object' && body !== null && 'value' in body) {
-      return String(body.value);
+      return formatTextWithBreaks(String(body.value));
     }
-    return JSON.stringify(body);
+    return formatTextWithBreaks(JSON.stringify(body));
   } catch (err) {
     console.error('Error parsing body content:', err);
     return '';
   }
 };
+
+interface ContentState {
+  isExpanded: boolean;
+  truncatedText: string;
+  fullText: string;
+  showReadMore: boolean;
+}
 
 const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose }) => {
   // State management
@@ -35,6 +78,12 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeContent, setActiveContent] = useState<DrupalContentNode | null>(null);
+  const [contentState, setContentState] = useState<ContentState>({
+    isExpanded: false,
+    truncatedText: '',
+    fullText: '',
+    showReadMore: false
+  });
 
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -134,6 +183,47 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
     }
   }, [content, activeContent]);
   
+  // Process content when active content changes
+  useEffect(() => {
+    if (activeContent?.body) {
+      const fullText = getBodyHtml(activeContent.body);
+      const words = fullText.split(/\s+/);
+      
+      if (words.length > 400) {
+        // Find a good breaking point after ~400 words
+        let truncatedAt = 400;
+        // Look for the next sentence end after 400 words
+        for (let i = 400; i < Math.min(450, words.length); i++) {
+          if (/[.!?]\s*$/.test(words[i])) {
+            truncatedAt = i + 1;
+            break;
+          }
+        }
+        const truncatedText = words.slice(0, truncatedAt).join(' ');
+        setContentState({
+          isExpanded: false,
+          truncatedText,
+          fullText,
+          showReadMore: true
+        });
+      } else {
+        setContentState({
+          isExpanded: true,
+          truncatedText: fullText,
+          fullText,
+          showReadMore: false
+        });
+      }
+    } else {
+      setContentState({
+        isExpanded: false,
+        truncatedText: '',
+        fullText: '',
+        showReadMore: false
+      });
+    }
+  }, [activeContent]);
+
   // Handle fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -289,11 +379,11 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar */}
             <div className="w-full lg:w-72 flex-shrink-0">
-              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-200 hover:shadow-md">
-                <div className="p-4 border-b border-gray-100">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <div className="w-full md:w-64 flex-shrink-0 bg-white/80 backdrop-blur-sm border-r border-gray-100 overflow-y-auto">
+                <div className="p-3 border-b border-gray-100">
+                  <h3 className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
                     {activeContent?.type ? `${activeContent.type}s` : 'Content Pages'}
-                  </p>
+                  </h3>
                 </div>
                 <nav className="divide-y divide-gray-100">
                   {content
@@ -308,13 +398,13 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
                             : 'hover:bg-gray-50/50'
                         }`}
                       >
-                        <h4 className={`font-medium ${
+                        <h4 className={`text-sm font-medium ${
                           activeContent?.nid === item.nid ? 'text-indigo-700' : 'text-gray-800'
                         }`}>
                           {item.title || 'Untitled'}
                         </h4>
                         {item.body && (
-                          <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">
                             {getPreviewText(item.body)}
                           </p>
                         )}
@@ -329,25 +419,59 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
               <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-200 hover:shadow-md">
                 <div className="p-6 md:p-8">
                   {activeContent?.title && (
-                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-100">
+                    <h2 className="text-md lmd:text-md font-light text-gray-900 mb-4 pb-3 border-b border-gray-100">
                       {activeContent.title}
                     </h2>
                   )}
                   <div className="prose max-w-none">
                     {activeContent?.body ? (
-                      <div 
-                        dangerouslySetInnerHTML={{ __html: getBodyHtml(activeContent.body) }} 
-                        className="text-gray-700" 
-                      />
+                      <div className="text-gray-700 text-xs leading-relaxed">
+                        {(contentState.isExpanded ? contentState.fullText : contentState.truncatedText)
+                          .split('\n\n')
+                          .map((paragraph, idx, arr) => (
+                            <p key={idx} className="mb-4 last:mb-0">
+                              {paragraph}
+                              {!contentState.isExpanded && 
+                               contentState.showReadMore && 
+                               idx === arr.length - 1 && 
+                               '...'}
+                            </p>
+                          ))}
+                        {contentState.showReadMore && (
+                          <button
+                            onClick={() => setContentState(prev => ({
+                              ...prev,
+                              isExpanded: !prev.isExpanded
+                            }))}
+                            className="mt-2 text-indigo-600 hover:text-indigo-800 font-medium text-xs flex items-center"
+                          >
+                            {contentState.isExpanded ? (
+                              <>
+                                <span>Show less</span>
+                                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                </svg>
+                              </>
+                            ) : (
+                              <>
+                                <span>Read more</span>
+                                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
                     ) : (
-                      <div className="text-center py-12">
-                        <div className="text-gray-400 mb-4">
-                          <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="text-center py-10">
+                        <div className="text-gray-400 mb-3">
+                          <svg className="mx-auto h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
-                        <h3 className="text-lg font-medium text-gray-700">No content available</h3>
-                        <p className="mt-1 text-gray-500">Select an item from the sidebar to view its content</p>
+                        <h3 className="text-base font-medium text-gray-700">No content available</h3>
+                        <p className="mt-1 text-sm text-gray-500">Select an item from the sidebar to view its content</p>
                       </div>
                     )}
                   </div>
