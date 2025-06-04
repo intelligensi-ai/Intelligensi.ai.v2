@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import CreateDrupalSiteForm from '../../components/Sites/CreateDrupalSiteForm';
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { ThemeCraftModal } from '../../theme';
 import axios from "axios";
 import { User } from "firebase/auth";
 import { ISite, ICMS } from "../../types/sites";
 import { getSiteIcon, getSiteDisplayName } from '../../utils/siteHelpers';
 import WebsitePreview from '../../components/Content/WebsitePreview';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../firebase';
 
 // Dynamic imports for components that might not be used immediately
 const ContentPreview = React.lazy(() => import('../../components/Content/contentPreview'));
@@ -49,9 +52,24 @@ const Sites: React.FC<SitesProps> = ({
   const [siteToRemove, setSiteToRemove] = useState<ISite | null>(null);
   const [isRemovingSite, setIsRemovingSite] = useState<boolean>(false);
   const [removeSiteError, setRemoveSiteError] = useState<string | null>(null);
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [showCreateDrupalSiteForm, setShowCreateDrupalSiteForm] = useState(false);
   const [showWebsitePreview, setShowWebsitePreview] = useState(false);
-  
+
+  const handleThemeScan = useCallback(async (url: string) => {
+    try {
+      const scanTheme = httpsCallable<{ url: string }, any>(functions, 'scanWebsiteTheme');
+      const result = await scanTheme({ url });
+      console.log('Theme scan result:', result);
+      toast.success('Theme scanned successfully!');
+      return result;
+    } catch (error) {
+      console.error('Error scanning theme:', error);
+      toast.error('Failed to scan theme. Please try again.');
+      throw error;
+    }
+  }, []);
+
   // Derive selectedSite from selectedSiteIdState
   const selectedSite = sites.find(site => site.id === selectedSiteIdState) || null;
 
@@ -463,7 +481,13 @@ const Sites: React.FC<SitesProps> = ({
                   <span>Prompt</span>
                 </button>
                 <button 
-                  onClick={() => console.log('Theme Capture button clicked for site ID:', selectedSite.id)}
+                  onClick={() => {
+                    if (selectedSite?.site_url) {
+                      setIsThemeModalOpen(true);
+                    } else {
+                      toast.error('No URL available for this site');
+                    }
+                  }}
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -638,6 +662,13 @@ const Sites: React.FC<SitesProps> = ({
           </div>
         </div>
       )}
+      
+      {/* Theme Craft Modal */}
+      <ThemeCraftModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+        onScan={handleThemeScan}
+      />
     </div>
   );
 };

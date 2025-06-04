@@ -12,6 +12,7 @@ import { createSchema } from "./routes/schemaRoutes";
 import { deleteSite } from "./routes/siteRoutes";
 import { createDrupalSite } from "./routes/windsailRoutes";
 import { simpleSearch } from "./routes/WeaviatesSimplesearch";
+import { themeCraftFunctions } from "./services/themeCraft";
 
 // New routes/imports from ea22d36
 import authRouter from "./routes/authRoutes";
@@ -60,7 +61,7 @@ export const healthcheck = onRequest((req, res) => {
   res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
-// Export all other HTTPS functions (from HEAD)
+// Export all functions
 export {
   updateHomepage,
   fetchusers,
@@ -74,5 +75,8 @@ export {
   createDrupalSite,
   simpleSearch,
 };
+
+// Export ThemeCraft functions
+export const { scanWebsiteTheme, getUserThemeScans } = themeCraftFunctions;
 
 
