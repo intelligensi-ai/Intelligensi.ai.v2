@@ -301,7 +301,7 @@ const Sites: React.FC<SitesProps> = ({
     <div className="bg-[#2D3748] h-[210px] p-4 border-t border-gray-700">
       <div className="flex gap-4">
         {/*  CMS Management Buttons */}
-        <div className="w-[200px] flex flex-col gap-4">
+        <div className="w-[140px] flex flex-col gap-4">
           <button 
             onClick={() => {
               setCurrentSite(null);
