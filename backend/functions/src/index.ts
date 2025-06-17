@@ -77,6 +77,6 @@ export {
 };
 
 // Export ThemeCraft functions
-export const { scanWebsiteTheme, getUserThemeScans } = themeCraftFunctions;
+// export const { scanWebsiteTheme, getUserThemeScans } = themeCraftFunctions;
 
 
