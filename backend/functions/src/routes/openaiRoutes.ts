@@ -21,28 +21,6 @@ function getOpenAIApiKey(): string {
 const openaiApiKey = getOpenAIApiKey();
 
 /**
- * Validates and cleans an API key
- * @param {string | undefined} key - The API key to validate
- * @return {string} The cleaned API key
- * @throws {Error} If the key is missing or empty after cleaning
- */
-function getValidApiKey(key: string | undefined): string {
-  if (!key) {
-    throw new Error("OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable.");
-  }
-  // Remove any whitespace or quotes that might have been accidentally added
-  const cleanKey = key.trim().replace(/^['"]|['"]$/g, "");
-
-  // Basic validation - just check if it's not empty after cleaning
-  if (!cleanKey) {
-    throw new Error("API key is empty after removing whitespace and quotes");
-  }
-
-  console.log("Using API key (first 8 chars):", cleanKey.substring(0, 8) + "...");
-  return cleanKey;
-}
-
-/**
  * Sanitize text by removing HTML tags.
  * @param {string} text - The text to sanitize.
  * @return {string} - Sanitized text.
@@ -87,85 +65,76 @@ that would be suitable for a professional website homepage.`;
         // Get the API key from Firebase Secrets
         const apiKey = openaiApiKey.value();
         const authHeader = `Bearer ${apiKey}`;
-        
-        console.log('Auth header length:', authHeader.length);
-        
-        // Log the first and last 5 characters of the key for debugging (don't log the full key)
-        if (apiKey.length > 10) {
-          console.log('API Key starts with:', apiKey.substring(0, 5) + '...');
-          console.log('API Key ends with:', '...' + apiKey.substring(apiKey.length - 5));
-        }
-        
+
         // Make the OpenAI API request
         const response = await axios({
-          method: 'post',
-          url: 'https://api.openai.com/v1/chat/completions',
+          method: "post",
+          url: "https://api.openai.com/v1/chat/completions",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': authHeader
+            "Content-Type": "application/json",
+            "Authorization": authHeader,
           },
           data: {
             model: "gpt-4",
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: `Please generate content for our website homepage based on this request: "${prompt}"` }
+              { role: "user", content: `Please generate content for our website homepage based on this request: "${prompt}"` },
             ],
             temperature: 0.7,
-            max_tokens: 1000
-          }
+            max_tokens: 1000,
+          },
         });
 
         console.log("OpenAI Response Status:", response.status);
-        
+
         // Extract the generated content
-        const generatedText = response.data.choices?.[0]?.message?.content || "No content generated";
+        const generatedText = response.data.choices?.[0]?.message?.content ||
+          "No content generated";
         const sanitizedText = sanitizeText(generatedText);
-        
+
         console.log("Generated content:", sanitizedText);
-        
+
         // Send the response back to the client
         res.status(200).json({
           success: true,
-          generatedText: sanitizedText
+          generatedText: sanitizedText,
         });
-
       } catch (error) {
         console.error("Error calling OpenAI API:", error);
-        
+
         let errorMessage = "Failed to process your request";
-        let errorDetails = error instanceof Error ? error.message : String(error);
-        
+        const errorDetails = error instanceof Error ? error.message : String(error);
+
         if (error instanceof AxiosError) {
           console.error("Axios error:", {
             status: error.response?.status,
             statusText: error.response?.statusText,
             data: error.response?.data,
-            headers: error.response?.headers
+            headers: error.response?.headers,
           });
           errorMessage = error.response?.data?.error?.message || errorMessage;
         }
-        
+
         const errorResponse: {
           error: string;
           details: string;
           stack?: string;
         } = {
           error: errorMessage,
-          details: errorDetails
+          details: errorDetails,
         };
-        
-        if (process.env.NODE_ENV === 'development' && error instanceof Error) {
+
+        if (process.env.NODE_ENV === "development" && error instanceof Error) {
           errorResponse.stack = error.stack;
         }
-        
+
         res.status(500).json(errorResponse);
       }
-      
     } catch (error) {
       console.error("Unexpected error:", error);
       res.status(500).json({
         error: "An unexpected error occurred",
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       });
     }
   }
