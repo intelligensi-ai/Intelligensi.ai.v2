@@ -1,15 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Chat } from '../../components/Chat/Chat';
-import Prompt from './Prompt';
-import { ChatMessage } from '../../types/chat';
-import Header from './Header';
-import InitialDisplay from '../../components/Display/InitialDisplay';
+import { User } from 'firebase/auth';
 import { AnimatePresence } from 'framer-motion';
-import Sites from './Sites';
-import { ISite, ICMS } from '../../types/sites';
+import axios from 'axios';
+
+import { Chat } from '../../components/Chat/Chat';
+import InitialDisplay from '../../components/Display/InitialDisplay';
+import { ChatMessage } from '../../types/chat';
+import { ISite } from '../../types/sites';
 import { supabase } from '../../utils/supabase';
-import { getAuth, User } from 'firebase/auth';
+import Prompt from './Prompt';
+import Header from './Header';
+import Sites from './Sites';
+
+interface ICMS {
+  id?: number;
+  name: string;
+  version?: string | null;
+  is_active?: boolean;
+  has_migrations?: boolean;
+  created_at?: Date | string;
+  updated_at?: Date | string;
+  user_id?: string;
+}
 
 export const Dashboard: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -18,14 +30,38 @@ export const Dashboard: React.FC = () => {
   const [sites, setSites] = useState<ISite[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Get current Firebase user
+  // Memoize mock user to prevent unnecessary recreations
+  const mockUser = React.useMemo(() => ({
+    uid: 'dev-user-123',
+    email: 'dev@example.com',
+    emailVerified: true,
+    isAnonymous: false,
+    metadata: {},
+    providerData: [],
+    displayName: 'Developer User',
+    photoURL: '',
+    providerId: 'firebase',
+    phoneNumber: null,
+    tenantId: null,
+    delete: async () => { /* noop */ },
+    getIdToken: async () => 'mock-id-token',
+    getIdTokenResult: async () => ({
+      authTime: '',
+      expirationTime: '',
+      issuedAtTime: '',
+      signInProvider: 'password',
+      signInSecondFactor: null,
+      token: 'mock-id-token',
+      claims: {},
+    }),
+    reload: async () => { /* noop */ },
+    toJSON: () => ({})
+  } as unknown as User), []);
+
+  // Set mock user on initial render
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setCurrentUser(user);
-    });
-    return () => unsubscribe();
-  }, []);
+    setCurrentUser(mockUser);
+  }, [mockUser]);
 
   // Fetch sites from Supabase when currentUser is available
   useEffect(() => {

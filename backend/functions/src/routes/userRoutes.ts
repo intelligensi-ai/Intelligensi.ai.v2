@@ -9,10 +9,22 @@ const supabaseUrl = defineSecret("SUPABASE_URL");
 const supabaseKey = defineSecret("SUPABASE_KEY");
 
 // Initialize Supabase Client
-const getSupabaseClient = () =>
-  createClient(supabaseUrl.value(), supabaseKey.value(), {
+const getSupabaseClient = () => {
+  // Use the Firebase secrets that are passed to the function
+  const url = supabaseUrl.value();
+  const key = supabaseKey.value();
+  
+  if (!url || !key) {
+    throw new Error("Supabase URL and Key must be configured");
+  }
+  
+  // Ensure the URL doesn't have a trailing slash
+  const cleanUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+  
+  return createClient(cleanUrl, key, {
     auth: { persistSession: false },
   });
+};
 
 // CORS Middleware
 const corsHandler = cors({ origin: true });

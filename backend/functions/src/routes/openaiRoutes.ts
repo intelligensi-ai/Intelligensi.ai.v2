@@ -2,9 +2,6 @@ import axios, { AxiosError } from "axios";
 import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
 
-// Define Firebase secret
-const openaiApiKey = defineSecret("OPENAI_API_KEY");
-
 /**
  * Sanitize text by removing HTML tags.
  * @param {string} text - The text to sanitize.
@@ -14,11 +11,14 @@ function sanitizeText(text: string): string {
   return text.replace(/<[^>]*>?/gm, "");
 }
 
+// Define Firebase secret
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
+
 // Standalone Firebase Function with built-in CORS
 export const updateHomepage = onRequest(
   {
-    secrets: [openaiApiKey], // Correctly uses the secret
-    cors: true, // Firebase handles CORS automatically
+    secrets: [openaiApiKey],
+    cors: true,
   },
   async (req, res) => {
     try {
@@ -37,79 +37,95 @@ export const updateHomepage = onRequest(
         return;
       }
 
-      const openAIResponse = await axios.post(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          model: "gpt-4",
-          messages: [{ role: "user", content: prompt }],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "update_homepage",
-                strict: false,
-                parameters: {
-                  type: "object",
-                  required: ["updateText"],
-                  properties: {
-                    updateText: {
-                      type: "string",
-                      description: "The text to update the homepage with.",
-                    },
-                  },
-                },
-                description: "Updates the homepage with the provided text.",
-              },
-            },
-          ],
-          temperature: 1,
-          max_tokens: 2048,
-          response_format: { type: "text" },
-        },
-        {
+      console.log("Sending to OpenAI with prompt:", prompt);
+
+      const systemPrompt = `You are a helpful assistant that generates content for a website homepage. 
+The user will ask you to create content, and you should generate appropriate, engaging text 
+that would be suitable for a professional website homepage.`;
+
+      try {
+        // Get the API key from Firebase Secrets
+        const apiKey = openaiApiKey.value();
+        const authHeader = `Bearer ${apiKey}`;
+        
+        console.log('Auth header length:', authHeader.length);
+        
+        // Log the first and last 5 characters of the key for debugging (don't log the full key)
+        if (apiKey.length > 10) {
+          console.log('API Key starts with:', apiKey.substring(0, 5) + '...');
+          console.log('API Key ends with:', '...' + apiKey.substring(apiKey.length - 5));
+        }
+        
+        // Make the OpenAI API request
+        const response = await axios({
+          method: 'post',
+          url: 'https://api.openai.com/v1/chat/completions',
           headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${openaiApiKey.value()}`,
+            'Content-Type': 'application/json',
+            'Authorization': authHeader
           },
-        }
-      );
-
-      const toolCall = openAIResponse.data.choices?.[0]?.message?.tool_calls?.[0];
-
-      if (toolCall?.function?.name === "update_homepage") {
-        try {
-          if (!toolCall.function.arguments) {
-            throw new Error("Function arguments are undefined");
+          data: {
+            model: "gpt-4",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `Please generate content for our website homepage based on this request: "${prompt}"` }
+            ],
+            temperature: 0.7,
+            max_tokens: 1000
           }
-          const { updateText } = JSON.parse(toolCall.function.arguments);
-          const sanitizedText = sanitizeText(updateText);
+        });
 
-          // Send the sanitized text to the Drupal API
-          const drupalResponse = await axios.post(
-            "https://drupal7.intelligensi.online/api/update-homepage",
-            { update_text: sanitizedText },
-            { headers: { "Content-Type": "application/json" } }
-          );
+        console.log("OpenAI Response Status:", response.status);
+        
+        // Extract the generated content
+        const generatedText = response.data.choices?.[0]?.message?.content || "No content generated";
+        const sanitizedText = sanitizeText(generatedText);
+        
+        console.log("Generated content:", sanitizedText);
+        
+        // Send the response back to the client
+        res.status(200).json({
+          success: true,
+          generatedText: sanitizedText
+        });
 
-          res.status(200).json({
-            message: `Homepage updated successfully with: ${sanitizedText}`,
-            drupalResponse: drupalResponse.data,
+      } catch (error) {
+        console.error("Error calling OpenAI API:", error);
+        
+        let errorMessage = "Failed to process your request";
+        let errorDetails = error instanceof Error ? error.message : String(error);
+        
+        if (error instanceof AxiosError) {
+          console.error("Axios error:", {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            headers: error.response?.headers
           });
-        } catch (parseError) {
-          console.error("Error parsing function arguments:", parseError);
-          res.status(500).json({ error: "Error parsing function arguments." });
+          errorMessage = error.response?.data?.error?.message || errorMessage;
         }
-      } else {
-        const message = openAIResponse.data.choices?.[0]?.message?.content ||
-          "Could not determine the homepage update.";
-        res.status(200).json({ message });
+        
+        const errorResponse: {
+          error: string;
+          details: string;
+          stack?: string;
+        } = {
+          error: errorMessage,
+          details: errorDetails
+        };
+        
+        if (process.env.NODE_ENV === 'development' && error instanceof Error) {
+          errorResponse.stack = error.stack;
+        }
+        
+        res.status(500).json(errorResponse);
       }
+      
     } catch (error) {
-      console.error("API error:", error instanceof AxiosError ? error.response?.data : error);
+      console.error("Unexpected error:", error);
       res.status(500).json({
-        error: "Failed to process your request.",
-        details: error instanceof AxiosError ? error.response?.data :
-          error instanceof Error ? error.message : "Unknown error",
+        error: "An unexpected error occurred",
+        details: error instanceof Error ? error.message : String(error)
       });
     }
   }
