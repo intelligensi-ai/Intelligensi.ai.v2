@@ -1,6 +1,46 @@
 import axios, { AxiosError } from "axios";
-import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
+
+// Get OpenAI API key from Firebase config
+import { config } from "firebase-functions";
+
+/**
+ * Retrieves the OpenAI API key from Firebase config or environment variable
+ * @return {string} The OpenAI API key
+ */
+function getOpenAIApiKey(): string {
+  const firebaseConfig = config();
+  // First try to get from firebase config (for production)
+  if (firebaseConfig?.openai?.api_key) {
+    return firebaseConfig.openai.api_key;
+  }
+  // Fallback to environment variable (for local development)
+  return process.env.OPENAI_API_KEY || "";
+}
+
+const openaiApiKey = getOpenAIApiKey();
+
+/**
+ * Validates and cleans an API key
+ * @param {string | undefined} key - The API key to validate
+ * @return {string} The cleaned API key
+ * @throws {Error} If the key is missing or empty after cleaning
+ */
+function getValidApiKey(key: string | undefined): string {
+  if (!key) {
+    throw new Error("OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable.");
+  }
+  // Remove any whitespace or quotes that might have been accidentally added
+  const cleanKey = key.trim().replace(/^['"]|['"]$/g, "");
+
+  // Basic validation - just check if it's not empty after cleaning
+  if (!cleanKey) {
+    throw new Error("API key is empty after removing whitespace and quotes");
+  }
+
+  console.log("Using API key (first 8 chars):", cleanKey.substring(0, 8) + "...");
+  return cleanKey;
+}
 
 /**
  * Sanitize text by removing HTML tags.
