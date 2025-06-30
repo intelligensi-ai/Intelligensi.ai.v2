@@ -2,17 +2,28 @@ import { onRequest } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2/options";
 import weaviate, { ApiKey } from "weaviate-ts-client";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY environment variable is not set");
+// Validate required environment variables
+const requiredEnvVars = [
+  "OPENAI_API_KEY",
+  "WEAVIATE_URL",
+  "WEAVIATE_API_KEY"
+];
+
+const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+if (missingVars.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingVars.join(", ")}`);
 }
+
+// Parse Weaviate URL
+const weaviateUrl = new URL(process.env.WEAVIATE_URL!);
 
 // Initialize Weaviate client with environment variables
 const client = weaviate.client({
-  scheme: "https",
-  host: "o8rpm9n6tz69qo7mrhl1a.c0.europe-west3.gcp.weaviate.cloud",
-  apiKey: new ApiKey("pqb7M3NvwICXPvO4Cf72knOhrplAqWNiKRy4"),
+  scheme: weaviateUrl.protocol.replace(":", "").replace("http", "ws"), // Convert http/https to ws/wss
+  host: weaviateUrl.host,
+  apiKey: new ApiKey(process.env.WEAVIATE_API_KEY!),
   headers: {
-    "X-OpenAI-Api-Key": process.env.OPENAI_API_KEY as string,
+    "X-OpenAI-Api-Key": process.env.OPENAI_API_KEY!,
   },
 });
 
