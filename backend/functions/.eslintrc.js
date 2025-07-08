@@ -44,6 +44,15 @@ module.exports = {
     "import/no-unresolved": "off",
     "import/namespace": "off", // Disable problematic rule
     "import/no-duplicates": "off", // Disable problematic rule
+    "valid-jsdoc": [
+      "error",
+      {
+        requireReturn: false,
+        requireParamType: false,
+        requireReturnType: false,
+        prefer: { returns: 'return' },
+      }
+    ],
     indent: [
       "error",
       2,

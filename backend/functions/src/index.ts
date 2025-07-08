@@ -1,25 +1,29 @@
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onRequest } from "firebase-functions/v2/https";
-import express, { json as expressJson } from "express";
+import express from "express";
 import cors from "cors";
 
-// Existing routes from HEAD
+// Import route handlers
 import { updateHomepage } from "./routes/openaiRoutes";
 import { fetchusers, updateuser, fetchuser } from "./routes/userRoutes";
 import drupal7Router from "./migrations/drupal7Migrations";
+import { drupal11Router } from "./migrations/drupal11intellibridge";
 import { checkWeaviate, writeSchema, writeWeaviate } from "./routes/weaviateRoutes";
 import { createSchema } from "./routes/schemaRoutes";
 import { deleteSite } from "./routes/siteRoutes";
 import { createDrupalSite } from "./routes/windsailRoutes";
 import { simpleSearch } from "./routes/WeaviatesSimplesearch";
-
-// New routes/imports from ea22d36
 import authRouter from "./routes/authRoutes";
 
-// Set global options
+// Set global options for all functions
 setGlobalOptions({
   region: "us-central1",
   maxInstances: 10,
+  memory: "1GiB",
+  timeoutSeconds: 60,
+  minInstances: 0,
+  concurrency: 80,
+  cpu: 1,
 });
 
 // Drupal 7 Express app
@@ -27,41 +31,48 @@ const drupal7App = express();
 drupal7App.use(express.json());
 drupal7App.use(cors({ origin: true }));
 drupal7App.use("/", drupal7Router);
-
-// Add health check endpoint for Cloud Run
 drupal7App.get("/healthz", (req, res) => {
-  res.status(200).send("ok");
+  res.status(200).send("drupal7-ok");
 });
 
-// Export the drupal7 function with proper configuration for Cloud Run
-export const drupal7 = onRequest({
+// Drupal 11 Express app
+const drupal11App = express();
+drupal11App.use(express.json());
+drupal11App.use(cors({ origin: true }));
+drupal11App.use("/", drupal11Router);
+drupal11App.get("/healthz", (req, res) => {
+  res.status(200).send("drupal11-ok");
+});
+
+// Create function instances without exporting them yet
+const drupal7Options = {
   region: "us-central1",
-  memory: "1GiB",
-  timeoutSeconds: 60,
-  minInstances: 0,
-  maxInstances: 10,
-  concurrency: 80,
-  cpu: 1,
-}, drupal7App);
+  cors: ["https://app.intelligensi.ai", "http://localhost:3000"],
+};
 
-// Auth Express app (incorporating from ea22d36)
+const drupal7 = onRequest(drupal7Options, drupal7App);
+
+const drupal11 = onRequest({
+  region: "us-central1",
+  cors: ["https://app.intelligensi.ai", "http://localhost:3000"],
+}, drupal11App);
+
+// Auth Express app
 const authApp = express();
+authApp.use(express.json());
 authApp.use(cors({ origin: true }));
-authApp.use(expressJson());
 authApp.use("/", authRouter);
-export const auth = onRequest(
-  {
-  },
-  authApp
-);
 
-// Health check endpoint (adapted from ea22d36 as a standalone function)
-export const healthcheck = onRequest((req, res) => {
-  res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
+const auth = onRequest(authApp);
+
+// Health check function
+const healthcheck = onRequest((req, res) => {
+  res.status(200).send("OK");
 });
 
-// Export all functions
+// Export all functions in a single export block
 export {
+  // HTTP Functions
   updateHomepage,
   fetchusers,
   updateuser,
@@ -73,9 +84,18 @@ export {
   deleteSite,
   createDrupalSite,
   simpleSearch,
+  
+  // Express Apps
+  drupal11,
+  drupal7,
+  auth,
+  healthcheck,
+  
+  // Export the Express apps as well if needed by other parts of the application
+  drupal11App,
+  drupal7App,
+  authApp
 };
 
-// Export ThemeCraft functions
+// Note: ThemeCraft functions are commented out as they're not currently in use
 // export const { scanWebsiteTheme, getUserThemeScans } = themeCraftFunctions;
-
-

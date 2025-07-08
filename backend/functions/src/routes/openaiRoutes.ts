@@ -1,24 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { onRequest } from "firebase-functions/v2/https";
-
-// Get OpenAI API key from Firebase config
-import { config } from "firebase-functions";
-
-/**
- * Retrieves the OpenAI API key from Firebase config or environment variable
- * @return {string} The OpenAI API key
- */
-function getOpenAIApiKey(): string {
-  const firebaseConfig = config();
-  // First try to get from firebase config (for production)
-  if (firebaseConfig?.openai?.api_key) {
-    return firebaseConfig.openai.api_key;
-  }
-  // Fallback to environment variable (for local development)
-  return process.env.OPENAI_API_KEY || "";
-}
-
-const openaiApiKey = getOpenAIApiKey();
+import { defineSecret } from "firebase-functions/params";
 
 /**
  * Sanitize text by removing HTML tags.
@@ -29,13 +11,16 @@ function sanitizeText(text: string): string {
   return text.replace(/<[^>]*>?/gm, "");
 }
 
-// Define Firebase secret
-const openaiApiKey = defineSecret("OPENAI_API_KEY");
+// Get OpenAI API key from environment
+const openaiApiKey = process.env.OPENAI_API_KEY || "";
+
+// Define Firebase secret for production
+const openaiSecret = defineSecret("OPENAI_API_KEY");
 
 // Standalone Firebase Function with built-in CORS
 export const updateHomepage = onRequest(
   {
-    secrets: [openaiApiKey],
+    secrets: [openaiSecret],
     cors: true,
   },
   async (req, res) => {
@@ -46,7 +31,11 @@ export const updateHomepage = onRequest(
         return;
       }
 
-      console.log("Received request:", req.method, req.path, req.body);
+      console.log("Received request:", {
+        method: req.method,
+        path: req.path,
+        body: req.body,
+      });
 
       const { prompt } = req.body || {};
 
@@ -62,9 +51,8 @@ The user will ask you to create content, and you should generate appropriate, en
 that would be suitable for a professional website homepage.`;
 
       try {
-        // Get the API key from Firebase Secrets
-        const apiKey = openaiApiKey.value();
-        const authHeader = `Bearer ${apiKey}`;
+        // Use the API key directly
+        const authHeader = `Bearer ${openaiApiKey}`;
 
         // Make the OpenAI API request
         const response = await axios({
@@ -78,7 +66,10 @@ that would be suitable for a professional website homepage.`;
             model: "gpt-4",
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: `Please generate content for our website homepage based on this request: "${prompt}"` },
+              {
+                role: "user",
+                content: `Please generate content for our website homepage based on this request: "${prompt}"`,
+              },
             ],
             temperature: 0.7,
             max_tokens: 1000,

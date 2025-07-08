@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { getAuth } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
 
@@ -32,26 +33,75 @@ const AIPromptDialog: React.FC<AIPromptDialogProps> = ({
     setResponse('');
 
     try {
-      // Call the Weaviate search function
-      const searchWeaviate = httpsCallable(functions, 'searchWeaviate');
-      const result = await searchWeaviate({ 
+      // For development, we'll skip authentication
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Only add auth header in production
+      if (!isDevelopment) {
+        const user = getAuth().currentUser;
+        if (!user) {
+          throw new Error('You need to be logged in to use this feature');
+        }
+        const token = await user.getIdToken();
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      console.log('Sending search request...');
+      const endpoint = isDevelopment 
+        ? 'http://localhost:5001/intelligensi-ai-v2/us-central1/simpleSearch'
+        : 'https://us-central1-intelligensi-ai-v2.cloudfunctions.net/simpleSearch';
+      
+      const requestBody = {
         query: prompt,
-        siteId: siteId.toString(),
-        userId: currentUser?.uid
+        limit: 3
+      };
+
+      console.log('Request details:', { endpoint, body: requestBody });
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
+        body: JSON.stringify(requestBody)
       });
 
-      // @ts-ignore - TypeScript doesn't know the shape of the result
-      const searchResults = result.data.results;
-      
-      if (searchResults && searchResults.length > 0) {
-        // @ts-ignore - TypeScript doesn't know the shape of the result
-        setResponse(searchResults[0]._additional.generate.singleResult || 'No results found');
-      } else {
-        setResponse('No matching results found.');
+      const responseData = await response.json().catch(err => ({
+        error: `Failed to parse response: ${err.message}`
+      }));
+
+      console.log('Response status:', response.status);
+      console.log('Response data:', responseData);
+
+      if (!response.ok) {
+        throw new Error(
+          responseData.error || 
+          responseData.message || 
+          `Request failed with status ${response.status}`
+        );
       }
-    } catch (err: any) {
+
+      if (!responseData.success) {
+        throw new Error(responseData.error || 'Search was not successful');
+      }
+      
+      if (responseData.results?.length > 0) {
+        // Use the first result's body as the response
+        const firstResult = responseData.results[0];
+        console.log('First result:', firstResult);
+        setResponse(firstResult.body || firstResult._additional?.body || 'No content available');
+      } else {
+        setResponse('No matching results found. Try rephrasing your question.');
+      }
+    } catch (err: unknown) {
+      console.error('Error in handleSubmit:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error('Error searching Weaviate:', err);
-      setError(err.message || 'Failed to get response. Please try again.');
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
