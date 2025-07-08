@@ -5,6 +5,12 @@ import https from "https";
 // Create and configure the router
 const router: Router = Router();
 
+// Middleware to log all requests
+router.use((req, res, next) => {
+  console.log(`[D11] ${req.method} ${req.path}`, req.query);
+  next();
+});
+
 // Export the router as a named export
 export const drupal11Router = router;
 
@@ -29,13 +35,7 @@ interface ImportResult {
   details: string[];
 }
 
-// Interface for bulk export response
-interface BulkExportResponse {
-  status: string;
-  count: number;
-  next: string | null;
-  data: DrupalNode[];
-}
+// Bulk export response type will be dynamically handled
 
 // Interface for site info response
 interface SiteInfo {
@@ -66,7 +66,13 @@ function createDrupalClient(baseURL: string, username?: string, password?: strin
     headers: {
       "Content-Type": "application/json",
       "Accept": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization"
     },
+    withCredentials: false,
+    timeout: 30000, // 30 second timeout
+    validateStatus: (status) => status < 500 // Don't throw for 4xx errors
   };
 
   // Add basic auth if credentials are provided
@@ -77,7 +83,21 @@ function createDrupalClient(baseURL: string, username?: string, password?: strin
     };
   }
 
-  return axios.create(config);
+  const client = axios.create(config);
+  
+  // Add request interceptor for logging
+  client.interceptors.request.use(
+    (config) => {
+      console.log(`Making request to: ${config.baseURL}${config.url}`);
+      return config;
+    },
+    (error) => {
+      console.error('Request error:', error);
+      return Promise.reject(error);
+    }
+  );
+  
+  return client;
 }
 
 /**
@@ -86,20 +106,42 @@ function createDrupalClient(baseURL: string, username?: string, password?: strin
 // Get site information from Drupal 11
 // Get site information from Drupal 11
 router.get("/info", async (req: Request, res: Response): Promise<void> => {
-  const { endpoint, username, password } = req.query;
-  if (!endpoint) {
-    res.status(400).json({ error: "Endpoint is required" });
-    return;
-  }
   try {
-    const client = createDrupalClient(endpoint as string, username as string, password as string);
+    // Use the same hardcoded endpoint as the /structure endpoint
+    const hardcodedEndpoint = 'https://umami-intelligensi.ai.ddev.site';
+    const { username, password } = req.query;
+    
+    console.log('Fetching site info from:', hardcodedEndpoint);
+    
+    const client = createDrupalClient(
+      hardcodedEndpoint, 
+      username as string, 
+      password as string
+    );
+    
+    console.log('Making request to:', `${hardcodedEndpoint}/intelligensi-bridge/site-info`);
     const response = await client.get<SiteInfo>("/intelligensi-bridge/site-info");
+    
+    console.log('Site info response status:', response.status);
     res.json(response.data);
   } catch (error) {
     console.error("Error fetching site info:", error);
-    res.status(500).json({
-      error: "Failed to fetch site info",
+    if (axios.isAxiosError(error)) {
+      console.error('Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        headers: error.response?.headers,
+        data: error.response?.data
+      });
+    }
+    res.status(500).json({ 
+      error: "Failed to fetch site info", 
       details: error instanceof Error ? error.message : String(error),
+      axiosError: axios.isAxiosError(error) ? {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      } : undefined
     });
   }
 });
@@ -109,24 +151,120 @@ router.get("/info", async (req: Request, res: Response): Promise<void> => {
  */
 // Update homepage in Drupal 11
 router.post("/homepage", async (req: Request, res: Response): Promise<void> => {
-  const { endpoint, username, password, nid } = req.body;
+  console.log('[D11] /homepage endpoint called with body:', req.body);
+  
+  const { nid, content } = req.body;
+  const hardcodedEndpoint = 'https://umami-intelligensi.ai.ddev.site';
+  const username = 'admin';
+  const password = 'admin';
 
-  if (!endpoint || !nid) {
-    res.status(400).json({
-      error: "Endpoint and node ID (nid) are required",
-    });
+  if (!nid) {
+    console.error('[D11] Error: nid is required');
+    res.status(400).json({ error: "Node ID (nid) is required" });
     return;
   }
 
   try {
-    const client = createDrupalClient(endpoint, username, password);
-    const response = await client.post("/intelligensi-bridge/update-homepage", { nid });
-    res.json(response.data);
+    console.log(`[D11] Updating node ${nid} at ${hardcodedEndpoint}`);
+    
+    // Create axios instance with base config
+    const client = axios.create({
+      baseURL: hardcodedEndpoint,
+      withCredentials: true,
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    });
+
+    // 1. Log in to get session cookie
+    console.log('[D11] Logging in to Drupal...');
+    await client.post('/user/login', 
+      `name=${encodeURIComponent(username)}&pass=${encodeURIComponent(password)}`,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+
+    // 2. Get CSRF token
+    console.log('[D11] Getting CSRF token...');
+    const tokenResponse = await client.get('/session/token');
+    const csrfToken = tokenResponse.data;
+
+    // 3. Create a new client with JSON:API headers
+    const jsonApiClient = axios.create({
+      baseURL: hardcodedEndpoint,
+      auth: {
+        username: username,
+        password: password
+      },
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+      headers: {
+        'Content-Type': 'application/vnd.api+json',
+        'Accept': 'application/vnd.api+json',
+        'X-CSRF-Token': csrfToken
+      }
+    });
+
+    // 4. First, get the node to update
+    console.log(`[D11] Fetching node ${nid}...`);
+    const nodeResponse = await jsonApiClient.get(`/jsonapi/node/article/${nid}?include=field_tags,field_image`);
+    const nodeData = nodeResponse.data.data;
+
+    // 5. Prepare updated node for JSON:API
+    const updatedNode = {
+      data: {
+        type: 'node--article',
+        id: nid,
+        attributes: {
+          title: content,
+          body: {
+            value: content,
+            format: 'basic_html',
+            summary: ''
+          }
+        }
+      }
+    };
+    
+    // 6. Send the update using JSON:API
+    console.log(`[D11] Updating node ${nid}...`);
+    const response = await jsonApiClient.patch(
+      `/jsonapi/node/article/${nid}`,
+      updatedNode.data,
+      {
+        headers: {
+          'Content-Type': 'application/vnd.api+json',
+          'Accept': 'application/vnd.api+json'
+        }
+      }
+    );
+
+    console.log(`[D11] Homepage update response:`, response.status, response.statusText);
+    res.json({
+      success: true,
+      message: "Homepage updated successfully",
+      data: response.data,
+      source: hardcodedEndpoint
+    });
   } catch (error) {
-    console.error("Error updating homepage:", error);
+    console.error("[D11] Error updating homepage:", error);
+    
+    if (axios.isAxiosError(error)) {
+      console.error('[D11] Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
+    }
+    
     res.status(500).json({
       error: "Failed to update homepage",
       details: error instanceof Error ? error.message : String(error),
+      axiosError: axios.isAxiosError(error) ? {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      } : undefined
     });
   }
 });
@@ -134,30 +272,58 @@ router.post("/homepage", async (req: Request, res: Response): Promise<void> => {
 /**
  * Bulk export nodes from Drupal 11
  */
-// Bulk export nodes from Drupal 11
+// Get site structure from Drupal 11 using hardcoded endpoint
 router.get("/structure", async (req: Request, res: Response): Promise<void> => {
-  const { endpoint, username, password, limit, offset } = req.query;
-
-  if (!endpoint) {
-    res.status(400).json({ error: "Endpoint is required" });
-    return;
-  }
-
+  console.log('[D11] /structure endpoint called');
   try {
-    const client = createDrupalClient(endpoint as string, username as string, password as string);
-    const params = new URLSearchParams();
-    if (limit) params.append("limit", limit as string);
-    if (offset) params.append("offset", offset as string);
-
-    const response = await client.get<BulkExportResponse>(
-      `/intelligensi-bridge/bulk-export?${params.toString()}`
-    );
-    res.json(response.data);
+    // Hardcoded endpoint for testing
+    const hardcodedEndpoint = 'https://umami-intelligensi.ai.ddev.site/api/bulk-export';
+    console.log('Using hardcoded endpoint:', hardcodedEndpoint);
+    
+    // Create client with the hardcoded endpoint as base URL
+    const client = axios.create({
+      baseURL: hardcodedEndpoint,
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      validateStatus: () => true // Don't throw for any status
+    });
+    
+    console.log('Making request to:', hardcodedEndpoint);
+    const response = await client.get('');
+    console.log('Response status:', response.status);
+    
+    if (response.status === 200 && response.data) {
+      console.log('Successfully fetched data');
+      res.json({
+        status: 'success',
+        data: response.data,
+        source: hardcodedEndpoint
+      });
+      return;
+    }
+    
+    throw new Error(`Endpoint returned status ${response.status}`);
   } catch (error) {
     console.error("Error fetching site structure:", error);
+    if (axios.isAxiosError(error)) {
+      console.error('Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        headers: error.response?.headers,
+        data: error.response?.data
+      });
+    }
     res.status(500).json({
       error: "Failed to fetch site structure",
       details: error instanceof Error ? error.message : String(error),
+      axiosError: axios.isAxiosError(error) ? {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      } : undefined
     });
   }
 });
