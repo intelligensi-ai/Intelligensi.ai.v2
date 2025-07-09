@@ -17,8 +17,11 @@ const openaiSecret = defineSecret("OPENAI_API_KEY");
 // Standalone Firebase Function with built-in CORS
 export const updateHomepage = onRequest(
   {
+    region: "us-central1",
     secrets: [openaiSecret],
     cors: true,
+    memory: "1GiB",
+    timeoutSeconds: 60
   },
   async (req, res) => {
     try {

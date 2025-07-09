@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { defineSecret } from "firebase-functions/params";
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 
-// Define secrets
+// Define secrets with proper typing
 const supabaseUrlSecret = defineSecret("SUPABASE_URL");
 const supabaseServiceRoleKey = defineSecret("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -15,7 +15,10 @@ interface GetUserDataRequest {
  */
 export const getUserData = onCall(
   {
-    secrets: [supabaseServiceRoleKey, supabaseUrlSecret]
+    region: "us-central1",
+    secrets: [supabaseServiceRoleKey, supabaseUrlSecret],
+    memory: "1GiB",
+    timeoutSeconds: 60
   },
   async (request: CallableRequest<GetUserDataRequest>) => {
     // Verify user is authenticated
