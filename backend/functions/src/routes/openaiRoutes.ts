@@ -11,10 +11,7 @@ function sanitizeText(text: string): string {
   return text.replace(/<[^>]*>?/gm, "");
 }
 
-// Get OpenAI API key from environment
-const openaiApiKey = process.env.OPENAI_API_KEY || "";
-
-// Define Firebase secret for production
+// Define Firebase secret for OpenAI API key
 const openaiSecret = defineSecret("OPENAI_API_KEY");
 
 // Standalone Firebase Function with built-in CORS
@@ -51,30 +48,25 @@ The user will ask you to create content, and you should generate appropriate, en
 that would be suitable for a professional website homepage.`;
 
       try {
-        // Use the API key directly
-        const authHeader = `Bearer ${openaiApiKey}`;
-
         // Make the OpenAI API request
-        const response = await axios({
-          method: "post",
-          url: "https://api.openai.com/v1/chat/completions",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": authHeader,
-          },
-          data: {
+        const response = await axios.post(
+          "https://api.openai.com/v1/chat/completions",
+          {
             model: "gpt-4",
             messages: [
               { role: "system", content: systemPrompt },
-              {
-                role: "user",
-                content: `Please generate content for our website homepage based on this request: "${prompt}"`,
-              },
+              { role: "user", content: `Please generate content for our website homepage based on this request: "${prompt}"` },
             ],
             temperature: 0.7,
             max_tokens: 1000,
           },
-        });
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${openaiSecret.value()}`,
+            },
+          }
+        );
 
         console.log("OpenAI Response Status:", response.status);
 

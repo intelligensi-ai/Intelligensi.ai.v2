@@ -23,23 +23,23 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const functions = getFunctions(app, "us-central1"); // Specify your region
 
-// Connect to emulators in development
-if (process.env.NODE_ENV === 'development') {
-  console.log("[Firebase Init] In development mode, connecting emulators...");
-  try {
-    // Connect Auth Emulator (assuming default port 9099)
-    connectAuthEmulator(auth, "http://localhost:9099");
-    console.log("[Firebase Init] Auth emulator connected.");
+// Using production services
+console.log("[Firebase Init] Using production Firebase services.");
 
-    // Connect Functions Emulator (port 5001)
-    connectFunctionsEmulator(functions, "localhost", 5001);
-    console.log("[Firebase Init] Functions emulator connected.");
+// If you need to use emulators during development, uncomment this block:
+/*
+if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_EMULATORS === 'true') {
+  console.log("[Firebase Init] Connecting to emulators...");
+  try {
+    // Connect to emulators if needed
+    // connectAuthEmulator(auth, "http://localhost:9099");
+    // connectFunctionsEmulator(functions, "localhost", 5001);
+    console.log("[Firebase Init] Emulators connected.");
   } catch (error) {
     console.error("[Firebase Init] Error connecting emulators:", error);
   }
-} else {
-  console.log("[Firebase Init] In non-development mode, using production services.");
 }
+*/
 
 export { auth, functions };
 

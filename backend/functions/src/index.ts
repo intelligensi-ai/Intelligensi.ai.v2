@@ -14,6 +14,7 @@ import { deleteSite } from "./routes/siteRoutes";
 import { createDrupalSite } from "./routes/windsailRoutes";
 import { simpleSearch } from "./routes/WeaviatesSimplesearch";
 import authRouter from "./routes/authRoutes";
+import { getUserData } from "./services/adminService";
 
 // Set global options for all functions
 setGlobalOptions({
@@ -44,16 +45,32 @@ drupal11App.get("/healthz", (req, res) => {
   res.status(200).send("drupal11-ok");
 });
 
-// Create function instances without exporting them yet
-const drupal7Options = {
+// Common options for functions
+const commonOptions = {
   region: "us-central1",
   cors: ["https://app.intelligensi.ai", "http://localhost:3000"],
+  secrets: [
+    "SUPABASE_URL",
+    "SUPABASE_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "OPENAI_API_KEY",
+    "WEAVIATE_API_KEY",
+    "AWS_ACCESS_KEY",
+    "AWS_SECRET_KEY",
+    "AWS_REGION",
+    "AWS_KEY_PAIR",
+    "INSTANCE_PREFIX"
+  ]
 };
 
-const drupal7 = onRequest(drupal7Options, drupal7App);
+// Create function instances with common options
+const drupal7 = onRequest({
+  ...commonOptions,
+  cors: ["https://app.intelligensi.ai", "http://localhost:3000", "https://drupal7.intelligensi.online"],
+}, drupal7App);
 
 const drupal11 = onRequest({
-  region: "us-central1",
+  ...commonOptions,
   cors: ["https://app.intelligensi.ai", "http://localhost:3000"],
 }, drupal11App);
 
@@ -66,35 +83,34 @@ authApp.use("/", authRouter);
 const auth = onRequest(authApp);
 
 // Health check function
-const healthcheck = onRequest((req, res) => {
+const healthcheck = onRequest(commonOptions, (req, res) => {
   res.status(200).send("OK");
 });
 
 // Export all functions in a single export block
 export {
   // HTTP Functions
+  createSchema,
+  checkWeaviate,
+  writeSchema,
+  writeWeaviate,
   updateHomepage,
   fetchusers,
   updateuser,
   fetchuser,
-  checkWeaviate,
-  writeSchema,
-  writeWeaviate,
-  createSchema,
   deleteSite,
   createDrupalSite,
   simpleSearch,
-  
+  getUserData,
   // Express Apps
   drupal11,
   drupal7,
   auth,
   healthcheck,
-  
   // Export the Express apps as well if needed by other parts of the application
   drupal11App,
   drupal7App,
-  authApp
+  authApp,
 };
 
 // Note: ThemeCraft functions are commented out as they're not currently in use

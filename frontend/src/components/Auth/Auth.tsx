@@ -1,37 +1,130 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../Config/firebaseConfig';
+import { useNavigate, Link } from 'react-router-dom';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
-const Auth: React.FC = () => {
+interface AuthProps {
+  isRegister?: boolean;
+}
+
+const Auth: React.FC<AuthProps> = ({ isRegister = false }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [name, setName] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
-    try {
-      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
-      if (!apiBaseUrl) {
-        console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
-        setError("Application configuration error: API endpoint is missing. Please contact support.");
-        return;
+  const validateForm = (): boolean => {
+    if (!email || !password) {
+      setError('Email and password are required');
+      return false;
+    }
+    
+    if (isRegister) {
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return false;
       }
+      
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters long');
+        return false;
+      }
+      
+      if (!name.trim()) {
+        setError('Name is required');
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      if (isRegister) {
+        await handleRegister();
+      } else {
+        await handleLogin();
+      }
+    } catch (err) {
+      console.error(isRegister ? 'Registration error:' : 'Login error:', err);
+      setError(
+        isRegister 
+          ? 'Failed to create account. Please try again.'
+          : 'Invalid credentials. Please check your email and password.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleLogin = async () => {
+    const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
+    if (!apiBaseUrl) {
+      console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
+      setError("Application configuration error: API endpoint is missing. Please contact support.");
+      return;
+    }
+    
+    try {
       const { data } = await axios.get(
         `${apiBaseUrl}/fetchuser?email=${email}`
       );
 
-      if (!data.success || !data.data.is_active) {
+      if (!data.success || !data.data?.is_active) {
         setError('User not found or account is inactive.');
         return;
       }
 
       await signInWithEmailAndPassword(auth, email, password);
-      navigate('/profile');
+      toast.success('Successfully logged in!');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
-      setError('Invalid credentials or account not found.');
+      throw err;
+    }
+  };
+  
+  const handleRegister = async () => {
+    const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
+    if (!apiBaseUrl) {
+      console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
+      setError("Application configuration error: API endpoint is missing. Please contact support.");
+      return;
+    }
+    
+    try {
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Create user in your database
+      await axios.post(`${apiBaseUrl}/updateuser`, {
+        id: user.uid,
+        email,
+        name,
+        is_active: true
+      });
+      
+      toast.success('Account created successfully!');
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Registration error:', err);
+      throw err;
     }
   };
 
@@ -48,93 +141,133 @@ const Auth: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-[#0F172A]/90 via-[#0F172A]/80 to-[#0F172A]/90" />
       </div>
 
-      {/* Logo at the very top */}
-      <div className="mb-2 relative z-10">
+      {/* Logo */}
+      <div className="mb-8 text-center relative z-10">
         <img 
           src="/logocutout.png" 
           alt="Intelligensi Logo" 
-          className="h-50 w-50 mx-auto"
+          className="h-32 w-auto mx-auto mb-4"
         />
-      </div>
-
-      {/* Header Section */}
-      <div className="text-center mb-6 relative z-10">
         <h1 className="text-4xl font-light text-white mb-1">Intelligensi.ai</h1>
         <p className="text-gray-300 text-lg">
-        Let's build smarter, faster, together.
-        </p>
-        <p className="text-gray-400 mt-1 text-sm">
-          {/* Let's build smarter, faster, together. */}
+          Let's build smarter, faster, together.
         </p>
       </div>
 
-      {/* Login Card with curved design */}
-      <div className="bg-[#1d242f5d] p-8 rounded-2xl shadow-xl w-full max-w-md relative z-10 backdrop-blur-sm">
-        <h2 className="text-2xl font-bold text-white mb-6 text-center">Login</h2>
-        
-        <div className="space-y-4">
+      {/* Auth Card */}
+      <div className="w-full max-w-md bg-white/5 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/10 relative z-10">
+        <h2 className="text-2xl font-bold text-white mb-6 text-center">
+          {isRegister ? 'Create an Account' : 'Welcome Back'}
+        </h2>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 text-red-200 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegister && (
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
+                Full Name
+              </label>
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="John Doe"
+                disabled={isLoading}
+              />
+            </div>
+          )}
+
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-1">Email</label>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+              Email Address
+            </label>
             <input
+              id="email"
               type="email"
-              placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#1A202C] text-white p-3 rounded-xl border border-gray-600 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="you@example.com"
+              disabled={isLoading}
             />
           </div>
 
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-1">Password</label>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+              Password
+            </label>
             <input
+              id="password"
               type="password"
-              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#1A202C] text-white p-3 rounded-xl border border-gray-600 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="••••••••"
+              disabled={isLoading}
             />
           </div>
 
-          {error && (
-            <div className="text-red-400 text-sm py-2 px-3 bg-red-900/30 rounded-xl">
-              {error}
+          {isRegister && (
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="••••••••"
+                disabled={isLoading}
+              />
             </div>
           )}
 
           <button
-            onClick={handleLogin}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200 shadow-md"
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-xl transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-6"
           >
-            Sign in
+            {isLoading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {isRegister ? 'Creating Account...' : 'Signing In...'}
+              </span>
+            ) : isRegister ? (
+              'Create Account'
+            ) : (
+              'Sign In'
+            )}
           </button>
-        </div>
+        </form>
 
         <div className="mt-6 text-center">
-          <p className="text-gray-400 text-sm">
-            Don't have an account?{' '}
-            <button
-              onClick={() => navigate('/register')}
-              className="text-teal-400 hover:text-teal-300 font-medium transition"
+          <p className="text-sm text-gray-400">
+            {isRegister ? 'Already have an account? ' : "Don't have an account? "}
+            <Link 
+              to={isRegister ? '/login' : '/register'} 
+              className="text-blue-400 hover:text-blue-300 font-medium"
             >
-              Register Here
-            </button>
+              {isRegister ? 'Sign in' : 'Create one'}
+            </Link>
           </p>
         </div>
       </div>
 
-      {/* Additional Links with pill-shaped buttons */}
-      <div className="flex space-x-4 mt-8">
-        <button className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-6 rounded-full transition shadow-md">
-          Get Started
-        </button>
-        <button className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-6 rounded-full transition shadow-md">
-          Documentation
-        </button>
-      </div>
-
-      {/* Footer Branding */}
-      <div className="mt-12 text-center text-gray-500 text-sm relative z-10">
-        <p>© 2025 intelligensi.ai. All rights reserved.</p>
+      {/* Footer */}
+      <div className="mt-8 text-center text-sm text-gray-400 relative z-10">
+        <p>© {new Date().getFullYear()} Intelligensi.ai. All rights reserved.</p>
       </div>
     </div>
   );
