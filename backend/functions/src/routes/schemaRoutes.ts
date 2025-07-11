@@ -7,13 +7,16 @@ import { z } from "zod";
 
 // Firebase Secrets
 const supabaseUrl = defineSecret("SUPABASE_URL");
-const supabaseKey = defineSecret("SUPABASE_KEY");
+const supabaseKey = defineSecret("SUPABASE_ANON_KEY");
 
 // Initialize Supabase Client
 const getSupabaseClient = () =>
-  createClient(supabaseUrl.value(), supabaseKey.value(), {
-    auth: { persistSession: false },
-  });
+  createClient(
+    supabaseUrl.value(),
+    supabaseKey.value(),
+    { auth: { persistSession: false } }
+  );
+
 
 // CORS Middleware
 const corsHandler = cors({ origin: true });
@@ -166,7 +169,10 @@ function inferFieldType(value: unknown, key?: string): z.ZodTypeAny {
 
 // Create a new schema
 export const createSchema = onRequest(
-  { cors: false, secrets: [supabaseUrl, supabaseKey] },
+  { 
+    cors: false, 
+    secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"] 
+  },
   (req: Request, res) => {
     corsHandler(req, res, async (err?: Error) => {
       if (err) {

@@ -8,7 +8,7 @@ import { z } from "zod";
 // Firebase Secrets for Supabase
 const supabaseUrl = defineSecret("SUPABASE_URL");
 // Ensure this is the service_role key or a key with delete permissions
-const supabaseKey = defineSecret("SUPABASE_KEY");
+const supabaseKey = defineSecret("SUPABASE_ANON_KEY");
 
 // Initialize Supabase Client
 const getSupabaseClient = () => {
@@ -34,7 +34,10 @@ const deleteSiteSchema = z.object({
  * Deletes a site and its associated data from Supabase.
  */
 export const deleteSite = onRequest(
-  { secrets: [supabaseUrl, supabaseKey], cors: false }, // Let corsHandler manage CORS headers
+  { 
+    secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"], 
+    cors: false 
+  }, // Let corsHandler manage CORS headers
   (req: Request, res) => {
     corsHandler(req, res, async (err?: Error) => {
       if (err) {

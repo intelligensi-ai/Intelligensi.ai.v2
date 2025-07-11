@@ -16,7 +16,7 @@ interface GetUserDataRequest {
 export const getUserData = onCall(
   {
     region: "us-central1",
-    secrets: [supabaseServiceRoleKey, supabaseUrlSecret],
+    secrets: ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_URL"],
     memory: "1GiB",
     timeoutSeconds: 60
   },

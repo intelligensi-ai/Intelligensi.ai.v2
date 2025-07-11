@@ -1,31 +1,44 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2/options";
+import { defineSecret } from "firebase-functions/params";
+import { logger } from "firebase-functions";
 import weaviate, { ApiKey } from "weaviate-ts-client";
 
-// Validate required environment variables
-const requiredEnvVars = [
-  "OPENAI_API_KEY",
-  "WEAVIATE_URL",
-  "WEAVIATE_API_KEY",
-];
+// Define Firebase Secrets
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
+const weaviateUrl = defineSecret("WEAVIATE_URL");
+const weaviateApiKey = defineSecret("WEAVIATE_API_KEY");
 
-const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
-if (missingVars.length > 0) {
-  throw new Error(`Missing required environment variables: ${missingVars.join(", ")}`);
-}
+// Initialize Weaviate client
+let client: ReturnType<typeof weaviate.client> | null = null;
 
-// Parse Weaviate URL
-const weaviateUrl = new URL(process.env.WEAVIATE_URL!);
+const initializeWeaviateClient = (secrets: {
+  openaiApiKey: string;
+  weaviateUrl: string;
+  weaviateApiKey: string;
+}) => {
+  try {
+    const { openaiApiKey: openaiKey, weaviateUrl: url, weaviateApiKey: apiKey } = secrets;
 
-// Initialize Weaviate client with environment variables
-const client = weaviate.client({
-  scheme: weaviateUrl.protocol.replace(":", "").replace("http", "ws"), // Convert http/https to ws/wss
-  host: weaviateUrl.host,
-  apiKey: new ApiKey(process.env.WEAVIATE_API_KEY!),
-  headers: {
-    "X-OpenAI-Api-Key": process.env.OPENAI_API_KEY!,
-  },
-});
+    if (!url) {
+      throw new Error("WEAVIATE_URL is not configured");
+    }
+
+    const weaviateUrlObj = new URL(url);
+    
+    return weaviate.client({
+      scheme: weaviateUrlObj.protocol.replace(":", "").replace("http", "ws"),
+      host: weaviateUrlObj.host,
+      apiKey: new ApiKey(apiKey),
+      headers: {
+        "X-OpenAI-Api-Key": openaiKey,
+      },
+    });
+  } catch (error) {
+    logger.error("Failed to initialize Weaviate client:", error);
+    throw error;
+  }
+};
 
 // Set global options for the function
 setGlobalOptions({
@@ -33,11 +46,9 @@ setGlobalOptions({
   maxInstances: 10,
 });
 
-/**
- * Simple search function that queries Weaviate vector database
- * @param query - The search query string
- * @param limit - Maximum number of results to return (default: 10)
- */
+// We'll initialize the client on first request
+// to ensure secrets are properly loaded
+
 interface SearchResult {
   title?: string;
   body?: string;
@@ -47,9 +58,42 @@ interface SearchResult {
   };
 }
 
-export const simpleSearch = onRequest(async (req, res) => {
+interface WeaviateClass {
+  class?: string;
+  className?: string;
+}
+
+export const simpleSearch = onRequest({
+  secrets: ["OPENAI_API_KEY", "WEAVIATE_URL", "WEAVIATE_API_KEY"]
+}, async (req, res) => {
+  // Initialize client on first request with the latest secrets
+  if (!client) {
+    client = initializeWeaviateClient({
+      openaiApiKey: openaiApiKey.value(),
+      weaviateUrl: weaviateUrl.value(),
+      weaviateApiKey: weaviateApiKey.value()
+    });
+  }
+  // CORS headers
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  };
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    res.set(corsHeaders).status(204).send("");
+    return;
+  }
+
+  // Set CORS headers for all responses
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    res.set(key, value);
+  });
+
   const sendError = (status: number, message: string, details?: unknown) => {
-    console.error(`Error ${status}:`, message, details);
+    logger.error(`Error ${status}:`, message, details);
     const errorResponse: { success: boolean; error: string; details?: unknown } = {
       success: false,
       error: message,
@@ -61,39 +105,24 @@ export const simpleSearch = onRequest(async (req, res) => {
 
     res.status(status).json(errorResponse);
   };
-  // Set response headers
-  const headers: Record<string, string> = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  };
-
-  // Apply headers
-  Object.entries(headers).forEach(([key, value]) => {
-    res.set(key, value);
-  });
-
-  // Handle preflight requests
-  if (req.method === "OPTIONS") {
-    res.status(204).send("");
-    return;
-  }
 
   try {
-    // Skip authentication in development
-    if (process.env.NODE_ENV !== "development") {
-      // Verify authentication in production
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        res.status(401).json({ success: false, error: "Unauthorized - Missing or invalid token" });
-        return;
+    // Initialize Weaviate client with secrets
+    if (!client) {
+      client = initializeWeaviateClient({
+        openaiApiKey: openaiApiKey.value(),
+        weaviateUrl: weaviateUrl.value(),
+        weaviateApiKey: weaviateApiKey.value()
+      });
+    } 
+    if (!client) {
+        throw new Error("Failed to initialize Weaviate client");
       }
-    }
 
-    // Parse the request body or query parameters
-    let query; let limit = 5;
+    // Parse the request
+    let query: string;
+    let limit = 5;
 
-    // Parse query parameters
     if (req.method === "GET") {
       // For GET requests, get query params from URL
       const queryParam = req.query.query;
@@ -101,6 +130,9 @@ export const simpleSearch = onRequest(async (req, res) => {
         query = queryParam;
       } else if (Array.isArray(queryParam) && queryParam.length > 0) {
         query = String(queryParam[0]);
+      } else {
+        sendError(400, "Query parameter is required");
+        return;
       }
 
       const limitParam = req.query.limit;
@@ -111,132 +143,91 @@ export const simpleSearch = onRequest(async (req, res) => {
       }
     } else if (req.method === "POST") {
       // For POST requests, parse the request body
-      const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-      if (body && typeof body.query === "string") {
-        query = body.query;
+      let body;
+      try {
+        body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+      } catch (e) {
+        sendError(400, "Invalid JSON body");
+        return;
       }
-      if (body && typeof body.limit === "number") {
-        limit = body.limit;
-      }
-    }
 
-    // Validate query parameter
-    if (!query) {
-      res.status(400).json({
-        success: false,
-        error: "Query parameter is required",
-      });
+      if (!body || typeof body.query !== "string") {
+        sendError(400, "Query parameter is required in request body");
+        return;
+      }
+
+      query = body.query;
+      if (body.limit && typeof body.limit === "number") {
+        limit = Math.min(Math.max(1, body.limit), 50); // Limit between 1 and 50
+      }
+    } else {
+      sendError(405, "Method not allowed");
       return;
     }
 
-    console.log("Executing text search with query:", { query, limit });
+    logger.info("Executing text search with query:", { query, limit });
 
-    try {
-      // First, try to find the correct class name by checking available classes
-      const schema = await client.schema.getter().do();
-      const availableClasses = schema.classes || [];
-      interface WeaviateClass {
-        class?: string;
-        // Add other properties as needed
-      }
-      console.log("Available classes:", availableClasses.map((c: WeaviateClass) => c?.class || "unnamed"));
+    // Get available classes
+    const schema = await client.schema.getter().do();
+    const availableClasses = (schema.classes || []).map((c: WeaviateClass) => c.class || c.className || "").filter(Boolean);
+    
+    logger.debug("Available classes:", availableClasses);
 
-      if (availableClasses.length === 0) {
-        sendError(404, "No searchable classes found in Weaviate");
-        return;
-      }
-
-      // Use the first available class
-      const className = availableClasses[0].class;
-      if (!className) {
-        sendError(500, "Invalid class name from Weaviate");
-        return;
-      }
-
-      console.log(`Using class for search: ${className}`);
-
-      // Execute a simple text-based search using the LIKE operator
-      const result = await client.graphql
-        .get()
-        .withClassName(className)
-        .withFields(`
-          title
-          body
-          _additional {
-            id
-            distance
-          }
-        `)
-        .withWhere({
-          operator: "Or",
-          operands: [
-            {
-              path: ["title"],
-              operator: "Like",
-              valueString: `*${query}*`,
-            },
-            {
-              path: ["body"],
-              operator: "Like",
-              valueString: `*${query}*`,
-            },
-          ],
-        })
-        .withLimit(limit)
-        .do();
-
-      // Process and validate results
-      const results = (result.data?.Get?.[className] || []) as SearchResult[];
-      console.log("Search successful, found results:", results.length);
-
-      // Format results with fallbacks for missing fields
-      const formattedResults = results.map((item) => ({
-        title: item.title || "Untitled",
-        body: item.body || "No content available",
-        _additional: item._additional || {},
-      }));
-
-      res.status(200).json({
-        success: true,
-        results: formattedResults,
-        count: formattedResults.length,
-      });
-    } catch (error: unknown) {
-      const weaviateError = error as {
-        response?: {
-          status: number;
-          data: unknown;
-          headers: Record<string, string>;
-        };
-        message?: string;
-      };
-      console.error("Weaviate search error:", weaviateError);
-
-      // Provide more detailed error information
-      if (weaviateError.response) {
-        console.error("Weaviate response error:", {
-          status: weaviateError.response.status,
-          data: weaviateError.response.data,
-          headers: weaviateError.response.headers,
-        });
-      }
-
-      // If it's a 404, it means the class doesn't exist
-      if (weaviateError.response?.status === 404) {
-        sendError(
-          404,
-          "The search index is not properly set up. Please contact support.",
-          "Search class not found in Weaviate"
-        );
-        return;
-      }
-
-      throw weaviateError;
+    if (availableClasses.length === 0) {
+      sendError(404, "No searchable classes found in Weaviate");
+      return;
     }
-  } catch (error) {
-    console.error("Search error:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
 
+    // Search across all available classes
+    for (const className of availableClasses) {
+      try {
+        const result = await client.graphql
+          .get()
+          .withClassName(className)
+          .withFields("title body _additional { id distance }")
+          .withNearText({ concepts: [query] })
+          .withLimit(limit)
+          .do();
+
+        const items = result.data.Get[className] as SearchResult[];
+        
+        if (items && items.length > 0) {
+          const results = items
+            .map((item) => ({
+              id: item._additional?.id,
+              title: item.title,
+              body: item.body,
+              distance: item._additional?.distance,
+            }))
+            .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+          logger.info(`Found ${results.length} results in class ${className}`);
+          
+          res.status(200).json({
+            success: true,
+            results,
+            class: className,
+          });
+          return;
+        }
+      } catch (error) {
+        logger.error(`Error searching class ${className}:`, error);
+        // Continue to next class
+      }
+    }
+
+    // If we get here, no results were found in any class
+    res.status(200).json({
+      success: true,
+      results: [],
+      message: "No results found"
+    });
+  } catch (error) {
+    logger.error("Error in simpleSearch:", error);
+    
+    // Handle different types of errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
     // Handle specific error cases
     if (errorMessage.includes("404") || errorMessage.includes("not found")) {
       sendError(404, "The requested resource was not found", errorMessage);

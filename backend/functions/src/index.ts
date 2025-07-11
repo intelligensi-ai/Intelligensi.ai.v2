@@ -48,21 +48,36 @@ drupal11App.get("/healthz", (req, res) => {
 // Common options for functions
 const commonOptions = {
   region: "us-central1",
-  cors: ["https://app.intelligensi.ai", "http://localhost:3000", "https://drupal7.intelligensi.online"],
-  // Don't include secrets here as they are now handled individually per function
+  cors: ["https://app.intelligensi.ai", "http://localhost:3000", "https://drupal7.intelligensi.online"]
 };
 
 // Create function instances with common options and required secrets
 const drupal7 = onRequest({
   ...commonOptions,
-  secrets: ["SUPABASE_URL", "SUPABASE_KEY", "WEAVIATE_API_KEY", "AWS_ACCESS_KEY", "AWS_SECRET_KEY", "AWS_REGION", "AWS_KEY_PAIR", "INSTANCE_PREFIX"],
-  cors: ["https://app.intelligensi.ai", "http://localhost:3000", "https://drupal7.intelligensi.online"],
+  secrets: [
+    "SUPABASE_URL", 
+    "SUPABASE_ANON_KEY", 
+    "WEAVIATE_API_KEY", 
+    "AWS_ACCESS_KEY", 
+    "AWS_SECRET_KEY", 
+    "AWS_REGION", 
+    "AWS_KEY_PAIR", 
+    "INSTANCE_PREFIX"
+  ]
 }, drupal7App);
 
 const drupal11 = onRequest({
   ...commonOptions,
-  secrets: ["SUPABASE_URL", "SUPABASE_KEY", "WEAVIATE_API_KEY", "AWS_ACCESS_KEY", "AWS_SECRET_KEY", "AWS_REGION", "AWS_KEY_PAIR", "INSTANCE_PREFIX"],
-  cors: ["https://app.intelligensi.ai", "http://localhost:3000"],
+  secrets: [
+    "SUPABASE_URL", 
+    "SUPABASE_ANON_KEY", 
+    "WEAVIATE_API_KEY", 
+    "AWS_ACCESS_KEY", 
+    "AWS_SECRET_KEY", 
+    "AWS_REGION", 
+    "AWS_KEY_PAIR", 
+    "INSTANCE_PREFIX"
+  ]
 }, drupal11App);
 
 // Auth Express app
@@ -73,7 +88,12 @@ authApp.use("/", authRouter);
 
 const auth = onRequest({
   ...commonOptions,
-  secrets: ["SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_SERVICE_ROLE_KEY"]
+  secrets: [
+    "SUPABASE_URL", 
+    "SUPABASE_ANON_KEY", 
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "JWT_SECRET"
+  ]
 }, authApp);
 
 // Health check function

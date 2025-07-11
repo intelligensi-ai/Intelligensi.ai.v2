@@ -6,7 +6,7 @@ import cors from "cors";
 
 // Firebase Secrets
 const supabaseUrl = defineSecret("SUPABASE_URL");
-const supabaseKey = defineSecret("SUPABASE_KEY");
+const supabaseKey = defineSecret("SUPABASE_ANON_KEY");
 
 // Initialize Supabase Client
 const getSupabaseClient = () => {
@@ -31,7 +31,7 @@ const corsHandler = cors({ origin: true });
 
 // Fetch all users
 export const fetchusers = onRequest(
-  { cors: false, secrets: [supabaseUrl, supabaseKey] },
+  { cors: false, secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"] },
   (req: Request, res) => {
     corsHandler(req, res, async (err?: Error) => {
       if (err) {
@@ -77,7 +77,7 @@ export const fetchusers = onRequest(
 
 // Update user
 export const updateuser = onRequest(
-  { cors: false, secrets: [supabaseUrl, supabaseKey] },
+  { cors: false, secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"] },
   (req: Request, res) => {
     corsHandler(req, res, async (err?: Error) => {
       if (err) {
@@ -154,7 +154,7 @@ export const updateuser = onRequest(
 
 // Fetch single user
 export const fetchuser = onRequest(
-  { cors: false, secrets: [supabaseUrl, supabaseKey] },
+  { cors: false, secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"] },
   (req: Request, res) => {
     corsHandler(req, res, async (err?: Error) => {
       if (err) {

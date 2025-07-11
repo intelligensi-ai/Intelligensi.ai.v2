@@ -11,7 +11,47 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(eot|otf|ttf|ttc|woff|font.css)",
+        "headers": [
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(jpg|jpeg|gif|png|svg|webp)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          }
+        ]
+      }
     ]
+  },
+  "functions": {
+    "source": "backend/functions",
+    "runtime": "nodejs22",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "*.local",
+      "**/__tests__",
+      "**/__mocks__",
+      ".env",
+      ".env.local"
+    ],
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" install",
+      "npm --prefix \"$RESOURCE_DIR\" run build"
+    ],
+    "vpcConnector": "projects/intelligensi-ai-v2/locations/europe-west3/connectors/weaviate-connector"
   },
   "emulators": {
     "functions": {
@@ -25,28 +65,5 @@
       "enabled": true
     },
     "singleProjectMode": true
-  },
-  "functions": {
-    "source": "backend/functions",
-    "runtime": "nodejs22",
-    "ignore": [
-      "node_modules",
-      ".git",
-      "firebase-debug.log",
-      "firebase-debug.*.log",
-      "*.local",
-      "**/__tests__",
-      "**/__mocks__"
-    ],
-    "predeploy": [
-      "npm --prefix \"$RESOURCE_DIR\" install",
-      "npm --prefix \"$RESOURCE_DIR\" run build"
-    ]
-  },
-  "firestore": {
-    "database": "(default)",
-    "location": "europe-west3",
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
   }
 }

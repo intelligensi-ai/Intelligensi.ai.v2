@@ -1,11 +1,12 @@
 import { Router } from "express";
 import type { RequestHandler } from "express";
 import { sign } from "jsonwebtoken";
+import { defineSecret } from "firebase-functions/params";
 
 const router = Router();
 
-// This should be moved to environment variables in production
-const JWT_SECRET = process.env.JWT_SECRET as string;
+// Get JWT secret from Firebase Secrets
+const jwtSecret = defineSecret("JWT_SECRET");
 
 // Generate token route
 const generateToken: RequestHandler = async (req, res) => {
@@ -17,7 +18,7 @@ const generateToken: RequestHandler = async (req, res) => {
         userId: "demo-user",
         timestamp: Date.now(),
       },
-      JWT_SECRET,
+      jwtSecret.value(),
       { expiresIn: "1h" }
     );
 
