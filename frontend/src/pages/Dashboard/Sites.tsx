@@ -430,7 +430,7 @@ const Sites: React.FC<SitesProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <button 
                   onClick={() => setShowWebsitePreview(true)}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -445,7 +445,7 @@ const Sites: React.FC<SitesProps> = ({
                       ? 'bg-gray-500 cursor-not-allowed'
                       : vectorizeStatus === 'error'
                       ? 'bg-red-500 hover:bg-red-600'
-                      : 'bg-teal-600 hover:bg-teal-700'
+                      : ' bg-teal-800 hover:bg-teal-900'
                   } text-white`}
                   disabled={vectorizeStatus === 'processing' || vectorizeStatus === 'complete'}
                 >
@@ -475,8 +475,8 @@ const Sites: React.FC<SitesProps> = ({
                 </button>
                 <button 
                   onClick={() => setShowAIPrompt(true)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
-                >
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
+                > 
                   <SparklesIcon className="w-4 h-4 hidden sm:inline" />
                   <span>AI Prompt</span>
                 </button>
@@ -488,7 +488,7 @@ const Sites: React.FC<SitesProps> = ({
                       toast.error('No URL available for this site');
                     }
                   }}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
@@ -498,7 +498,7 @@ const Sites: React.FC<SitesProps> = ({
                 {/* Create New CMS button moved to left column */}
                 <button 
                   onClick={() => console.log('Migrate site', selectedSite.id)}
-                  className="w-full bg-teal-900 hover:bg-teal-800 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -598,7 +598,7 @@ const Sites: React.FC<SitesProps> = ({
           <div className="bg-[#2D3748] p-6 rounded-lg shadow-xl max-w-md w-full">
             <h3 className="text-xl font-semibold text-white mb-4">Remove Site</h3>
             <p className="text-gray-300 mb-6">
-              Are you sure you want to remove the site "<strong>{siteToRemove.site_name}</strong>"?
+              Are you sure you want to remove the site &quot;<strong>{siteToRemove.site_name}</strong>&quot;?
               This action cannot be undone.
             </p>
             {removeSiteError && (

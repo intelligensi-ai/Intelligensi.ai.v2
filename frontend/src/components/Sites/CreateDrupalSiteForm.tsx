@@ -119,7 +119,7 @@ const CreateDrupalSiteForm: React.FC<CreateDrupalSiteFormProps> = ({
               disabled={isLoading}
             />
             <p className="text-xs text-gray-400 mt-1">
-              This will be used as part of your site's URL
+              This will be used as part of your site&apos;s URL
             </p>
           </div>
 

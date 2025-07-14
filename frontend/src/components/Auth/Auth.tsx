@@ -150,7 +150,7 @@ const Auth: React.FC<AuthProps> = ({ isRegister = false }) => {
         />
         <h1 className="text-4xl font-light text-white mb-1">Intelligensi.ai</h1>
         <p className="text-gray-300 text-lg">
-          Let's build smarter, faster, together.
+          Let&apos;s build smarter, faster, together.
         </p>
       </div>
 

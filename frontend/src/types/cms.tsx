@@ -9,5 +9,5 @@ export interface ICMS {
 }
 
 // Utility types (consistent with ISite pattern)
-export interface ICMSStrict extends Required<ICMS> {}
+export type ICMSStrict = Required<ICMS>
 export type ICMSUpdate = Partial<ICMS> & { id: number };

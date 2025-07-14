@@ -17,21 +17,21 @@ const accountTypes: AccountType[] = [
     name: 'Basic',
     description: 'Perfect for individuals getting started',
     price: '$1/month',
-    features: ['1 Site', '1 Migration', 'Basic Support', ]
+    features: ['1 Site', 'Basic Support', '1 Migration']
   },
   {
     id: 'premium',
     name: 'Premium',
-    description: 'For growing organisations',
+    description: 'For growing businesses',
     price: '$29/month',
-    features: ['10 Sites', '5 migrations', 'Priority Support', 'API Access']
+    features: ['5 Sites', 'Priority Support', '10GB Storage', 'API Access']
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
     description: 'For large organizations',
     price: 'Custom',
-    features: ['20 Sites', '10 migrations', '24/7 Support', 'Enterprise Private Cloud', 'Custom Integrations', ]
+    features: ['20 Sites', '24/7 Support', '1TB Storage', 'Custom Integrations']
   }
 ];
 

@@ -514,7 +514,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site: siteProp, onClose
             <div>
               <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Preview</h4>
               <p className="text-sm text-gray-400 mb-4">
-                You're currently viewing a preview of your website.
+                You&apos;re currently viewing a preview of your website.
               </p>
               <button
                 onClick={onClose}

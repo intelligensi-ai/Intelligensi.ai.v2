@@ -29,5 +29,5 @@ export interface ISite {
 }
 
 // Utility types
-export interface ISiteStrict extends Required<ISite> {}
+export type ISiteStrict = Required<ISite>
 export type ISiteUpdate = Partial<ISite> & { id: number };
