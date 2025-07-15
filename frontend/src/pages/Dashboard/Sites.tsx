@@ -116,7 +116,11 @@ const Sites: React.FC<SitesProps> = ({
     setShowContentPreview(false);
   }, []);
 
-
+  const handleVectorizeClose = useCallback(() => {
+    setShowContentVectorize(false);
+    setVectorizeStatus('idle');
+    setSchemaError(null);
+  }, []);
 
   const handleEditClick = (site: ISite) => {
     setCurrentSite(site);
@@ -583,7 +587,7 @@ const Sites: React.FC<SitesProps> = ({
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
             <div className="bg-[#2D3748] rounded-lg shadow-xl p-8 max-w-5xl max-h-[90vh] overflow-y-auto">
               <Vectorize
-                onClose={() => setShowContentVectorize(false)}
+                onClose={handleVectorizeClose}
                 onComplete={handleVectorizeComplete}
                 onError={handleVectorizeError}
                 site={selectedSite}
