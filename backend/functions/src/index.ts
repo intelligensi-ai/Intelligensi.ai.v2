@@ -13,6 +13,7 @@ import { createSchema } from "./routes/schemaRoutes";
 import { deleteSite } from "./routes/siteRoutes";
 import { createDrupalSite } from "./routes/windsailRoutes";
 import { simpleSearch } from "./routes/WeaviatesSimplesearch";
+import { nearTextSearch } from "./routes/nearTextFunction";
 import authRouter from "./routes/authRoutes";
 import { getUserData } from "./services/adminService";
 
@@ -118,6 +119,7 @@ export {
   deleteSite,
   createDrupalSite,
   simpleSearch,
+  nearTextSearch,
   getUserData,
   // Express Apps
   drupal11,
