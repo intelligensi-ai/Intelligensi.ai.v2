@@ -543,20 +543,38 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
               </select>
             </div>
 
-            {/* Version */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">Version</label>
-              <input
-                type="text"
-                value={formData.cms.version || ''}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  cms: { ...formData.cms, version: e.target.value } 
-                })}
-                placeholder="e.g. 7.0, 5.8.2"
-                className="w-full bg-[#1A202C] border border-gray-600 rounded-md p-2"
-              />
-            </div>
+            {/* Version - Show based on selected CMS */}
+            {['Drupal', 'WordPress', 'Joomla'].includes(formData.cms.name) && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">
+                  {formData.cms.name} Version
+                </label>
+                <div className="flex flex-wrap gap-4">
+                  {(
+                    formData.cms.name === 'Drupal' 
+                      ? [7, 8, 9, 10, 11]
+                      : formData.cms.name === 'WordPress'
+                      ? ['6.4', '6.3', '6.2', '6.1', '6.0']
+                      : ['5.0', '4.3', '4.2', '4.1', '4.0']
+                  ).map((version) => (
+                    <label key={version} className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio text-indigo-600"
+                        name={`${formData.cms.name.toLowerCase()}-version`}
+                        value={version}
+                        checked={formData.cms.version === version.toString()}
+                        onChange={() => setFormData({
+                          ...formData,
+                          cms: { ...formData.cms, version: version.toString() }
+                        })}
+                      />
+                      <span className="ml-2">{formData.cms.name} {version}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             <div className="mb-4">

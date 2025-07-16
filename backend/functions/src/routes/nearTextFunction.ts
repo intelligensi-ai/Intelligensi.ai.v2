@@ -52,15 +52,26 @@ export const nearTextSearch = onRequest(
 
       logger.info(`🔍 Running nearText query for: ${query}`);
 
+      const className = "IntelligensiAi";
+      logger.info(`🔍 Querying Weaviate class: ${className}`);
+      
+      // Using raw GraphQL query as confirmed working in Weaviate
       const response = await client.graphql
         .get()
-        .withClassName("intelligensi-ai")
-        .withFields("title body nid type _additional { id distance }")
+        .withClassName(className)
+        .withFields(`
+          body
+          nid
+          _additional {
+            id
+            distance
+          }
+        `)
         .withNearText({ concepts: [query] })
         .withLimit(5)
         .do();
 
-      const results = response.data?.Get?.intelligensiAi || [];
+      const results = response.data?.Get?.[className] || [];
 
       res.status(200).json({
         success: true,
