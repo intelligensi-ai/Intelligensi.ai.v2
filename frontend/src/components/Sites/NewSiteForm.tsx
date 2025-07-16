@@ -187,6 +187,15 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
     }
   };
 
+  const formatSiteUrl = (url: string, useHttps: boolean) => {
+    // Remove protocol if it exists
+    let formattedUrl = url.replace(/^https?:\/\//, '');
+    // Remove trailing slashes
+    formattedUrl = formattedUrl.replace(/\/+$/, '');
+    // Add selected protocol
+    return `${useHttps ? 'https://' : 'http://'}${formattedUrl}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -222,25 +231,24 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         return;
       }
 
-      // Clean up URL
-      let siteUrl = formData.site_url.trim();
-      if (siteUrl.startsWith('http://') || siteUrl.startsWith('https://')) {
-        siteUrl = siteUrl.split('://')[1];
-      }
-      siteUrl = `${useHttps ? 'https://' : 'http://'}${siteUrl}`;
+      // Format the site URL before saving
+      const formattedSite = {
+        ...formData,
+        site_url: formatSiteUrl(formData.site_url, useHttps)
+      };
 
       const siteDataToSave = {
         user_id: currentUser.uid, // USE FIREBASE STRING UID HERE
-        cms_id: formData.cms.id,
-        company_id: formData.company_id,
-        site_name: formData.site_name.trim(),
-        site_url: siteUrl,
-        description: formData.description, // Include description field
-        mysql_file_url: formData.mysql_file_url,
-        status: initialData?.id ? formData.status : 'pending', // Initial status for new sites
-        migration_ids: formData.migration_ids,
-        tags: formData.tags,
-        is_active: formData.is_active,
+        cms_id: formattedSite.cms.id,
+        company_id: formattedSite.company_id,
+        site_name: formattedSite.site_name.trim(),
+        site_url: formattedSite.site_url,
+        description: formattedSite.description, // Include description field
+        mysql_file_url: formattedSite.mysql_file_url,
+        status: initialData?.id ? formattedSite.status : 'pending', // Initial status for new sites
+        migration_ids: formattedSite.migration_ids,
+        tags: formattedSite.tags,
+        is_active: formattedSite.is_active,
       };
 
       console.log('Preparing to save site data:', siteDataToSave);
@@ -409,11 +417,11 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         cms: {
           id: siteRecordForApp.cms_id,
           name: CMS_OPTIONS.find(opt => opt.id === siteRecordForApp.cms_id)?.name || 'Unknown CMS',
-          version: formData.cms.version 
+          version: formattedSite.cms.version 
         },
         site_name: siteRecordForApp.site_name,
         site_url: siteRecordForApp.site_url,
-        description: formData.description, 
+        description: formattedSite.description, 
         mysql_file_url: siteRecordForApp.mysql_file_url,
         status: siteRecordForApp.status, 
         is_active: siteRecordForApp.is_active,
@@ -447,13 +455,8 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
   };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    
-    // Remove protocol if user types it (we'll handle it with our toggle)
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-      value = value.split('://')[1];
-    }
-    
+    // Remove protocol if user tries to type it
+    const value = e.target.value.replace(/^https?:\/\//, '');
     setFormData({ ...formData, site_url: value });
   };
 

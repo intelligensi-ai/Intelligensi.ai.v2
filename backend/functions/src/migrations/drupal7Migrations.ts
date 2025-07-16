@@ -75,11 +75,29 @@ router.get("/info", async function(req: express.Request, res: express.Response) 
 
 /**
  * Fetch site structure from Drupal 7 using curl
- * @param req - Express request object (endpoint query param is currently ignored)
+ * @param req - Express request object with query params: siteUrl
  * @param res - Express response object
  */
-router.get("/structure", async function(req: express.Request, res: express.Response) {
-  const drupalUrl = "https://drupal7.intelligensi.online/api/bulk-export"; // Hardcoded target URL
+router.get("/structure", async function(req: express.Request, res: express.Response): Promise<void> {
+  const { siteUrl } = req.query;
+  
+  if (!siteUrl || typeof siteUrl !== 'string') {
+    res.status(400).json({ error: 'siteUrl parameter is required' });
+    return;
+  }
+
+  // Ensure the URL has a protocol and ends with /api/bulk-export
+  let drupalUrl = siteUrl.trim();
+  if (!drupalUrl.startsWith('http://') && !drupalUrl.startsWith('https://')) {
+    drupalUrl = `https://${drupalUrl}`;
+  }
+  
+  // Remove any trailing slashes and append /api/bulk-export if not present
+  drupalUrl = drupalUrl.replace(/\/+$/, '');
+  if (!drupalUrl.endsWith('/api/bulk-export')) {
+    drupalUrl = `${drupalUrl}/api/bulk-export`;
+  }
+
   const command = `curl -sSLk "${drupalUrl}"`;
 
   console.log(`[structure_curl] Executing command: ${command}`);
