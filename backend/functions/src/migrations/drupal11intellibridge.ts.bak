@@ -1,165 +1,69 @@
-import express, { Request, Response, NextFunction } from "express";
-import axios, { AxiosError, AxiosRequestConfig } from "axios";
-import https from "https";
+import type { Request, Response } from "express";
+import { Router } from "express";
 import { exec } from "child_process";
+import axios, { AxiosError, isAxiosError, type AxiosRequestConfig } from "axios";
+import * as https from "https";
 
-const router = express.Router();
+// Import Drupal types from the types file
+import type { DrupalNode } from "../types/drupal";
 
-/**
- * Creates an HTTPS agent to ignore SSL certificate errors
- */
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: false, // Ignore certificate validation
+// Re-export the DrupalNode type for use in other files
+export type { DrupalNode };
+
+// Create a custom axios instance with default config
+const drupalAxios = axios.create({
+  httpsAgent: new https.Agent({  
+    rejectUnauthorized: false
+  })
 });
 
+drupalAxios.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (isAxiosError(error)) {
+      console.error('Axios error:', error.message);
+      if (error.response) {
+        console.error('Status:', error.response.status);
+        console.error('Data:', error.response.data);
+        console.error('Headers:', error.response.headers);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+      }
+    } else {
+      console.error('Unexpected error:', error);
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Initialize Supabase client (commented out until needed)
+// const supabaseUrl = defineSecret("SUPABASE_URL");
+// const supabaseKey = defineSecret("SUPABASE_ANON_KEY");
+// 
+// const supabase = createClient(
+//   supabaseUrl.value(),
+//   supabaseKey.value(),
+//   { auth: { persistSession: false } }
+// );
+
+// Create and configure the router
+const router = Router();
+
+export { router };
+
 // Middleware to log all requests
-router.use((req: Request, res: Response, next: NextFunction): void => {
+router.use((req: Request, res: Response, next: () => void): void => {
   console.log(`[D11] ${req.method} ${req.path}`, req.query || req.body);
   next();
 });
 
-/**
- * Helper function to handle axios errors
- */
-const handleAxiosError = (error: unknown, context: string): { status: number; error: string; details?: unknown } => {
-  const err = error as AxiosError;
-  console.error(`Error in ${context}:`, err.message);
-  
-  if (err.response) {
-    console.error('Response status:', err.response.status);
-    console.error('Response data:', err.response.data);
-    return {
-      status: err.response.status,
-      error: `Failed to ${context}`,
-      details: err.response.data
-    };
-  }
-  
-  return {
-    status: 500,
-    error: `Failed to ${context}`,
-    details: err.message
-  };
-};
+// Export the router as a named export
+export const drupal11Router = router;
 
-/**
- * Fetch JSON data for nodes from Drupal 11
- * @param req - Express request object with query params: endpoint, username, password
- * @param res - Express response object
- */
-router.get("/transmit", async (req: Request, res: Response) => {
-  const { endpoint, username, password } = req.query;
-  
-  if (!endpoint || !username || !password) {
-    return res.status(400).json({ error: 'endpoint, username, and password are required' });
-  }
-
-  const fullEndpoint = `${endpoint}/jsonapi`; // Drupal 11 uses /jsonapi endpoint
-  const config: AxiosRequestConfig = {
-    auth: { 
-      username: username as string, 
-      password: password as string 
-    },
-    httpsAgent,
-  };
-
-  try {
-    const response = await axios.get(fullEndpoint, config);
-    return res.json(response.data);
-  } catch (error) {
-    const { status, ...errorData } = handleAxiosError(error, 'fetch node data');
-    return res.status(status).json(errorData);
-  }
-});
-
-/**
- * Fetch JSON site info from Drupal 11
- * @param req - Express request object with query params: endpoint, username, password
- * @param res - Express response object
- */
-router.get("/info", async (req: Request, res: Response) => {
-  const { endpoint, username, password } = req.query;
-  
-  if (!endpoint || !username || !password) {
-    return res.status(400).json({ error: 'endpoint, username, and password are required' });
-  }
-
-  const fullEndpoint = `${endpoint}/jsonapi`; // Drupal 11 uses /jsonapi for site info
-  const config: AxiosRequestConfig = {
-    auth: { 
-      username: username as string, 
-      password: password as string 
-    },
-    httpsAgent,
-  };
-
-  try {
-    const response = await axios.get(fullEndpoint, config);
-    return res.json(response.data);
-  } catch (error) {
-    const { status, ...errorData } = handleAxiosError(error, 'fetch site info');
-    return res.status(status).json(errorData);
-  }
-});
-
-/**
- * Fetch site structure from Drupal 11 using curl
- * @param req - Express request object with query params: siteUrl
- * @param res - Express response object
- */
-router.get("/structure", async (req: Request, res: Response): Promise<void> => {
-  const { siteUrl } = req.query;
-  
-  if (!siteUrl || typeof siteUrl !== 'string') {
-    res.status(400).json({ error: 'siteUrl parameter is required' });
-    return;
-  }
-
-  // Ensure the URL has a protocol and ends with /jsonapi
-  let drupalUrl = siteUrl.trim();
-  if (!drupalUrl.startsWith('http://') && !drupalUrl.startsWith('https://')) {
-    drupalUrl = `https://${drupalUrl}`;
-  }
-  
-  // Remove any trailing slashes and append /jsonapi if not present
-  drupalUrl = drupalUrl.replace(/\/+$/, '');
-  if (!drupalUrl.endsWith('/jsonapi')) {
-    drupalUrl = `${drupalUrl}/jsonapi`;
-  }
-
-  const command = `curl -sSLk "${drupalUrl}"`;
-  console.log(`[structure_curl] Executing command: ${command}`);
-
-  try {
-    const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      exec(command, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`[structure_curl] Error executing curl: ${error.message}`);
-          console.error(`[structure_curl] Curl stderr: ${stderr}`);
-          reject(new Error(`Exec error: ${error.message}${stderr ? `\nStderr: ${stderr}` : ""}`));
-        } else {
-          if (stderr) {
-            console.warn(`[structure_curl] Curl stderr (non-fatal or warning): ${stderr}`);
-          }
-          resolve({ stdout, stderr });
-        }
-      });
-    });
-
-    const structureData = JSON.parse(stdout);
-    console.log("[structure_curl] Successfully fetched and parsed data via curl.");
-    res.json({ structure: structureData });
-  } catch (e) {
-    const execError = e as Error;
-    console.error(`[structure_curl] Caught exec error: ${execError.message}`);
-
-    res.status(500).json({
-      error: "Failed to execute command to fetch Drupal structure.",
-      details: execError.message,
-    });
-  }
-});
-
+// Interface for Drupal 11 node data
+export interface DrupalNodeData {
+  id: number;
+  type: string;
   title: string;
   created: number;
   changed: number;
@@ -188,8 +92,12 @@ interface SiteInfo {
 }
 
 /**
- * Creates an authenticated Axios client for interacting with Drupal 7
- * @param {string} baseURL - The base URL of the Drupal 7 site
+ * Creates an HTTPS agent to ignore SSL certificate errors
+ */
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false, // Ignore certificate validation
+});
+
 /**
  * Creates an authenticated Axios client for interacting with Drupal 11
  * @param {string} baseURL - The base URL of the Drupal 11 site

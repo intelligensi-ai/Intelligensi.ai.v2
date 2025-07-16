@@ -13,9 +13,10 @@ interface NewSiteFormProps {
 }
 
 const CMS_OPTIONS: ICMS[] = [
-  { id: 1, name: 'Drupal', version: '' },
-  { id: 2, name: 'WordPress', version: '' },
-  { id: 3, name: 'Joomla', version: '' },
+  { id: 1, name: 'Drupal', version: '7' },
+  { id: 2, name: 'Drupal', version: '11' },
+  { id: 3, name: 'WordPress', version: '' },
+  { id: 4, name: 'Joomla', version: '' },
 ];
 
 const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, initialData, currentUser }) => {
@@ -35,11 +36,18 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
       is_active: initialData?.is_active !== undefined ? initialData.is_active : true,
       is_selected: initialData?.is_selected !== undefined ? initialData.is_selected : false,
       schema_id: initialData?.schema_id || null,
+      // Drupal specific fields
+      drupal_username: initialData?.drupal_username || 'admin',
+      drupal_password: initialData?.drupal_password || '',
+      // Timestamps
       created_at: initialData?.created_at || new Date().toISOString(),
       updated_at: initialData?.updated_at || new Date().toISOString(),
       company_id: initialData?.company_id || null,
     };
   });
+  
+  // Check if the selected CMS is Drupal 11
+  const isDrupal11 = formData.cms?.name === 'Drupal' && formData.cms?.version === '11';
   const [useHttps, setUseHttps] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [supabaseUserId, setSupabaseUserId] = useState<number | null>(null);
@@ -159,13 +167,27 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
           }
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         console.error('Error in user initialization:', {
           error,
-          message: errorMessage,
-          stack: error instanceof Error ? error.stack : undefined
+          errorString: String(error),
+          errorName: error?.name,
+          errorMessage: error?.message,
+          errorStack: error?.stack,
+          errorCode: error?.code,
+          errorDetails: error?.details,
+          errorHint: error?.hint,
+          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
         });
-        setError(`Failed to initialize user: ${errorMessage}`);
+        
+        let errorMessage = 'An unknown error occurred';
+        
+        if (error?.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+        
+        setError(errorMessage);
       } finally {
         setIsLoading(false);
       }
@@ -200,6 +222,13 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
     e.preventDefault();
     setError(null);
     console.log('Form submission started');
+    
+    // Log the form data being submitted
+    console.log('Form data being submitted:', {
+      ...formData,
+      // Don't log sensitive data in production
+      drupal_password: formData.drupal_password ? '***' : 'not set'
+    });
 
     if (!currentUser?.uid) { // Check for Firebase UID from prop
       const errorMsg = 'No authenticated Firebase user UID found. Please ensure you are logged in.';
@@ -237,9 +266,35 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         site_url: formatSiteUrl(formData.site_url, useHttps)
       };
 
+      // Log the formatted site data for debugging
+      console.log('Formatted site data:', {
+        ...formattedSite,
+        drupal_password: formattedSite.drupal_password ? '***' : 'not set'
+      });
+
+      // Validate required fields
+      const requiredFields = ['site_name', 'site_url', 'cms'];
+      const missingFields = requiredFields.filter(field => !formattedSite[field]);
+      
+      if (missingFields.length > 0) {
+        const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
+        console.error('Validation error:', errorMsg);
+        setError(errorMsg);
+        return;
+      }
+
+      // Ensure cms has required properties
+      if (!formattedSite.cms || !formattedSite.cms.id || !formattedSite.cms.name) {
+        const errorMsg = 'CMS information is incomplete';
+        console.error('Validation error:', errorMsg, { cms: formattedSite.cms });
+        setError(errorMsg);
+        return;
+      }
+
       const siteDataToSave = {
         user_id: currentUser.uid, // USE FIREBASE STRING UID HERE
         cms_id: formattedSite.cms.id,
+        cms_version: formattedSite.cms.version, // Save the CMS version
         company_id: formattedSite.company_id,
         site_name: formattedSite.site_name.trim(),
         site_url: formattedSite.site_url,
@@ -249,38 +304,114 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         migration_ids: formattedSite.migration_ids,
         tags: formattedSite.tags,
         is_active: formattedSite.is_active,
+        // Include Drupal credentials if they exist
+        ...(formattedSite.drupal_username && { drupal_username: formattedSite.drupal_username }),
+        ...(formattedSite.drupal_password && { drupal_password: formattedSite.drupal_password }),
       };
 
       console.log('Preparing to save site data:', siteDataToSave);
 
       let result; 
       if (initialData?.id) {
-        console.log('Updating existing site:', initialData.id);
-        const { data, error: updateError } = await supabase
-          .from('sites')
-          .update({...siteDataToSave, updated_at: new Date().toISOString()})
-          .eq('id', initialData.id)
-          .select()
-          .single();
+        console.log('Updating existing site:', initialData.id, 'with data:', JSON.stringify(siteDataToSave, null, 2));
+        
+        try {
+          const { data, error: updateError } = await supabase
+            .from('sites')
+            .update({
+              ...siteDataToSave, 
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', initialData.id)
+            .select()
+            .single();
 
-        if (updateError) {
-          console.error('Update error:', updateError);
-          throw updateError;
+          if (updateError) {
+            console.error('Update error details:', {
+              message: updateError.message,
+              details: updateError.details,
+              hint: updateError.hint,
+              code: updateError.code,
+              fullError: JSON.stringify(updateError, Object.getOwnPropertyNames(updateError))
+            });
+            
+            // Try to get more details about the table structure
+            try {
+              const { data: tableInfo, error: tableError } = await supabase
+                .rpc('get_table_info', { table_name: 'sites' });
+                
+              console.log('Table info:', tableInfo);
+              console.log('Table error:', tableError);
+            } catch (e) {
+              console.error('Error getting table info:', e);
+            }
+            
+            throw updateError;
+          }
+          result = data;
+        } catch (error) {
+          console.error('Error during site update:', {
+            error,
+            errorString: String(error),
+            errorObj: JSON.stringify(error, Object.getOwnPropertyNames(error))
+          });
+          throw error;
         }
-        result = data;
       } else {
-        console.log('Creating new site');
+        console.log('Creating new site with data:', JSON.stringify(siteDataToSave, null, 2));
+      
+      try {
         const { data, error: insertError } = await supabase
           .from('sites')
-          .insert({...siteDataToSave, created_at: new Date().toISOString(), updated_at: new Date().toISOString()})
+          .insert({
+            ...siteDataToSave, 
+            created_at: new Date().toISOString(), 
+            updated_at: new Date().toISOString()
+          })
           .select()
           .single();
 
         if (insertError) {
-          console.error('Insert error:', insertError);
+          console.error('Insert error details:', {
+            message: insertError.message,
+            details: insertError.details,
+            hint: insertError.hint,
+            code: insertError.code,
+            fullError: JSON.stringify(insertError, Object.getOwnPropertyNames(insertError))
+          });
+          
+          // Try to get more details about the table structure
+          try {
+            const { data: tableInfo, error: tableError } = await supabase
+              .rpc('get_table_info', { table_name: 'sites' });
+              
+            console.log('Table info:', tableInfo);
+            console.log('Table error:', tableError);
+            
+            // Try to get the table structure using information_schema
+            const { data: columns, error: columnsError } = await supabase
+              .from('information_schema.columns')
+              .select('column_name, data_type, is_nullable, column_default')
+              .eq('table_name', 'sites');
+              
+            console.log('Table columns:', columns);
+            console.log('Columns error:', columnsError);
+            
+          } catch (e) {
+            console.error('Error getting table info:', e);
+          }
+          
           throw insertError;
         }
         result = data;
+      } catch (error) {
+        console.error('Error during site creation:', {
+          error,
+          errorString: String(error),
+          errorObj: JSON.stringify(error, Object.getOwnPropertyNames(error))
+        });
+        throw error;
+      }
       }
 
       console.log('Supabase response after insert/update:', result);
@@ -438,13 +569,11 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
       onSave(savedSite); 
       
       if (!error) { 
-          onClose();
-          console.log('Form submission successful, form closed.');
+        onClose();
       } else {
-          console.log(`Form submission process completed with issues (see error message). Form remains open. Error: ${error}`);
+        console.log(`Form submission process completed with issues (see error message). Form remains open. Error: ${error}`);
       }
-
-    } catch (error) { 
+    } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to save site';
       console.error('Critical error in handleSubmit:', {
         message: errorMsg,
@@ -575,6 +704,45 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
                       <span className="ml-2">{formData.cms.name} {version}</span>
                     </label>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Drupal Admin Credentials - Only show for Drupal 11 */}
+            {isDrupal11 && (
+              <div className="mb-6 p-4 bg-gray-800 rounded-md border border-gray-700">
+                <h3 className="text-sm font-medium mb-3 text-yellow-400">Drupal Admin Credentials</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Admin Username
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.drupal_username || 'admin'}
+                      onChange={(e) => setFormData({ ...formData, drupal_username: e.target.value })}
+                      className="w-full bg-[#1A202C] border border-gray-600 rounded-md p-2"
+                      placeholder="admin"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">
+                      Drupal admin username for API access
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Admin Password
+                    </label>
+                    <input
+                      type="password"
+                      value={formData.drupal_password || ''}
+                      onChange={(e) => setFormData({ ...formData, drupal_password: e.target.value })}
+                      className="w-full bg-[#1A202C] border border-gray-600 rounded-md p-2"
+                      placeholder="••••••••"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">
+                      Drupal admin password for API access
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

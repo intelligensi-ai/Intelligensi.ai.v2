@@ -24,8 +24,14 @@ export interface ISite {
     is_active?: boolean;
     is_selected?: boolean; // New property to track selection state
     schema_id?: number | null; // <<< ADDED schema_id
+    // Drupal specific fields
+    drupal_username?: string | null;
+    drupal_password?: string | null;
+    // Timestamps
     created_at?: Date | string;
     updated_at?: Date | string;
+    // For backward compatibility with raw database fields
+    cms_version?: string | null;
 }
 
 // Utility types

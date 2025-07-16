@@ -29,6 +29,7 @@ export const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [sites, setSites] = useState<ISite[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [selectedSite, setSelectedSite] = useState<ISite | null>(null);
 
   // Memoize mock user to prevent unnecessary recreations
   const mockUser = React.useMemo(() => ({
@@ -101,31 +102,64 @@ export const Dashboard: React.FC = () => {
         } else {
           console.log("Fetched sites:", data);
           // Ensure cms data is correctly mapped
-          const sitesWithCms: ISite[] = data ? data.map(s => {
-            let cmsData: ICMS | undefined = undefined;
-            if (s.cms) { // s.cms could be an object or an array from Supabase
+          // Define a type for the raw site data from the database
+          type RawSite = {
+            id: number;
+            user_id: string;
+            cms_id: number;
+            cms_version?: string;
+            company_id: number | null;
+            site_name: string;
+            site_url: string;
+            description: string | null;
+            mysql_file_url: string | null;
+            status: string | null;
+            migration_ids: number[] | null;
+            tags: string | null;
+            is_active: boolean;
+            is_selected?: boolean;
+            schema_id: number | null;
+            created_at: string;
+            updated_at: string;
+            cms: any; // Can be array or object
+          };
+
+          const sitesWithCms: ISite[] = data ? (data as RawSite[]).map(s => {
+            // Create a base CMS object with default values
+            const baseCms: ICMS = {
+              id: 0,
+              name: 'Unknown CMS',
+              version: s.cms_version || null,
+              is_active: false,
+              has_migrations: false,
+              user_id: s.user_id || 'unknown'
+            };
+
+            // If cms data exists, use it to override the base values
+            if (s.cms) {
+              let cmsFromDb: Partial<ICMS> = {};
+              
               if (Array.isArray(s.cms) && s.cms.length > 0) {
-                cmsData = s.cms[0] as ICMS; // Take the first element if it's an array
-              } else if (!Array.isArray(s.cms) && typeof s.cms === 'object' && s.cms !== null) {
-                cmsData = s.cms as ICMS; // Assume it's a single object
+                cmsFromDb = { ...s.cms[0] };
+              } else if (typeof s.cms === 'object' && s.cms !== null) {
+                cmsFromDb = { ...s.cms };
               }
+              
+              // Merge the database CMS data with our base, preserving the version from the site
+              Object.assign(baseCms, cmsFromDb, {
+                version: s.cms_version || cmsFromDb.version || null
+              });
+              
+              if (!cmsFromDb.name) {
+                console.warn(`Site with ID ${s.id} has CMS data but no name. Using default.`);
+              }
+            } else {
+              console.warn(`Site with ID ${s.id} has no CMS data. Using default.`);
             }
-            // Fallback if cmsData is still undefined (e.g., s.cms was null, empty array, or not an expected object)
-            if (!cmsData) {
-                console.warn(`Site with ID ${s.id} has missing, empty, or invalid CMS data. Using a default CMS.`);
-                // Provide a default/fallback ICMS object.
-                // ISite expects cms: ICMS, and ICMS requires name: string.
-                cmsData = { 
-                  id: 0, // Default ID for unknown CMS
-                  name: 'Unknown CMS', // Required by ICMS interface
-                  user_id: s.user_id || 'unknown', // s.user_id will be a string
-                  // Initialize other optional ICMS fields if necessary
-                  version: null,
-                  is_active: false,
-                  has_migrations: false
-                };
-            }
-            return { ...s, cms: cmsData };
+            
+            // Return the site with the properly typed CMS data
+            const { cms, cms_version, ...siteData } = s;
+            return { ...siteData, cms: baseCms };
           }) : [];
           setSites(sitesWithCms);
           setError(null);
@@ -168,10 +202,69 @@ export const Dashboard: React.FC = () => {
         return;
       }
 
+      // Check if a site is selected
+      if (!selectedSite) {
+        setError("Please select a site first");
+        setMessages(prev => prev.map(msg => 
+          msg.id === userMessage.id ? {...msg, status: 'error'} : msg
+        ));
+        setIsLoading(false);
+        return;
+      }
+
+      // Get the site URL from the selected site
+      const siteUrl = selectedSite.site_url;
+      if (!siteUrl) {
+        setError("Selected site is missing a URL");
+        setMessages(prev => prev.map(msg => 
+          msg.id === userMessage.id ? {...msg, status: 'error'} : msg
+        ));
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("Sending request to OpenAI with site URL:", siteUrl);
+      // Determine the CMS version from the selected site
+      const cmsName = selectedSite.cms?.name?.toLowerCase() || '';
+      const cmsVersion = selectedSite.cms?.version || '';
+      const isDrupal11 = cmsName.includes('drupal') && cmsVersion.startsWith('11');
+      const cmsType = isDrupal11 ? 'drupal11' : 'drupal7';
+      
+      console.log(`Using CMS: ${cmsName} ${cmsVersion} (${cmsType}) for site ${siteUrl}`);
+      
+      // Prepare the request data with site information
+      const requestData: any = {
+        prompt: message,
+        siteUrl: siteUrl,
+        cmsVersion: cmsType,
+        cmsName: cmsName,
+        cmsVersionNumber: cmsVersion
+      };
+      
+      // Add Drupal admin credentials for Drupal 11
+      if (isDrupal11) {
+        // In a production environment, these should be retrieved from a secure source
+        // For now, we'll use the site's credentials if available, or fall back to defaults
+        const username = selectedSite.drupal_username || 'admin';
+        const password = selectedSite.drupal_password || 'admin';
+        
+        requestData.username = username;
+        requestData.password = password;
+        
+        // Log a warning in development if using default credentials
+        if (process.env.NODE_ENV === 'development' && (!selectedSite.drupal_username || !selectedSite.drupal_password)) {
+          console.warn('Using default admin credentials for Drupal 11. In production, store credentials securely.');
+        }
+      }
+      
       const response = await axios.post(
         `${apiBaseUrl}/updateHomepage`,
-        { prompt: message },
-        { headers: { "Content-Type": "application/json" } }
+        requestData,
+        { 
+          headers: { 
+            "Content-Type": "application/json" 
+          } 
+        }
       );
 
       setMessages(prev => prev.map(msg => 
@@ -298,83 +391,65 @@ export const Dashboard: React.FC = () => {
 
       {/* Sites Section */}
       <Sites 
-        sites={sites} 
-        onSiteAdded={handleAddSite} 
+        sites={sites}
+        onSiteAdded={handleAddSite}
         onSiteUpdated={handleUpdateSite}
-        onSiteRemoved={(siteId) => {
-          console.log('Removing site with ID:', siteId);
-          setSites(prevSites => {
-            const updatedSites = prevSites.filter(site => site.id !== siteId);
-            console.log('Sites after removal:', updatedSites);
-            return updatedSites;
-          });
-        }}
-        onAddChatMessage={(message) => {
-          console.log('Received chat message in Dashboard:', message);
-          
-          // message.site might be a partial site object or just contain an ID
-          // We need to find the full site from our state to get all details
-          const siteFromMessage = message.site;
-          console.log('Site from message:', siteFromMessage);
-          
-          if (siteFromMessage && siteFromMessage.id !== undefined) {
-            console.log('Looking for site with ID:', siteFromMessage.id, 'in sites:', sites);
-            const fullSite = sites.find(s => s.id === siteFromMessage.id);
-            console.log('Found site:', fullSite);
-
-            if (fullSite) {
-              console.log('Creating chat message for site:', fullSite);
-              addSiteChatMessage(
-                {
-                  // Construct the payload using data from fullSite
-                  id: fullSite.id,
-                  user_id: fullSite.user_id || currentUser?.uid || '',
-                  site_name: fullSite.site_name,
-                  site_url: fullSite.site_url,
-                  cms: {
-                    id: fullSite.cms?.id || 0,
-                    name: fullSite.cms?.name || 'Unknown CMS',
-                    user_id: fullSite.cms?.user_id || fullSite.user_id || currentUser?.uid || ''
-                  },
-                  description: fullSite.description || '',
-                  schema_id: fullSite.schema_id || null,
-                  // Add any other fields from ISite that addSiteChatMessage might need
-                },
-                message.text.includes('updated') // Determine if update based on message
-              );
-            } else {
-              console.warn('Site for chat message not found in state:', siteFromMessage.id);
-              // Try to use the site data from the message if available
-              if (siteFromMessage.site_name) {
-                console.log('Using site data from message');
-                addSiteChatMessage(
-                  {
-                    id: siteFromMessage.id,
-                    user_id: siteFromMessage.user_id || currentUser?.uid || '',
-                    site_name: siteFromMessage.site_name,
-                    site_url: siteFromMessage.site_url,
-                    cms: {
-                      id: siteFromMessage.cms?.id || 0,
-                      name: siteFromMessage.cms?.name || 'Unknown CMS',
-                      user_id: siteFromMessage.cms?.user_id || siteFromMessage.user_id || currentUser?.uid || ''
-                    },
-                    description: siteFromMessage.description || '',
-                    schema_id: siteFromMessage.schema_id || null,
-                  },
-                  message.text.includes('updated')
-                );
+        currentUser={currentUser}
+        onSiteSelected={(siteId) => {
+          const site = sites.find(s => s.id === siteId) || null;
+          setSelectedSite(site);
+          // Add a message when a site is selected
+          if (site) {
+            const message: ChatMessage = {
+              id: `site-${siteId}-selected`,
+              text: `Now working with site: ${site.site_name}`,
+              sender: 'assistant',
+              timestamp: new Date(),
+              status: 'sent',
+              site: {
+                id: site.id,
+                name: site.site_name,
+                url: site.site_url,
+                cms: site.cms?.name || 'Unknown',
+                description: site.description || ''
               }
-            }
-          } else {
-            console.warn('No site ID in message:', message);
+            };
+            setMessages(prev => [message, ...prev]);
           }
         }}
-        onSiteSelected={(site) => {
-          // Handle site selection logic, e.g., set selectedSite state
-          console.log("Site selected in Dashboard:", site);
-          // Example: setSelectedSite(site);
+        onSiteRemoved={(siteId) => {
+          // Find the site before it's removed
+          const siteToRemove = sites.find(site => site.id === siteId);
+          
+          // Remove the site from state
+          setSites(prev => prev.filter(site => site.id !== siteId));
+          
+          // Clear selected site if it's the one being removed
+          if (selectedSite?.id === siteId) {
+            setSelectedSite(null);
+          }
+          
+          // Add a notification about the removed site
+          if (siteToRemove) {
+            const chatMessage: ChatMessage = {
+              id: `site-${siteId}-removed`,
+              text: `Site "${siteToRemove.site_name}" has been removed`,
+              sender: 'assistant',
+              status: 'sent',
+              timestamp: new Date(),
+              site: {
+                id: siteId,
+                name: siteToRemove.site_name,
+                url: siteToRemove.site_url,
+                cms: siteToRemove.cms?.name || 'Unknown',
+                description: siteToRemove.description || ''
+              }
+            };
+            
+            // Add the message to the chat
+            setMessages(prev => [chatMessage, ...prev]);
+          }
         }}
-        currentUser={currentUser} // Pass currentUser to Sites component
       />
     </div>
   );
