@@ -34,9 +34,9 @@ const deleteSiteSchema = z.object({
  * Deletes a site and its associated data from Supabase.
  */
 export const deleteSite = onRequest(
-  { 
-    secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"], 
-    cors: false 
+  {
+    secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"],
+    cors: false,
   }, // Let corsHandler manage CORS headers
   (req: Request, res) => {
     corsHandler(req, res, async (err?: Error) => {

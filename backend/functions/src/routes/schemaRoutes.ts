@@ -169,9 +169,9 @@ function inferFieldType(value: unknown, key?: string): z.ZodTypeAny {
 
 // Create a new schema
 export const createSchema = onRequest(
-  { 
-    cors: false, 
-    secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"] 
+  {
+    cors: false,
+    secrets: ["SUPABASE_URL", "SUPABASE_ANON_KEY"],
   },
   (req: Request, res) => {
     corsHandler(req, res, async (err?: Error) => {

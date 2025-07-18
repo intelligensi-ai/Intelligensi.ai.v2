@@ -165,8 +165,7 @@ router.get("/structure", async (req: Request, res: Response): Promise<void> => {
   changed: number;
   status: boolean;
   url: string;
-  [key: string]: string | number | boolean | null | undefined | unknown[]
-    | Record<string, unknown>; // For dynamic fields
+  [key: string]: string | number | boolean | null | undefined | unknown[] | Record<string, unknown>; // For dynamic fields
 }
 
 // Interface for import/export results

@@ -13,7 +13,7 @@ interface CreateDrupalSiteData {
 
 export const createDrupalSite = onCall<CreateDrupalSiteData>({
   cors: ["*"],
-  secrets: ["AWS_ACCESS_KEY", "AWS_SECRET_KEY", "AWS_REGION", "AWS_KEY_PAIR", "INSTANCE_PREFIX"]
+  secrets: ["AWS_ACCESS_KEY", "AWS_SECRET_KEY", "AWS_REGION", "AWS_KEY_PAIR", "INSTANCE_PREFIX"],
 }, async (request) => {
   // For development environment or emulator, return mock data
   if (process.env.NODE_ENV === "development" || process.env.FUNCTIONS_EMULATOR === "true") {

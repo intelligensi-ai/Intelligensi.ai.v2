@@ -80,21 +80,21 @@ router.get("/info", async function(req: express.Request, res: express.Response) 
  */
 router.get("/structure", async function(req: express.Request, res: express.Response): Promise<void> {
   const { siteUrl } = req.query;
-  
-  if (!siteUrl || typeof siteUrl !== 'string') {
-    res.status(400).json({ error: 'siteUrl parameter is required' });
+
+  if (!siteUrl || typeof siteUrl !== "string") {
+    res.status(400).json({ error: "siteUrl parameter is required" });
     return;
   }
 
   // Ensure the URL has a protocol and ends with /api/bulk-export
   let drupalUrl = siteUrl.trim();
-  if (!drupalUrl.startsWith('http://') && !drupalUrl.startsWith('https://')) {
+  if (!drupalUrl.startsWith("http://") && !drupalUrl.startsWith("https://")) {
     drupalUrl = `https://${drupalUrl}`;
   }
-  
+
   // Remove any trailing slashes and append /api/bulk-export if not present
-  drupalUrl = drupalUrl.replace(/\/+$/, '');
-  if (!drupalUrl.endsWith('/api/bulk-export')) {
+  drupalUrl = drupalUrl.replace(/\/+$/, "");
+  if (!drupalUrl.endsWith("/api/bulk-export")) {
     drupalUrl = `${drupalUrl}/api/bulk-export`;
   }
 

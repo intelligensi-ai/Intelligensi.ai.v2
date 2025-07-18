@@ -33,7 +33,7 @@ async function initializeWeaviateClient(): Promise<WeaviateClient> {
  * Firebase HTTPS function to check Weaviate connection.
  */
 export const checkWeaviate = onRequest({
-  secrets: ["WEAVIATE_URL", "WEAVIATE_API_KEY"]
+  secrets: ["WEAVIATE_URL", "WEAVIATE_API_KEY"],
 }, async function(req, res) {
   try {
     const client = await initializeWeaviateClient();
@@ -50,7 +50,7 @@ export const checkWeaviate = onRequest({
  * Firebase HTTPS function to write schema to Weaviate.
  */
 export const writeSchema = onRequest({
-  secrets: ["WEAVIATE_URL", "WEAVIATE_API_KEY"]
+  secrets: ["WEAVIATE_URL", "WEAVIATE_API_KEY"],
 }, async (req, res) => {
   try {
     const classSchema = {
@@ -109,7 +109,7 @@ export const writeSchema = onRequest({
  * Firebase HTTPS function to write data to Weaviate
  */
 export const writeWeaviate = onRequest({
-  secrets: ["WEAVIATE_URL", "WEAVIATE_API_KEY"]
+  secrets: ["WEAVIATE_URL", "WEAVIATE_API_KEY"],
 }, async (req, res) => {
   try {
     // Handle both single object and batch operations

@@ -18,7 +18,7 @@ export const getUserData = onCall(
     region: "us-central1",
     secrets: ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_URL"],
     memory: "1GiB",
-    timeoutSeconds: 60
+    timeoutSeconds: 60,
   },
   async (request: CallableRequest<GetUserDataRequest>) => {
     // Verify user is authenticated
