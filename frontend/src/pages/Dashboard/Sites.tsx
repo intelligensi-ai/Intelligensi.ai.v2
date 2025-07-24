@@ -375,7 +375,15 @@ const Sites: React.FC<SitesProps> = ({
         </div>
 
         {/* Middle column - Site Icons */}
-        <div className="bg-[#344054] py-3 rounded-lg border border-gray-600 shadow-sm overflow-hidden">
+        <div className="flex-1 bg-[#344054] py-3 rounded-lg border border-gray-600 shadow-sm overflow-hidden">
+          {selectedSite && (
+            <div className="px-4 pb-2 border-b border-gray-600">
+              <h2 className="text-lg font-semibold text-white text-center">
+                {selectedSite.site_name}
+              </h2>
+            </div>
+          )}
+          <div className="mt-2">
           <div className="overflow-x-auto px-2">
             {sites.length === 0 ? (
               <div className="flex justify-center items-center w-full h-24 text-gray-400 italic font-bold">
@@ -426,10 +434,11 @@ const Sites: React.FC<SitesProps> = ({
               </div>
             )}
           </div>
+          </div>
         </div>
         
         {/* Right side - Buttons and Info */}
-        <div className="flex-1 flex gap-4">
+        <div className="w-[45%] flex gap-4">
           {/* Buttons Card - Slightly reduced width to make room for info */}
           <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-full md:w-[45%]">
             {selectedSite && (

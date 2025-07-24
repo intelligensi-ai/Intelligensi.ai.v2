@@ -40,7 +40,7 @@ export const nearTextSearch = onRequest(
         apiKey: new ApiKey(WEAVIATE_API_KEY),
         headers: {
           "X-OpenAI-Api-Key": OPENAI_API_KEY,
-        }
+        },
       });
 
       logger.info(`🔍 Running nearText query for: ${query}`);
@@ -64,7 +64,7 @@ export const nearTextSearch = onRequest(
         .withLimit(5)
         .do();
 
-      let result: Record<string, unknown> = response.data?.Get?.[className] || [];
+      const result: Record<string, unknown> = response.data?.Get?.[className] || [];
 
       res.status(200).json({
         success: true,
