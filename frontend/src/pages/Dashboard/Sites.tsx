@@ -438,7 +438,7 @@ const Sites: React.FC<SitesProps> = ({
         </div>
         
         {/* Right side - Buttons and Info */}
-        <div className="w-[45%] flex gap-4">
+        <div className="w-3/4 flex gap-2">
           {/* Buttons Card - Slightly reduced width to make room for info */}
           <div className="bg-[#2D3748] px-4 py-4 rounded-lg border border-gray-600 shadow-sm w-full md:w-[45%]">
             {selectedSite && (
