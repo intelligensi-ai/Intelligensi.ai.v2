@@ -111,6 +111,9 @@ const Sites: React.FC<SitesProps> = ({
     } else {
       setSelectedSiteIdState(siteId);
       onSiteSelected(siteId);
+      
+      // Note: Removed chat message creation when a site is selected
+      // to prevent unwanted chat messages when clicking on site icons
     }
   }, [selectedSiteIdState, onSiteSelected]);
 
