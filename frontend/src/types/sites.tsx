@@ -16,6 +16,7 @@ export interface ISite {
     company_id?: number | null;
     site_name: string;
     site_url: string;
+    drupalVersion?: string;
     description?: string;
     mysql_file_url?: string | null;
     status?: string | null;

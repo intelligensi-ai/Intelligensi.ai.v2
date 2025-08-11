@@ -19,6 +19,15 @@ const CMS_OPTIONS: ICMS[] = [
 ];
 
 const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, initialData, currentUser }) => {
+  // Available Drupal versions
+  const DRUPAL_VERSIONS = [
+    { value: '7', label: 'Drupal 7' },
+    { value: '8', label: 'Drupal 8' },
+    { value: '9', label: 'Drupal 9' },
+    { value: '10', label: 'Drupal 10' },
+    { value: '11', label: 'Drupal 11' },
+  ];
+
   const [formData, setFormData] = useState<ISite>(() => {
     const defaultCms = CMS_OPTIONS.find(cms => cms.name === 'Drupal') || CMS_OPTIONS[0];
     return {
@@ -27,6 +36,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
       cms: initialData?.cms || defaultCms,
       site_name: initialData?.site_name || '',
       site_url: initialData?.site_url || '',
+      drupalVersion: initialData?.drupalVersion || '7',
       description: initialData?.description || '',
       mysql_file_url: initialData?.mysql_file_url || null,
       status: initialData?.status || 'active',
@@ -42,7 +52,6 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
   });
   const [useHttps, setUseHttps] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [supabaseUserId, setSupabaseUserId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -116,7 +125,6 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
               }
 
               console.log('Found existing user after conflict:', existingUser);
-              setSupabaseUserId(existingUser.id);
               setFormData(prev => ({
                 ...prev,
                 user_id: existingUser.id
@@ -133,14 +141,12 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
           }
 
           console.log('Successfully created new Supabase user:', newUser);
-          setSupabaseUserId(newUser.id);
           setFormData(prev => ({
             ...prev,
             user_id: newUser.id
           }));
         } else {
           console.log('Found existing Supabase user:', userData);
-          setSupabaseUserId(userData.id);
           setFormData(prev => ({
             ...prev,
             user_id: userData.id
@@ -185,6 +191,13 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         mysql_file_url: URL.createObjectURL(file) 
       });
     }
+  };
+
+  const handleDrupalVersionChange = (version: string) => {
+    setFormData(prev => ({
+      ...prev,
+      drupalVersion: version
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -526,22 +539,43 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">CMS Type *</label>
               <select
-                value={formData.cms.id} 
+                value={formData.cms?.name}
                 onChange={(e) => {
-                  const selectedId = parseInt(e.target.value, 10);
-                  const selected = CMS_OPTIONS.find(opt => opt.id === selectedId) || CMS_OPTIONS[0];
-                  setFormData({ ...formData, cms: selected });
+                  const selectedCms = CMS_OPTIONS.find(cms => cms.name === e.target.value) || CMS_OPTIONS[0];
+                  setFormData(prev => ({
+                    ...prev,
+                    cms: selectedCms
+                  }));
                 }}
                 className="w-full bg-[#1A202C] border border-gray-600 rounded-md p-2"
                 required
               >
                 {CMS_OPTIONS.map((cms) => (
-                  <option key={cms.id} value={cms.id}> 
+                  <option key={cms.id} value={cms.name}>
                     {cms.name}
                   </option>
                 ))}
               </select>
             </div>
+
+            {formData.cms?.name === 'Drupal' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2 text-gray-300">Drupal Version</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DRUPAL_VERSIONS.map((version) => (
+                    <label key={version.value} className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300"
+                        checked={formData.drupalVersion === version.value}
+                        onChange={() => handleDrupalVersionChange(version.value)}
+                      />
+                      <span className="ml-2 text-gray-300">{version.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Version */}
             <div className="mb-4">
