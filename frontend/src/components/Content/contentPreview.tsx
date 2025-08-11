@@ -1,24 +1,178 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { ISite } from '../../types/sites';
+
+export interface ContentNode {
+  nid: string;
+  title: string;
+  created: string;
+  status: string;
+  type: string;
+  body: string;
+}
 
 interface ContentPreviewProps {
-  site: {
-    name: string;
-    site_name?: string;
-  };
+  site: ISite;
   onClose: () => void;
 }
 
 const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
+  const [content, setContent] = useState<ContentNode[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+  // Mock data for development
+  const mockContent: ContentNode[] = [
+    {
+      nid: '1',
+      title: 'Sample Article',
+      created: Math.floor(Date.now() / 1000 - 86400).toString(), // Yesterday
+      status: '1',
+      type: 'article',
+      body: '<p>This is a sample article content. In a real scenario, this would be loaded from your Drupal site.</p>'
+    },
+    {
+      nid: '2',
+      title: 'Another Sample Page',
+      created: Math.floor(Date.now() / 1000 - 172800).toString(), // 2 days ago
+      status: '1',
+      type: 'page',
+      body: '<p>This is another sample content item showing different types of content that might exist in your Drupal site.</p>'
+    }
+  ];
+
+  useEffect(() => {
+    const loadContent = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // In a real implementation, we would fetch from the API here
+        // For now, we'll use mock data
+        setContent(mockContent);
+        
+      } catch (err) {
+        console.error('Error loading content:', err);
+        setError('Failed to load content. Please try again later.');
+        setContent([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadContent();
+  }, [site.id]);
+
+  const toggleExpand = (nid: string) => {
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(nid)) {
+        newSet.delete(nid);
+      } else {
+        newSet.add(nid);
+      }
+      return newSet;
+    });
+  };
+
+  const formatDate = (timestamp: string) => {
+    try {
+      const date = new Date(parseInt(timestamp) * 1000);
+      return date.toLocaleDateString();
+    } catch (e) {
+      return 'Unknown date';
+    }
+  };
+
+  const cleanBodyText = (html: string): string => {
+    if (!html) return '';
+    
+    // Create a temporary div element
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    
+    // Get the text content and clean it up
+    return tempDiv.textContent || tempDiv.innerText || '';
+  };
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-32 space-y-2">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
+          <p className="text-gray-400">Loading content...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="bg-[#1F2937] border border-red-500/50 rounded-lg p-4 mb-6">
+          <div className="flex items-start text-gray-200">
+            <svg className="w-5 h-5 mr-3 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="font-medium">Could not load content</p>
+              <p className="text-sm mt-1">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (content.length === 0) {
+      return (
+        <div className="bg-[#344054] p-4 rounded-lg border border-gray-600 text-center">
+          <p className="text-gray-400 italic">No content found for this site.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {content.map((node) => (
+          <div 
+            key={node.nid} 
+            className="bg-[#344054] p-4 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors"
+          >
+            <h3 className="font-bold text-sm text-teal-400 truncate">{node.title}</h3>
+            <div className="text-xs text-gray-400 mb-2">
+              {formatDate(node.created)} | {node.type} | {node.status === "1" ? "Published" : "Unpublished"}
+            </div>
+            <div className="text-gray-300 text-sm line-clamp-3">
+              {cleanBodyText(node.body)}
+            </div>
+            {cleanBodyText(node.body).split('\n').length > 3 && (
+              <button
+                onClick={() => toggleExpand(node.nid)}
+                className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                {expandedNodes.has(node.nid) ? 'Show less' : 'Read more...'}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">
-            Content Preview: {site.site_name || site.name}
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#2D3748] rounded-lg p-6 w-full max-w-5xl max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-white">
+            Content Preview: {site.site_name}
           </h2>
           <button 
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-400 hover:text-white transition-colors"
             aria-label="Close preview"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -26,8 +180,24 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
             </svg>
           </button>
         </div>
-        <div className="text-center py-8 text-gray-500">
-          Content preview is not available in this view.
+
+        <div className="mb-4 p-4 bg-blue-900/20 border-l-4 border-blue-500 rounded">
+          <p className="text-sm text-blue-300">
+            <strong>Note:</strong> This is a preview using sample data. In a production environment, this would show real content from your connected site.
+          </p>
+        </div>
+
+        <div className="overflow-y-auto flex-1 pr-2">
+          {renderContent()}
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700 mt-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors text-sm font-medium"
+          >
+            Close Preview
+          </button>
         </div>
       </div>
     </div>

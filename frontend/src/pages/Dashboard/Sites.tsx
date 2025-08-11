@@ -14,7 +14,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
 
 // Dynamic imports for components that might not be used immediately
-const ContentPreviewClean = React.lazy(() => import('../../components/Content/ContentPreviewClean'));
+const ContentPreview = React.lazy(() => import('../../components/Content/contentPreview'));
 const Vectorize = React.lazy(() => import('../../components/Content/contentVectorize'));
 
 interface SitesProps {
@@ -572,7 +572,7 @@ const Sites: React.FC<SitesProps> = ({
 
       <React.Suspense fallback={null}>
         {selectedSite && showContentPreview && (
-          <ContentPreviewClean
+          <ContentPreview
             onClose={handlePreviewClose}
             site={selectedSite}
           />
