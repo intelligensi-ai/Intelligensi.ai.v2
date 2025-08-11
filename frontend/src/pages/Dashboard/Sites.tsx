@@ -14,7 +14,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
 
 // Dynamic imports for components that might not be used immediately
-const ContentPreview = React.lazy(() => import('../../components/Content/contentPreview'));
+const ContentPreviewClean = React.lazy(() => import('../../components/Content/ContentPreviewClean'));
 const Vectorize = React.lazy(() => import('../../components/Content/contentVectorize'));
 
 interface SitesProps {
@@ -427,7 +427,7 @@ const Sites: React.FC<SitesProps> = ({
             {selectedSite && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <button 
-                  onClick={() => setShowWebsitePreview(true)}
+                  onClick={() => setShowContentPreview(true)}
                   className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -572,12 +572,10 @@ const Sites: React.FC<SitesProps> = ({
 
       <React.Suspense fallback={null}>
         {selectedSite && showContentPreview && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <ContentPreview
-              onClose={handlePreviewClose}
-              site={selectedSite}
-            />
-          </div>
+          <ContentPreviewClean
+            onClose={handlePreviewClose}
+            site={selectedSite}
+          />
         )}
         {selectedSite && showContentVectorize && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
