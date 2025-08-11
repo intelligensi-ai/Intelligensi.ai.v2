@@ -76,23 +76,47 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
         <div className="overflow-y-auto flex-1 pr-2">
           <div className="grid grid-cols-1 gap-4">
             {content.map((node) => (
-              <div key={node.nid} className="border p-4 rounded">
-                <h3 className="font-bold">{node.title}</h3>
-                <div className="text-sm text-gray-500 mb-2">
-                  {formatDate(node.created)} • {node.type}
-                </div>
-                <div className="text-gray-700">
-                  {node.body.length > 200 && !expandedNodes.has(node.nid)
-                    ? `${node.body.substring(0, 200)}...`
-                    : node.body}
-                  {node.body.length > 200 && (
-                    <button
-                      onClick={() => toggleExpand(node.nid)}
-                      className="text-blue-500 hover:underline ml-1"
-                    >
-                      {expandedNodes.has(node.nid) ? 'Show less' : 'Read more'}
-                    </button>
-                  )}
+              <div 
+                key={node.nid} 
+                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+              >
+                <div className="p-4">
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {node.title}
+                    </h3>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+                      {node.type}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {formatDate(node.created)}
+                  </div>
+                  <div className="mt-3 text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none">
+                    {node.body.length > 200 && !expandedNodes.has(node.nid) ? (
+                      <React.Fragment>
+                        {`${node.body.substring(0, 200)}... `}
+                        <button
+                          onClick={() => toggleExpand(node.nid)}
+                          className="text-blue-500 hover:underline"
+                        >
+                          Read more
+                        </button>
+                      </React.Fragment>
+                    ) : (
+                      <React.Fragment>
+                        <div dangerouslySetInnerHTML={{ __html: node.body }} />
+                        {node.body.length > 200 && (
+                          <button
+                            onClick={() => toggleExpand(node.nid)}
+                            className="text-blue-500 hover:underline mt-2 block"
+                          >
+                            Show less
+                          </button>
+                        )}
+                      </React.Fragment>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
