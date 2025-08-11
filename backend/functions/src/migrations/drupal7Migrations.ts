@@ -74,27 +74,62 @@ router.get("/info", async function(req: express.Request, res: express.Response) 
 });
 
 /**
- * Fetch site structure from Drupal 7 using curl
- * @param req - Express request object (endpoint query param is currently ignored)
+ * Fetch site structure from Drupal 7
+ * @param req - Express request object with query params: endpoint, _t (cache buster)
  * @param res - Express response object
  */
 router.get("/structure", async function(req: express.Request, res: express.Response) {
-  const drupalUrl = "https://drupal7.intelligensi.online/api/bulk-export"; // Hardcoded target URL
-  const command = `curl -sSLk "${drupalUrl}"`;
+  const { endpoint, _t } = req.query;
+  
+  if (!endpoint) {
+    console.error('[structure] Missing required parameter: endpoint');
+    return res.status(400).json({ error: 'Missing required parameter: endpoint' });
+  }
 
-  console.log(`[structure_curl] Executing command: ${command}`);
+  // Ensure the endpoint ends with a slash
+  const baseUrl = endpoint.toString().endsWith('/') 
+    ? endpoint.toString() 
+    : `${endpoint}/`;
+  
+  const drupalUrl = `${baseUrl}api/bulk-export`;
+  console.log(`[structure] Fetching content from: ${drupalUrl}`);
 
   try {
+    // First try direct axios request
+    try {
+      const response = await axios.get(drupalUrl, {
+        httpsAgent,
+        timeout: 30000,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
+      if (!response.data) {
+        throw new Error('Empty response from Drupal site');
+      }
+      
+      console.log(`[structure] Successfully fetched ${Array.isArray(response.data) ? response.data.length : '1'} items`);
+      return res.json(response.data);
+    } catch (axiosError) {
+      console.warn('[structure] Axios request failed, falling back to curl:', axiosError.message);
+    }
+    
+    // Fallback to curl if axios fails
+    const command = `curl -sSLk "${drupalUrl}"`;
+    console.log(`[structure] Executing fallback command: ${command}`);
+
     const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
         if (error) {
-          console.error(`[structure_curl] Error executing curl: ${error.message}`);
-          console.error(`[structure_curl] Curl stderr: ${stderr}`);
-          reject(new Error(`Exec error: ${error.message}${stderr ? `\nStderr: ${stderr}` : ""}`));
+          console.error(`[structure] Error executing curl: ${error.message}`);
+          console.error(`[structure] Curl stderr: ${stderr}`);
+          reject(new Error(`Drupal request failed: ${error.message}${stderr ? `\nStderr: ${stderr}` : ""}`));
         } else {
-          // Even if exec error is null, stderr might contain warnings, log them
           if (stderr) {
-            console.warn(`[structure_curl] Curl stderr (non-fatal or warning): ${stderr}`);
+            console.warn(`[structure] Curl stderr (non-fatal): ${stderr}`);
           }
           resolve({ stdout, stderr });
         }

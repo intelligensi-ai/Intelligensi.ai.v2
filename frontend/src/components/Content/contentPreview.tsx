@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { ISite } from '../../types/sites';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 export interface ContentNode {
   nid: string;
@@ -21,6 +23,121 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
+  // Format content node from Drupal API response
+  const formatContentNode = useCallback((item: any): ContentNode => {
+    // Basic node with safe defaults
+    return {
+      nid: item.nid?.toString() || '',
+      title: item.title || 'Untitled',
+      created: item.created?.toString() || Math.floor(Date.now() / 1000).toString(),
+      status: item.status?.toString() || '1',
+      type: item.type || 'page',
+      body: item.body || ''
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadContent = async () => {
+      if (!site?.site_url) {
+        setError('No site URL available');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Use the backend proxy to avoid CORS issues
+        const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/intelligensi-ai-v2/us-central1';
+        
+        console.log(`Fetching content via backend proxy for: ${site.site_url}`);
+        
+        // Use the structure endpoint which was working before
+        const response = await axios.get(
+          `${apiBaseUrl}/drupal7/structure`,
+          {
+            params: { 
+              endpoint: site.site_url,
+              _t: Date.now() // Cache buster
+            },
+            timeout: 30000,
+          }
+        );
+
+        console.log('Response data:', response.data);
+        
+        if (response.data) {
+          let data = [];
+          
+          // Handle the structure property in the response
+          if (response.data.structure && Array.isArray(response.data.structure)) {
+            // Extract the structure array
+            data = response.data.structure;
+            console.log('Extracted content from structure property:', data);
+          } 
+          // Fallback to other possible response formats
+          else if (Array.isArray(response.data)) {
+            data = response.data;
+          } else if (response.data.data) {
+            data = Array.isArray(response.data.data) ? response.data.data : [response.data.data];
+          } else if (response.data.items) {
+            data = Array.isArray(response.data.items) ? response.data.items : [response.data.items];
+          } else if (typeof response.data === 'object') {
+            // If it's a single object, wrap it in an array
+            data = [response.data];
+          }
+          
+          console.log('Processed data:', data);
+          
+          if (data.length > 0) {
+            try {
+              // Map each item in the structure array to a content node
+              const contentNodes = data.map(item => {
+                // Ensure required fields have default values
+                return {
+                  nid: item.nid?.toString() || '',
+                  title: item.title?.toString() || 'Untitled',
+                  created: item.created?.toString() || Math.floor(Date.now() / 1000).toString(),
+                  status: item.status?.toString() || '1',
+                  type: item.type?.toString() || 'page',
+                  body: item.body?.toString() || ''
+                };
+              });
+              setContent(contentNodes);
+            } catch (formatError) {
+              console.error('Error formatting content nodes:', formatError);
+              setError(`Error processing content: ${formatError.message}`);
+              setContent(mockContent); // Fall back to mock data
+            }
+          } else {
+            console.warn('No content found in response.data:', response.data);
+            setError('No content found in the response. The Drupal site may not have any content or the endpoint may be incorrect.');
+            setContent(mockContent); // Fall back to mock data
+          }
+        } else {
+          console.warn('Unexpected response format:', response.data);
+          throw new Error('Unexpected response format from server');
+        }
+        
+      } catch (err) {
+        console.error('Error loading content:', err);
+        const errorMessage = axios.isAxiosError(err) 
+          ? `Failed to load content: ${err.response?.data?.error || err.message}`
+          : err instanceof Error 
+            ? err.message 
+            : 'Failed to load content. Please try again later.';
+            
+        setError(errorMessage);
+        setContent([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadContent();
+  }, [site.id, site.site_url, formatContentNode]);
+  
   // Mock data for development
   const mockContent: ContentNode[] = [
     {
@@ -40,28 +157,6 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
       body: '<p>This is another sample content item showing different types of content that might exist in your Drupal site.</p>'
     }
   ];
-
-  useEffect(() => {
-    const loadContent = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // In a real implementation, we would fetch from the API here
-        // For now, we'll use mock data
-        setContent(mockContent);
-        
-      } catch (err) {
-        console.error('Error loading content:', err);
-        setError('Failed to load content. Please try again later.');
-        setContent([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadContent();
-  }, [site.id]);
 
   const toggleExpand = (nid: string) => {
     setExpandedNodes(prev => {
@@ -87,12 +182,32 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
   const cleanBodyText = (html: string): string => {
     if (!html) return '';
     
-    // Create a temporary div element
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-    
-    // Get the text content and clean it up
-    return tempDiv.textContent || tempDiv.innerText || '';
+    try {
+      // Create a temporary div element
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+      
+      // Remove script and style elements
+      const scripts = tempDiv.getElementsByTagName('script');
+      const styles = tempDiv.getElementsByTagName('style');
+      
+      Array.from(scripts).forEach(script => script.remove());
+      Array.from(styles).forEach(style => style.remove());
+      
+      // Get the text content and clean it up
+      let text = tempDiv.textContent || tempDiv.innerText || '';
+      
+      // Normalize whitespace and trim
+      text = text
+        .replace(/\s+/g, ' ')
+        .replace(/\n+/g, '\n')
+        .trim();
+        
+      return text;
+    } catch (err) {
+      console.error('Error cleaning HTML:', err);
+      return html; // Return original if parsing fails
+    }
   };
 
   const renderContent = () => {
