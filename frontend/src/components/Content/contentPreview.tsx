@@ -298,7 +298,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
 
         <div className="mb-4 p-4 bg-blue-900/20 border-l-4 border-blue-500 rounded">
           <p className="text-sm text-blue-300">
-            <strong>Note:</strong> This is a preview using sample data. In a production environment, this would show real content from your connected site.
+            <strong>Note:</strong>Site preview showing content from your site
           </p>
         </div>
 
