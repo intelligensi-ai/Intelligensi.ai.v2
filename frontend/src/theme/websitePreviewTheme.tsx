@@ -23,14 +23,24 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site, onClose }) => {
   const [currentPage, setCurrentPage] = useState<ContentNode | null>(null);
 
   // Format content node from API response
-  const formatContentNode = useCallback((item: any): ContentNode => ({
-    nid: item.nid?.toString() || '',
-    title: item.title || 'Untitled',
-    created: item.created?.toString() || Math.floor(Date.now() / 1000).toString(),
-    status: item.status?.toString() || '1',
-    type: item.type || 'page',
-    body: item.body || ''
-  }), []);
+  const formatContentNode = useCallback((item: any): ContentNode => {
+    // Handle different possible body field names from the API
+    const bodyContent = item.body?.[0]?.value ||  // Drupal JSON:API format
+                      item.body?.[0]?.processed ||  // Drupal REST format
+                      item.body ||                // Direct body string
+                      item.field_body?.[0]?.value ||  // Common Drupal field name
+                      item.content?.[0]?.value ||  // Another common field name
+                      '';                        // Fallback to empty string
+
+    return {
+      nid: item.nid?.toString() || '',
+      title: item.title || item.label || 'Untitled',
+      created: item.created?.toString() || Math.floor(Date.now() / 1000).toString(),
+      status: item.status?.toString() || '1',
+      type: item.type || 'page',
+      body: bodyContent
+    };
+  }, []);
 
   // Mock data for development
   const mockContent: ContentNode[] = [
@@ -230,3 +240,6 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ site, onClose }) => {
 };
 
 export default WebsitePreview;
+
+
+ 
