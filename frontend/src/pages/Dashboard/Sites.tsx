@@ -4,12 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import CreateDrupalSiteForm from '../../components/Sites/CreateDrupalSiteForm';
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, BoltIcon } from '@heroicons/react/24/outline';
-import { ThemeCraftModal } from '../../theme';
+
 import axios from "axios";
 import { User } from "firebase/auth";
 import { ISite, ICMS } from "../../types/sites";
 import { getSiteIcon, getSiteDisplayName } from '../../utils/siteHelpers';
-import WebsitePreview from '../../components/Content/WebsitePreview';
+import WebsitePreview from '../../theme/websitePreviewTheme';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
 
@@ -52,11 +52,12 @@ const Sites: React.FC<SitesProps> = ({
   const [siteToRemove, setSiteToRemove] = useState<ISite | null>(null);
   const [isRemovingSite, setIsRemovingSite] = useState<boolean>(false);
   const [removeSiteError, setRemoveSiteError] = useState<string | null>(null);
-  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showCreateDrupalSiteForm, setShowCreateDrupalSiteForm] = useState(false);
+  const [previewSite, setPreviewSite] = useState<ISite | null>(null);
   const [showWebsitePreview, setShowWebsitePreview] = useState(false);
-
-  const handleThemeScan = useCallback(async (url: string) => {
+  
+  const scanAndApplyTheme = useCallback(async (url: string) => {
     try {
       const scanTheme = httpsCallable<{ url: string }, any>(functions, 'scanWebsiteTheme');
       const result = await scanTheme({ url });
@@ -483,7 +484,7 @@ const Sites: React.FC<SitesProps> = ({
                 <button 
                   onClick={() => {
                     if (selectedSite?.site_url) {
-                      setIsThemeModalOpen(true);
+                      setPreviewSite(selectedSite);
                     } else {
                       toast.error('No URL available for this site');
                     }
@@ -495,6 +496,12 @@ const Sites: React.FC<SitesProps> = ({
                   </svg>
                   Theme
                 </button>
+                {previewSite && (
+                  <WebsitePreview
+                    site={previewSite}
+                    onClose={() => setPreviewSite(null)}
+                  />
+                )}
                 {/* Create New CMS button moved to left column */}
                 <button 
                   onClick={() => console.log('Migrate site', selectedSite.id)}
@@ -650,9 +657,12 @@ const Sites: React.FC<SitesProps> = ({
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
               <WebsitePreview 
                 site={{
-                  id: selectedSite.id?.toString() || '',
-                  name: selectedSite.site_name || 'Website Preview',
-                  url: selectedSite.site_url || ''
+                  ...selectedSite,
+                  id: selectedSite.id || 0, // Ensure id is a number
+                  site_name: selectedSite.site_name || 'Website Preview',
+                  site_url: selectedSite.site_url || '',
+                  user_id: selectedSite.user_id || '', // Ensure required fields are set
+                  cms: selectedSite.cms || { name: 'Unknown', version: '' } // Ensure cms is defined
                 }} 
                 onClose={() => setShowWebsitePreview(false)} 
               />
@@ -660,13 +670,7 @@ const Sites: React.FC<SitesProps> = ({
           </div>
         </div>
       )}
-      
-      {/* Theme Craft Modal */}
-      <ThemeCraftModal
-        isOpen={isThemeModalOpen}
-        onClose={() => setIsThemeModalOpen(false)}
-        onScan={handleThemeScan}
-      />
+
     </div>
   );
 };
