@@ -1,7 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { fetchDrupalContent, ContentNode } from '../Lib/fetchDrupalContent';
-import { ICMS, ISite } from '../../types/sites';
+import { ISite } from '../../types/sites';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+
+export interface ContentNode {
+  nid: string;
+  title: string;
+  created: string;
+  status: string;
+  type: string;
+  body: string;
+}
 
 interface VectorizeProps {
   site: ISite;
@@ -18,20 +27,94 @@ const Vectorize: React.FC<VectorizeProps> = ({ site, onComplete, onError, onClos
   const [contentCount, setContentCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Format content node from Drupal API response
+  const formatContentNode = useCallback((item: any): ContentNode => {
+    // Handle different Drupal API response formats
+    const bodyContent = item.body?.[0]?.value ||
+                      item.body?.[0]?.processed ||
+                      item.body ||
+                      item.field_body?.[0]?.value ||
+                      item.content?.[0]?.value ||
+                      '';
+    
+    return {
+      nid: item.nid?.toString() || '',
+      title: item.title || item.label || 'Untitled',
+      created: item.created?.toString() || Math.floor(Date.now() / 1000).toString(),
+      status: item.status?.toString() || '1',
+      type: item.type || 'page',
+      body: bodyContent
+    };
+  }, []);
+
   // Fetch content from Drupal when component mounts
   useEffect(() => {
     const loadContent = async () => {
+      if (!site?.site_url) {
+        setError('No site URL available');
+        setFetchingContent(false);
+        return;
+      }
+
       try {
         setFetchingContent(true);
         setError(null);
-        const nodes = await fetchDrupalContent(site);
-        if (nodes.length === 0) {
-          setError('No content available to vectorize from this site.');
-          return;
+        
+        // Use the backend proxy to avoid CORS issues
+        const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/intelligensi-ai-v2/us-central1';
+        
+        console.log(`[Vectorize] Fetching content via backend proxy for: ${site.site_url}`);
+        
+        // Use the structure endpoint which was working before
+        const response = await axios.get(
+          `${apiBaseUrl}/drupal7/structure`,
+          {
+            params: { 
+              endpoint: site.site_url,
+              _t: Date.now() // Cache buster
+            },
+            timeout: 30000,
+          }
+        );
+
+        console.log('[Vectorize] Response data:', response.data);
+        
+        if (response.data) {
+          let data = [];
+          
+          // Handle the structure property in the response
+          if (response.data.structure && Array.isArray(response.data.structure)) {
+            // Extract the structure array
+            data = response.data.structure;
+            console.log('[Vectorize] Extracted content from structure property:', data);
+          } 
+          // Fallback to other possible response formats
+          else if (Array.isArray(response.data)) {
+            data = response.data;
+          } else if (response.data.data) {
+            data = Array.isArray(response.data.data) ? response.data.data : [response.data.data];
+          } else if (response.data.items) {
+            data = Array.isArray(response.data.items) ? response.data.items : [response.data.items];
+          } else if (typeof response.data === 'object') {
+            // If it's a single object, wrap it in an array
+            data = [response.data];
+          }
+          
+          console.log('[Vectorize] Processed data:', data);
+          
+          if (data.length > 0) {
+            const formattedNodes = data.map(formatContentNode) as ContentNode[];
+            if (formattedNodes.length === 0) {
+              setError('No content available to vectorize from this site.');
+              return;
+            }
+            setContent(formattedNodes);
+            setContentCount(formattedNodes.length);
+          } else {
+            throw new Error('No content found in the response');
+          }
         }
-        setContent(nodes);
-        setContentCount(nodes.length);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to fetch Drupal content:', err);
         setError('Could not connect to the site. Please check your connection and try again.');
         onError('Could not fetch Drupal content');
@@ -41,7 +124,7 @@ const Vectorize: React.FC<VectorizeProps> = ({ site, onComplete, onError, onClos
     };
 
     loadContent();
-  }, [site]);
+  }, [site, formatContentNode, onError]);
 
   const cleanBodyText = (text: string) => {
     if (!text) return '';
