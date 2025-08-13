@@ -16,6 +16,7 @@ import { functions } from '../../firebase';
 // Dynamic imports for components that might not be used immediately
 const ContentPreview = React.lazy(() => import('../../components/Content/contentPreview'));
 const Vectorize = React.lazy(() => import('../../components/Content/contentVectorize'));
+const ContentPrompt = React.lazy(() => import('../../components/Content/ContentPrompt'));
 
 interface SitesProps {
   sites: ISite[];
@@ -56,6 +57,7 @@ const Sites: React.FC<SitesProps> = ({
   const [showCreateDrupalSiteForm, setShowCreateDrupalSiteForm] = useState(false);
   const [previewSite, setPreviewSite] = useState<ISite | null>(null);
   const [showWebsitePreview, setShowWebsitePreview] = useState(false);
+  const [showPromptDialog, setShowPromptDialog] = useState(false);
   
   const scanAndApplyTheme = useCallback(async (url: string) => {
     try {
@@ -473,7 +475,7 @@ const Sites: React.FC<SitesProps> = ({
                   )}
                 </button>
                 <button 
-                  onClick={() => console.log('AI Prompt button clicked for site ID:', selectedSite.id)}
+                  onClick={() => setShowPromptDialog(true)}
                   className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 px-3 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1 h-10"
                 >
                   <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -647,6 +649,22 @@ const Sites: React.FC<SitesProps> = ({
       )}
 
       {/* Website Preview Modal */}
+      {/* Content Prompt Dialog */}
+      <React.Suspense fallback={null}>
+        {selectedSite && (
+          <ContentPrompt
+            isOpen={showPromptDialog}
+            onClose={() => setShowPromptDialog(false)}
+            onSubmit={(prompt) => {
+              console.log('Prompt submitted for site:', selectedSite.site_name, 'Prompt:', prompt);
+              // Here you can add the logic to handle the prompt submission
+              toast.success(`Prompt submitted for ${selectedSite.site_name}`);
+            }}
+            siteName={selectedSite.site_name}
+          />
+        )}
+      </React.Suspense>
+
       {showWebsitePreview && selectedSite && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
