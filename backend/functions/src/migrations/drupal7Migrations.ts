@@ -78,12 +78,13 @@ router.get("/info", async function(req: express.Request, res: express.Response) 
  * @param req - Express request object with query params: endpoint, _t (cache buster)
  * @param res - Express response object
  */
-router.get("/structure", async function(req: express.Request, res: express.Response) {
-  const { endpoint, _t } = req.query;
-  
+// Define the structure endpoint with proper typing
+router.get("/structure", (async (req: express.Request, res: express.Response): Promise<void> => {
+  const { endpoint } = req.query;
   if (!endpoint) {
     console.error('[structure] Missing required parameter: endpoint');
-    return res.status(400).json({ error: 'Missing required parameter: endpoint' });
+    res.status(400).json({ error: 'Missing required parameter: endpoint' });
+    return;
   }
 
   // Ensure the endpoint ends with a slash
@@ -112,9 +113,11 @@ router.get("/structure", async function(req: express.Request, res: express.Respo
       }
       
       console.log(`[structure] Successfully fetched ${Array.isArray(response.data) ? response.data.length : '1'} items`);
-      return res.json(response.data);
-    } catch (axiosError) {
-      console.warn('[structure] Axios request failed, falling back to curl:', axiosError.message);
+      res.json(response.data);
+      return;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.warn('[structure] Axios request failed, falling back to curl:', errorMessage);
     }
     
     // Fallback to curl if axios fails
@@ -124,9 +127,10 @@ router.get("/structure", async function(req: express.Request, res: express.Respo
     const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
         if (error) {
-          console.error(`[structure] Error executing curl: ${error.message}`);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`[structure] Error executing curl: ${errorMessage}`);
           console.error(`[structure] Curl stderr: ${stderr}`);
-          reject(new Error(`Drupal request failed: ${error.message}${stderr ? `\nStderr: ${stderr}` : ""}`));
+          reject(new Error(`Drupal request failed: ${errorMessage}${stderr ? `\nStderr: ${stderr}` : ""}`));
         } else {
           if (stderr) {
             console.warn(`[structure] Curl stderr (non-fatal): ${stderr}`);
@@ -151,7 +155,8 @@ router.get("/structure", async function(req: express.Request, res: express.Respo
       details: execError.message,
       // stderrOutput: "See details for stderr if present" // Or parse from execError.message if needed
     });
+    return;
   }
-});
+}));
 
 export default router;

@@ -12,7 +12,6 @@ import { createSchema } from "./routes/schemaRoutes";
 import { deleteSite } from "./routes/siteRoutes";
 import { createDrupalSite } from "./routes/windsailRoutes";
 import { simpleSearch } from "./routes/WeaviatesSimplesearch";
-import { themeCraftFunctions } from "./services/themeCraft";
 
 // New routes/imports from ea22d36
 import authRouter from "./routes/authRoutes";
