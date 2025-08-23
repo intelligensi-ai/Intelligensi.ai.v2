@@ -7,6 +7,7 @@ import cors from "cors";
 import { updateHomepage } from "./routes/openaiRoutes";
 import { fetchusers, updateuser, fetchuser } from "./routes/userRoutes";
 import drupal7Router from "./migrations/drupal7Migrations";
+import { d11Router } from "./migrations/drupal11intellibridge";
 import { checkWeaviate, writeSchema, writeWeaviate } from "./routes/weaviateRoutes";
 import { createSchema } from "./routes/schemaRoutes";
 import { deleteSite } from "./routes/siteRoutes";
@@ -28,21 +29,27 @@ drupal7App.use(express.json());
 drupal7App.use(cors({ origin: true }));
 drupal7App.use("/", drupal7Router);
 
+// Drupal 11 Express app
+const drupal11App = express();
+drupal11App.use(express.json());
+drupal11App.use(cors({ origin: true }));
+drupal11App.use("/", d11Router);
+
 // Add health check endpoint for Cloud Run
 drupal7App.get("/healthz", (req, res) => {
   res.status(200).send("ok");
 });
 
-// Export the drupal7 function with proper configuration for Cloud Run
+// Export the Express apps as Firebase Functions
 export const drupal7 = onRequest({
   region: "us-central1",
-  memory: "1GiB",
-  timeoutSeconds: 60,
-  minInstances: 0,
-  maxInstances: 10,
-  concurrency: 80,
-  cpu: 1,
+  cors: true,
 }, drupal7App);
+
+export const drupal11 = onRequest({
+  region: "us-central1",
+  cors: true,
+}, drupal11App);
 
 // Auth Express app (incorporating from ea22d36)
 const authApp = express();
