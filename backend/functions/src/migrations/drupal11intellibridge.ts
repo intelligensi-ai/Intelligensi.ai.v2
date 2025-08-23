@@ -1,15 +1,15 @@
 /**
  * Drupal 11 Bridge API
- * 
+ *
  * This module provides a bridge between Firebase Functions and a Drupal 11 instance.
  * It allows for fetching content, updating nodes, and importing content into Drupal 11.
- * 
+ *
  * Available Endpoints:
- * 
+ *
  * 1. GET /
  *    Health check and endpoint listing
  *    Example: GET http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/
- * 
+ *
  * 2. GET /structure
  *    Fetch site structure and content
  *    Query Params:
@@ -17,27 +17,27 @@
  *      - limit: Number of items (default: 10)
  *      - fields: Fields to include (default: "title,body,field_image")
  *    Example: GET http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/structure?types=article&limit=5
- * 
+ *
  * 3. POST /node-update
  *    Update existing nodes
  *    Body: Array of node objects with 'id' and fields to update
- *    Example: 
+ *    Example:
  *      POST http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/node-update
  *      Body: [{"id": 1, "type": "article", "title": "Updated Title"}]
- * 
+ *
  * 4. POST /import
  *    Import new nodes
  *    Body: { nodes: [...] } - Array of node objects to create
  *    Example:
  *      POST http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/import
  *      Body: {"nodes": [{"type": "article", "title": "New Article"}]}
- * 
+ *
  * Environment Variables:
  * - DRUPAL_11_BASE_URL: Base URL of the Drupal 11 instance
  */
 
 import express, { Request, Response, NextFunction } from "express";
-import axios, { AxiosRequestConfig } from "axios";
+import axios, { AxiosRequestConfig, isAxiosError } from "axios";
 import https from "https";
 import { onRequest } from "firebase-functions/v2/https";
 
@@ -70,7 +70,7 @@ const httpsAgent = new https.Agent({
 
 // Handle Axios errors consistently
 const handleAxiosError = (error: unknown, context: string) => {
-  if (axios.isAxiosError(error)) {
+  if (isAxiosError(error)) {
     console.error(`Axios error in ${context}:`, error.message);
     if (error.response) {
       return {
@@ -104,7 +104,7 @@ const createDrupalClient = () => {
 
 /**
  * Drupal 11 Bridge Router
- * 
+ *
  * This router handles all Drupal 11 specific API endpoints. It provides the following functionality:
  * - Content retrieval and querying
  * - Node creation and updates
@@ -263,7 +263,7 @@ d11Router.get("/", (req: Request, res: Response) => {
 /**
  * Structure endpoint - fetches content from Drupal 11
  * This endpoint uses the Drupal 11 bulk export API to fetch content.
- * 
+ *
  * @param req - Express request object with query params: types, limit, fields
  * @param res - Express response object
  */
@@ -290,7 +290,7 @@ d11Router.get("/structure", async (req: Request, res: Response): Promise<void> =
     res.json({ structure: response.data });
   } catch (error) {
     console.error("Error in /structure:", error);
-    const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
+    const status = isAxiosError(error) ? error.response?.status || 500 : 500;
     res.status(status).json({
       error: "Failed to fetch site structure",
       details: error instanceof Error ? error.message : "Unknown error",
@@ -338,7 +338,7 @@ d11Router.get("/info", async (req: Request, res: Response): Promise<void> => {
     }
   } catch (error) {
     console.error("Error in /info:", error);
-    const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
+    const status = isAxiosError(error) ? error.response?.status || 500 : 500;
     res.status(status).json({
       error: "Failed to fetch site info",
       details: error instanceof Error ? error.message : "Unknown error",
@@ -385,7 +385,7 @@ d11Router.post("/homepage", async (req: Request, res: Response): Promise<void> =
     return;
   } catch (error) {
     console.error("Error in /homepage:", error);
-    const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
+    const status = isAxiosError(error) ? error.response?.status || 500 : 500;
     res.status(status).json({
       error: "Failed to update homepage",
       details: error instanceof Error ? error.message : "Unknown error",
@@ -578,7 +578,7 @@ d11Router.get("/structure", async (req: Request, res: Response): Promise<void> =
       details: errorMessage,
     };
 
-    if (axios.isAxiosError(error)) {
+    if (isAxiosError(error)) {
       console.error("Request failed:", error.message);
       Object.assign(errorResponse, {
         axiosError: {

@@ -82,16 +82,16 @@ router.get("/info", async function(req: express.Request, res: express.Response) 
 router.get("/structure", (async (req: express.Request, res: express.Response): Promise<void> => {
   const { endpoint } = req.query;
   if (!endpoint) {
-    console.error('[structure] Missing required parameter: endpoint');
-    res.status(400).json({ error: 'Missing required parameter: endpoint' });
+    console.error("[structure] Missing required parameter: endpoint");
+    res.status(400).json({ error: "Missing required parameter: endpoint" });
     return;
   }
 
   // Ensure the endpoint ends with a slash
-  const baseUrl = endpoint.toString().endsWith('/') 
-    ? endpoint.toString() 
-    : `${endpoint}/`;
-  
+  const baseUrl = endpoint.toString().endsWith("/") ?
+    endpoint.toString() :
+    `${endpoint}/`;
+
   const drupalUrl = `${baseUrl}api/bulk-export`;
   console.log(`[structure] Fetching content from: ${drupalUrl}`);
 
@@ -102,24 +102,25 @@ router.get("/structure", (async (req: express.Request, res: express.Response): P
         httpsAgent,
         timeout: 30000,
         headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
       });
-      
+
       if (!response.data) {
-        throw new Error('Empty response from Drupal site');
+        throw new Error("Empty response from Drupal site");
       }
-      
-      console.log(`[structure] Successfully fetched ${Array.isArray(response.data) ? response.data.length : '1'} items`);
+
+      const itemCount = Array.isArray(response.data) ? response.data.length : 1;
+      console.log(`[structure] Successfully fetched ${itemCount} items`);
       res.json(response.data);
       return;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.warn('[structure] Axios request failed, falling back to curl:', errorMessage);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.warn("[structure] Axios request failed, falling back to curl:", errorMessage);
     }
-    
+
     // Fallback to curl if axios fails
     const command = `curl -sSLk "${drupalUrl}"`;
     console.log(`[structure] Executing fallback command: ${command}`);
@@ -127,13 +128,14 @@ router.get("/structure", (async (req: express.Request, res: express.Response): P
     const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
         if (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          console.error(`[structure] Error executing curl: ${errorMessage}`);
-          console.error(`[structure] Curl stderr: ${stderr}`);
-          reject(new Error(`Drupal request failed: ${errorMessage}${stderr ? `\nStderr: ${stderr}` : ""}`));
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          console.error("[structure] Error executing curl: " + errorMessage);
+          console.error("[structure] Curl stderr: " + stderr);
+          const errorDetails = stderr ? "\nStderr: " + stderr : "";
+          reject(new Error("Drupal request failed: " + errorMessage + errorDetails));
         } else {
           if (stderr) {
-            console.warn(`[structure] Curl stderr (non-fatal): ${stderr}`);
+            console.warn("[structure] Curl stderr (non-fatal): " + stderr);
           }
           resolve({ stdout, stderr });
         }
@@ -153,7 +155,7 @@ router.get("/structure", (async (req: express.Request, res: express.Response): P
     res.status(500).json({
       error: "Failed to execute command to fetch Drupal structure.",
       details: execError.message,
-      // stderrOutput: "See details for stderr if present" // Or parse from execError.message if needed
+      // stderrOutput: "See details for stderr if present"
     });
     return;
   }
