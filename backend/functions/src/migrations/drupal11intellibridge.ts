@@ -1,3 +1,41 @@
+/**
+ * Drupal 11 Bridge API
+ * 
+ * This module provides a bridge between Firebase Functions and a Drupal 11 instance.
+ * It allows for fetching content, updating nodes, and importing content into Drupal 11.
+ * 
+ * Available Endpoints:
+ * 
+ * 1. GET /
+ *    Health check and endpoint listing
+ *    Example: GET http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/
+ * 
+ * 2. GET /structure
+ *    Fetch site structure and content
+ *    Query Params:
+ *      - types: Content types (default: "article,page")
+ *      - limit: Number of items (default: 10)
+ *      - fields: Fields to include (default: "title,body,field_image")
+ *    Example: GET http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/structure?types=article&limit=5
+ * 
+ * 3. POST /node-update
+ *    Update existing nodes
+ *    Body: Array of node objects with 'id' and fields to update
+ *    Example: 
+ *      POST http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/node-update
+ *      Body: [{"id": 1, "type": "article", "title": "Updated Title"}]
+ * 
+ * 4. POST /import
+ *    Import new nodes
+ *    Body: { nodes: [...] } - Array of node objects to create
+ *    Example:
+ *      POST http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/import
+ *      Body: {"nodes": [{"type": "article", "title": "New Article"}]}
+ * 
+ * Environment Variables:
+ * - DRUPAL_11_BASE_URL: Base URL of the Drupal 11 instance
+ */
+
 import express, { Request, Response, NextFunction } from "express";
 import axios, { AxiosRequestConfig } from "axios";
 import https from "https";
@@ -64,10 +102,18 @@ const createDrupalClient = () => {
   });
 };
 
-// Create a new router for Drupal 11 specific routes
+/**
+ * Drupal 11 Bridge Router
+ * 
+ * This router handles all Drupal 11 specific API endpoints. It provides the following functionality:
+ * - Content retrieval and querying
+ * - Node creation and updates
+ * - Schema generation and validation
+ * - System health checks
+ */
 const d11Router = express.Router();
 
-// Debug route to list all available routes
+// Debug route to list all available routes (development only)
 d11Router.get("/debug-routes", (req: Request, res: Response) => {
   interface RouteInfo {
     path: string;
@@ -215,84 +261,9 @@ d11Router.get("/", (req: Request, res: Response) => {
 });
 
 /**
- * Fetch JSON data for nodes from Drupal 11
- * @param req - Express request object with query params: types, limit, fields
- * @param res - Express response object
- */
-d11Router.get("/transmit", async (req: Request, res: Response): Promise<void> => {
-  const { types = "article,page", limit = "10", fields = "title,body,field_image" } = req.query;
-
-  const fullEndpoint = `${DRUPAL_11_BASE_URL}/api/bulk-export`;
-  const params = new URLSearchParams({
-    types: types as string,
-    limit: limit as string,
-    fields: fields as string,
-  });
-
-  const config: AxiosRequestConfig = {
-    headers: {
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
-    httpsAgent,
-  };
-
-  try {
-    const response = await axios.get(`${fullEndpoint}?${params.toString()}`, config);
-    res.json(response.data);
-    return;
-  } catch (error) {
-    console.error("Error in /transmit:", error);
-    const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
-    res.status(status).json({
-      error: "Failed to fetch node data",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-    return;
-  }
-});
-
-/**
- * Update nodes in Drupal 11
- * @param req - Express request object with node data in the body
- * @param res - Express response object
- */
-d11Router.post("/update", async (req: Request, res: Response): Promise<void> => {
-  const { nodes } = req.body;
-
-  if (!nodes || !Array.isArray(nodes)) {
-    res.status(400).json({ error: "Missing nodes array in request body" });
-    return;
-  }
-
-  const fullEndpoint = `${DRUPAL_11_BASE_URL}/api/node-update`;
-
-  const config: AxiosRequestConfig = {
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
-    httpsAgent,
-  };
-
-  try {
-    const response = await axios.post(fullEndpoint, nodes, config);
-    res.json(response.data);
-    return;
-  } catch (error) {
-    console.error("Error in /update:", error);
-    const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
-    res.status(status).json({
-      error: "Failed to update nodes",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-    return;
-  }
-});
-
-/**
- * Fetch site structure from Drupal 11
- * This endpoint uses the Drupal 11 bulk export API
+ * Structure endpoint - fetches content from Drupal 11
+ * This endpoint uses the Drupal 11 bulk export API to fetch content.
+ * 
  * @param req - Express request object with query params: types, limit, fields
  * @param res - Express response object
  */
@@ -317,7 +288,6 @@ d11Router.get("/structure", async (req: Request, res: Response): Promise<void> =
   try {
     const response = await axios.get(`${fullEndpoint}?${params.toString()}`, config);
     res.json({ structure: response.data });
-    return;
   } catch (error) {
     console.error("Error in /structure:", error);
     const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
@@ -325,13 +295,9 @@ d11Router.get("/structure", async (req: Request, res: Response): Promise<void> =
       error: "Failed to fetch site structure",
       details: error instanceof Error ? error.message : "Unknown error",
     });
-    return;
   }
 });
 
-/**
- * Interface for site info response
- */
 interface SiteInfo {
   name: string;
   slogan: string;
@@ -655,14 +621,10 @@ d11Router.post("/import", async (req: Request, res: Response): Promise<void> => 
   }
 });
 
-// Backward compatibility endpoint
-d11Router.get("/transmit", (req: Request, res: Response): void => {
-  const { ...queryParams } = req.query;
-  const queryString = new URLSearchParams(
-    queryParams as Record<string, string>
-  ).toString();
-  res.redirect(`/structure?${queryString}`);
-});
+// Legacy endpoints have been removed. Please use the following endpoints instead:
+// - GET /structure - For content retrieval
+// - POST /node-update - For updating existing nodes
+// - POST /import - For creating new nodes
 
 // Health check endpoint
 d11Router.get("/hello", (_: Request, res: Response): void => {
