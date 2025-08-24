@@ -166,11 +166,17 @@ export const updateHomepage = onRequest(
         }
       );
 
-      const toolCalls = openAIResponse.data.choices[0]?.message?.tool_calls;
-      if (!toolCalls || !Array.isArray(toolCalls) || toolCalls.length === 0) {
-        sendSingleResponse(200, { message: "No actions to perform" });
+      const message = openAIResponse.data.choices[0]?.message;
+      
+      // If there are no tool calls, return the assistant's message
+      if (!message.tool_calls || message.tool_calls.length === 0) {
+        sendSingleResponse(200, { 
+          message: message.content || "No response from assistant"
+        });
         return;
       }
+      
+      const toolCalls = message.tool_calls;
 
       const results: ToolCallResult[] = [];
 
@@ -306,9 +312,9 @@ export const updateHomepage = onRequest(
         }
       }
 
-      // If we get here, all operations completed successfully
+      // Return the results of the operations
       sendSingleResponse(200, {
-        message: "All operations completed successfully",
+        message: message.content || "Operation completed",
         results: results,
       });
     } catch (error) {
