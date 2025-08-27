@@ -2,6 +2,9 @@ import axios from "axios";
 import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
 import type { Request, Response } from "express";
+// FormData will be used in the image upload process
+// @ts-ignore - FormData is used in the image upload process
+import * as FormData from 'form-data';
 
 // Define a type for our request body
 interface UpdateHomepageRequest extends Request {
@@ -36,6 +39,15 @@ interface DrupalResponse {
   };
 }
 
+interface GenerateImageRequest {
+  prompt: string;
+  drupalBaseUrl: string;
+  username: string;
+  password: string;
+  nodeId: string;
+  fieldName: string;
+}
+
 interface ToolCallResult<T = unknown> {
   function: string;
   success: boolean;
@@ -62,6 +74,148 @@ function sanitizeText(text: string): string {
 }
 
 // Standalone Firebase Function with built-in CORS
+/**
+ * Generates an image using OpenAI's DALL-E model and uploads it to Drupal
+ * @param prompt - The text prompt for image generation
+ * @param drupalBaseUrl - Base URL of the Drupal site
+ * @param username - Drupal username for authentication
+ * @param password - Drupal password for authentication
+ * @param nodeId - ID of the node to attach the image to
+ * @param fieldName - Name of the image field on the node
+ */
+// Generate and upload image handler
+async function generateAndUploadImageHandler(request: any, response: any): Promise<void> {
+  // Type assertion for request body
+  const body = request.body as GenerateImageRequest;
+  try {
+    const { prompt, drupalBaseUrl, username, password, nodeId, fieldName } = body;
+
+    // Validate required fields
+    if (!prompt || !drupalBaseUrl || !username || !password || !nodeId || !fieldName) {
+      return response.status(400).json({
+          success: false,
+          error: "Missing required parameters. Please provide prompt, drupalBaseUrl, username, password, nodeId, and fieldName."
+        });
+      }
+
+      // 1. Generate image using OpenAI
+      const imageResponse = await axios.post(
+        "https://api.openai.com/v1/images/generations",
+        {
+          model: "dall-e-3",
+          prompt: prompt,
+          n: 1,
+          size: "1024x1024",
+          quality: "standard",
+          response_format: "url"
+        },
+        {
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const imageUrl = imageResponse.data.data[0].url;
+      if (!imageUrl) {
+        throw new Error("No image URL returned from OpenAI");
+      }
+
+      // 2. Download the image
+      const imageBuffer = (await axios.get(imageUrl, { responseType: 'arraybuffer' })).data;
+
+      // 3. Get CSRF token from Drupal
+      const csrfResponse = await axios.get(`${drupalBaseUrl}/session/token`, {
+        auth: { username, password }
+      });
+      const csrfToken = csrfResponse.data;
+
+      // 4. Upload file to Drupal
+      const FormData = require('form-data');
+      const formData = new FormData();
+      formData.append('file', Buffer.from(imageBuffer), {
+        filename: `generated-${Date.now()}.png`,
+        contentType: 'image/png'
+      });
+
+      const uploadResponse = await axios.post(
+        `${drupalBaseUrl}/jsonapi/node/article/field_media/field_media_image`,
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders(),
+            'X-CSRF-Token': csrfToken,
+            'Accept': 'application/vnd.api+json',
+            'Authorization': `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
+          }
+        }
+      );
+
+      const fileId = uploadResponse.data.data.id;
+
+      // 5. Attach the file to the node
+      await axios.patch(
+        `${drupalBaseUrl}/jsonapi/node/article/${nodeId}`,
+        {
+          data: {
+            type: 'node--article',
+            id: nodeId,
+            relationships: {
+              [fieldName]: {
+                data: {
+                  type: 'file--file',
+                  id: fileId
+                }
+              }
+            }
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/vnd.api+json',
+            'X-CSRF-Token': csrfToken,
+            'Authorization': `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
+          }
+        }
+      );
+
+      return response.status(200).json({
+        success: true,
+        message: "Image generated and uploaded successfully",
+        fileId
+      });
+
+    } catch (error: any) {
+      console.error("Error in generateAndUploadImage:", error);
+      return response.status(500).json({
+        success: false,
+        error: error?.message || "Unknown error occurred"
+      });
+    }
+  }
+
+// Export the Firebase function
+export const generateAndUploadImage = onRequest(
+  { 
+    secrets: [openaiApiKey], 
+    cors: true,
+    region: 'europe-west1'
+  },
+  // Use any type to avoid type conflicts with Firebase v2 and Express
+  async (request: any, response: any) => {
+    try {
+      await generateAndUploadImageHandler(request, response);
+    } catch (error) {
+      console.error('Error in generateAndUploadImage:', error);
+      response.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+);
+
 export const updateHomepage = onRequest(
   {
     secrets: [openaiApiKey],
@@ -95,26 +249,28 @@ export const updateHomepage = onRequest(
       const openAIResponse = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
-          model: "gpt-4",
-          messages: [{ role: "user", content: prompt }],
+          model: "gpt-4o-mini", // or gpt-4-0613 if you want stability
+          messages: [
+            {
+              role: "system",
+              content: "You are an assistant that ONLY responds by calling one of the provided functions. Never reply in plain text."
+            },
+            { role: "user", content: prompt }
+          ],
           tools: [
             {
               type: "function",
               function: {
                 name: "update_homepage",
-                strict: false,
                 parameters: {
                   type: "object",
                   required: ["updateText"],
                   properties: {
-                    updateText: {
-                      type: "string",
-                      description: "The text to update the homepage with.",
-                    },
-                  },
+                    updateText: { type: "string", description: "The text to update the homepage with." }
+                  }
                 },
-                description: "Updates the homepage with the provided text.",
-              },
+                description: "Updates the homepage with the provided text."
+              }
             },
             {
               type: "function",
@@ -125,46 +281,30 @@ export const updateHomepage = onRequest(
                   type: "object",
                   required: ["title", "body", "ingredients", "instructions", "cooking_time", "servings"],
                   properties: {
-                    title: { type: "string", description: "The title of the recipe." },
-                    body: { type: "string", description: "A detailed description of the recipe." },
-                    ingredients: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "List of ingredients needed for the recipe.",
-                    },
-                    instructions: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "Step-by-step instructions for preparing the recipe.",
-                    },
-                    cooking_time: {
-                      type: "number",
-                      description: "Total cooking time in minutes.",
-                    },
-                    servings: {
-                      type: "number",
-                      description: "Number of servings the recipe makes.",
-                    },
-                    difficulty: {
-                      type: "string",
-                      enum: ["easy", "medium", "hard"],
-                      description: "Difficulty level of the recipe.",
-                    },
-                  },
-                },
-              },
-            },
+                    title: { type: "string" },
+                    body: { type: "string" },
+                    ingredients: { type: "array", items: { type: "string" } },
+                    instructions: { type: "array", items: { type: "string" } },
+                    cooking_time: { type: "integer" },
+                    servings: { type: "integer" },
+                    difficulty: { type: "string", enum: ["easy", "medium", "hard"] }
+                  }
+                }
+              }
+            }
           ],
-          temperature: 1,
-          max_tokens: 2048,
+          tool_choice: { type: "function", function: { name: "create_recipe" } }, // force recipe calls
+          temperature: 0.7,
+          max_tokens: 1024
         },
         {
           headers: {
             "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+            "Content-Type": "application/json"
+          }
         }
       );
+      
 
       const message = openAIResponse.data.choices[0]?.message;
       
