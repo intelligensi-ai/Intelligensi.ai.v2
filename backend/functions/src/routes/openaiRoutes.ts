@@ -2,9 +2,6 @@ import axios from "axios";
 import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
 import type { Request, Response } from "express";
-// FormData will be used in the image upload process
-// @ts-ignore - FormData is used in the image upload process
-import * as FormData from 'form-data';
 
 // Define a type for our request body
 interface UpdateHomepageRequest extends Request {
@@ -39,15 +36,6 @@ interface DrupalResponse {
   };
 }
 
-interface GenerateImageRequest {
-  prompt: string;
-  drupalBaseUrl: string;
-  username: string;
-  password: string;
-  nodeId: string;
-  fieldName: string;
-}
-
 interface ToolCallResult<T = unknown> {
   function: string;
   success: boolean;
@@ -72,149 +60,6 @@ const sendResponse = <T>(res: Response, status: number, data: T): void => {
 function sanitizeText(text: string): string {
   return text.replace(/<[^>]*>?/gm, "");
 }
-
-// Standalone Firebase Function with built-in CORS
-/**
- * Generates an image using OpenAI's DALL-E model and uploads it to Drupal
- * @param prompt - The text prompt for image generation
- * @param drupalBaseUrl - Base URL of the Drupal site
- * @param username - Drupal username for authentication
- * @param password - Drupal password for authentication
- * @param nodeId - ID of the node to attach the image to
- * @param fieldName - Name of the image field on the node
- */
-// Generate and upload image handler
-async function generateAndUploadImageHandler(request: any, response: any): Promise<void> {
-  // Type assertion for request body
-  const body = request.body as GenerateImageRequest;
-  try {
-    const { prompt, drupalBaseUrl, username, password, nodeId, fieldName } = body;
-
-    // Validate required fields
-    if (!prompt || !drupalBaseUrl || !username || !password || !nodeId || !fieldName) {
-      return response.status(400).json({
-          success: false,
-          error: "Missing required parameters. Please provide prompt, drupalBaseUrl, username, password, nodeId, and fieldName."
-        });
-      }
-
-      // 1. Generate image using OpenAI
-      const imageResponse = await axios.post(
-        "https://api.openai.com/v1/images/generations",
-        {
-          model: "dall-e-3",
-          prompt: prompt,
-          n: 1,
-          size: "1024x1024",
-          quality: "standard",
-          response_format: "url"
-        },
-        {
-          headers: {
-            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const imageUrl = imageResponse.data.data[0].url;
-      if (!imageUrl) {
-        throw new Error("No image URL returned from OpenAI");
-      }
-
-      // 2. Download the image
-      const imageBuffer = (await axios.get(imageUrl, { responseType: 'arraybuffer' })).data;
-
-      // 3. Get CSRF token from Drupal
-      const csrfResponse = await axios.get(`${drupalBaseUrl}/session/token`, {
-        auth: { username, password }
-      });
-      const csrfToken = csrfResponse.data;
-
-      // 4. Upload file to Drupal
-      const FormData = require('form-data');
-      const formData = new FormData();
-      formData.append('file', Buffer.from(imageBuffer), {
-        filename: `generated-${Date.now()}.png`,
-        contentType: 'image/png'
-      });
-
-      const uploadResponse = await axios.post(
-        `${drupalBaseUrl}/jsonapi/node/article/field_media/field_media_image`,
-        formData,
-        {
-          headers: {
-            ...formData.getHeaders(),
-            'X-CSRF-Token': csrfToken,
-            'Accept': 'application/vnd.api+json',
-            'Authorization': `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
-          }
-        }
-      );
-
-      const fileId = uploadResponse.data.data.id;
-
-      // 5. Attach the file to the node
-      await axios.patch(
-        `${drupalBaseUrl}/jsonapi/node/article/${nodeId}`,
-        {
-          data: {
-            type: 'node--article',
-            id: nodeId,
-            relationships: {
-              [fieldName]: {
-                data: {
-                  type: 'file--file',
-                  id: fileId
-                }
-              }
-            }
-          }
-        },
-        {
-          headers: {
-            'Content-Type': 'application/vnd.api+json',
-            'X-CSRF-Token': csrfToken,
-            'Authorization': `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
-          }
-        }
-      );
-
-      return response.status(200).json({
-        success: true,
-        message: "Image generated and uploaded successfully",
-        fileId
-      });
-
-    } catch (error: any) {
-      console.error("Error in generateAndUploadImage:", error);
-      return response.status(500).json({
-        success: false,
-        error: error?.message || "Unknown error occurred"
-      });
-    }
-  }
-
-// Export the Firebase function
-export const generateAndUploadImage = onRequest(
-  { 
-    secrets: [openaiApiKey], 
-    cors: true,
-    region: 'europe-west1'
-  },
-  // Use any type to avoid type conflicts with Firebase v2 and Express
-  async (request: any, response: any) => {
-    try {
-      await generateAndUploadImageHandler(request, response);
-    } catch (error) {
-      console.error('Error in generateAndUploadImage:', error);
-      response.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  }
-);
 
 export const updateHomepage = onRequest(
   {
@@ -385,47 +230,60 @@ export const updateHomepage = onRequest(
               field_preparation_time: prepTime,
               field_number_of_servings: recipeData.servings || 1,
               field_difficulty: recipeData.difficulty || "medium",
-              field_recipe_category: "main", // Default category
+              "field_recipe_category": {
+                "data": {
+                  "type": "taxonomy_term--recipe_category",
+                  "id": "main"
+                }
+              }, // Default category
             };
 
-            console.log("Drupal payload:", JSON.stringify(recipe, null, 2));
+            console.log("Recipe data prepared:", JSON.stringify(recipe, null, 2));
 
-            // Create the node object with type and title at root level
-            const node = {
-              type: "node--recipe", // Drupal content type with bundle prefix
-              id: `create-${Date.now()}`,
-              attributes: {
-                title: recipe.title,
-                status: 1,
-                body: recipe.body,
-                field_summary: recipe.field_summary,
-                field_ingredients: recipe.field_ingredients,
-                field_recipe_instruction: recipe.field_recipe_instruction,
-                field_cooking_time: recipe.field_cooking_time,
-                field_preparation_time: recipe.field_preparation_time,
-                field_number_of_servings: recipe.field_number_of_servings,
-                field_difficulty: recipe.field_difficulty,
-                field_recipe_category: recipe.field_recipe_category,
-              },
-            };
+            // Format ingredients as array of objects with value property
+            const ingredients = recipe.field_ingredients
+              .split('\n')
+              .filter((i: string) => i.trim())
+              .map((ingredient: string) => ({
+                value: ingredient.trim()
+              }));
 
-            // Clean up any undefined attributes
-            Object.keys(node.attributes).forEach((key) => {
-              if ((node.attributes as Record<string, unknown>)[key] === undefined) {
-                delete (node.attributes as Record<string, unknown>)[key];
-              }
-            });
+            // Format instructions as array of objects with value property
+            const instructions = recipe.field_recipe_instruction
+              .replace(/<\/?p>/g, '') // Remove <p> tags
+              .split('.')
+              .filter((i: string) => i.trim())
+              .map((instruction: string) => ({
+                value: instruction.trim() + '.' // Add back the period
+              }));
 
-            const nodes = [node];
-
-            console.log("Sending to Drupal 11:", JSON.stringify(nodes, null, 2));
-
+            // Create the node object matching the working curl example format
+          const node = [
+  {
+    type: "recipe",
+    attributes: {
+      title: recipe.title,
+      body: {
+        value: recipe.body,
+        format: "full_html"
+      },
+      status: 1, // make sure it's inside attributes
+    },
+    field_ingredients: ingredients,
+    field_instructions: instructions,
+    field_cooking_time: { value: Number(recipe.field_cooking_time) },
+    field_servings: { value: Number(recipe.field_number_of_servings) },
+    field_difficulty: { value: recipe.field_difficulty }
+  }
+];
+            
             const drupalResponse = await axios.post(
               "http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/node-update",
-              nodes,
+              node,
               {
                 headers: {
-                  "Content-Type": "application/json",
+                  "Content-Type": "application/json", // match curl
+                  "Accept": "application/json"
                 },
               }
             );
