@@ -257,26 +257,37 @@ export const updateHomepage = onRequest(
                 value: instruction.trim() + '.' // Add back the period
               }));
 
-            // Create the node object matching the working curl example format
-          const node = [
-  {
-    type: "recipe",
-    attributes: {
-      title: recipe.title,
-      body: {
-        value: recipe.body,
-        format: "full_html"
-      },
-      status: 1, // make sure it's inside attributes
-    },
-    field_ingredients: ingredients,
-    field_instructions: instructions,
-    field_cooking_time: { value: Number(recipe.field_cooking_time) },
-    field_servings: { value: Number(recipe.field_number_of_servings) },
-    field_difficulty: { value: recipe.field_difficulty }
-  }
-];
-            
+              const node = [
+                {
+                  type: "recipe",
+                  title: recipe.title,
+                  body: {
+                    value: recipe.body,
+                    format: "full_html"
+                  },
+                  status: 1,
+                  moderation_state: "published",
+                  field_summary: recipe.field_summary || recipe.body.substring(0, 200) + "...",
+                  field_ingredients: ingredients, // array of { value }
+                  field_instructions: instructions, // array of { value }
+                  field_cooking_time: { value: Number(recipe.field_cooking_time) },
+                  field_preparation_time: { value: Number(recipe.field_preparation_time || 10) },
+                  field_number_of_servings: { value: Number(recipe.field_number_of_servings) },
+                  field_difficulty: { value: recipe.field_difficulty || "medium" },
+                  field_recipe_instruction: {
+                    value: instructionsHtml,
+                    format: "full_html" // ✅ ensures HTML is rendered
+                  },
+                  field_recipe_category: recipe.field_recipe_category || {
+                    data: {
+                      type: "taxonomy_term--recipe_category",
+                      id: "main"
+                    }
+                  }
+                }
+              ];
+              
+                            
             const drupalResponse = await axios.post(
               "http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/node-update",
               node,
