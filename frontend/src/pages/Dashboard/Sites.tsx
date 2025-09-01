@@ -548,6 +548,17 @@ const Sites: React.FC<SitesProps> = ({
                       <p className="text-xs text-gray-400 mb-0.5">Description</p>
                       <p className="text-sm text-gray-200">{selectedSite.description}</p>
                     </div>
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Link to site</p>
+                      <a 
+                        href={selectedSite.site_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-400 hover:underline"
+                      >
+                        {selectedSite.site_url?.replace(/^https?:\/\//, '')}
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
