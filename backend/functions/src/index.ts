@@ -13,6 +13,8 @@ import { createSchema } from "./routes/schemaRoutes";
 import { deleteSite } from "./routes/siteRoutes";
 import { createDrupalSite } from "./routes/windsailRoutes";
 import { simpleSearch } from "./routes/WeaviatesSimplesearch";
+import { generateImage, openaiApiKey } from "./services/openaiImageGenerator";
+import OpenAI from "openai";
 
 // New routes/imports from ea22d36
 import authRouter from "./routes/authRoutes";
@@ -67,8 +69,56 @@ export const healthcheck = onRequest((req, res) => {
   res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
+// HTTP endpoint for generateImage
+const generateImageHttp = onRequest(
+  {
+    secrets: [openaiApiKey],
+    cors: true,
+  },
+  async (req: any, res: any) => {  // Using 'any' type to avoid Express type conflicts
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    try {
+      // Directly call the OpenAI API instead of the callable function
+      const { prompt, n = 1, size = '1024x1024', response_format = 'url' } = req.body.data || {};
+      
+      if (!prompt) {
+        res.status(400).json({ error: 'Prompt is required' });
+        return;
+      }
+
+      const openai = new OpenAI({
+        apiKey: openaiApiKey.value(),
+      });
+
+      const image = await openai.images.generate({
+        model: 'dall-e-3',
+        prompt,
+        n: Math.min(Number(n), 4), // Ensure n is a number and max 4
+        size,
+        response_format,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: image.data,
+      });
+    } catch (error: any) {
+      console.error('Error in generateImageHttp:', error);
+      res.status(500).json({
+        error: error.message || 'Internal server error',
+        details: error.details || {}
+      });
+    }
+  }
+);
+
 // Export all functions
-export {
+export { generateImage, generateImageHttp,
   updateHomepage,
   fetchusers,
   updateuser,
@@ -84,5 +134,3 @@ export {
 
 // Export ThemeCraft functions
 // export const { scanWebsiteTheme, getUserThemeScans } = themeCraftFunctions;
-
-
