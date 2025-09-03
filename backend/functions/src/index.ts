@@ -75,19 +75,20 @@ const generateImageHttp = onRequest(
     secrets: [openaiApiKey],
     cors: true,
   },
-  async (req: any, res: any) => {  // Using 'any' type to avoid Express type conflicts
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async (req: any, res: any) => {
     // Only allow POST requests
-    if (req.method !== 'POST') {
-      res.status(405).json({ error: 'Method not allowed' });
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
       return;
     }
 
     try {
       // Directly call the OpenAI API instead of the callable function
-      const { prompt, n = 1, size = '1024x1024', response_format = 'url' } = req.body.data || {};
-      
+      const { prompt, n = 1, size = "1024x1024", response_format: responseFormat = "url" } = req.body.data || {};
+
       if (!prompt) {
-        res.status(400).json({ error: 'Prompt is required' });
+        res.status(400).json({ error: "Prompt is required" });
         return;
       }
 
@@ -96,22 +97,24 @@ const generateImageHttp = onRequest(
       });
 
       const image = await openai.images.generate({
-        model: 'dall-e-3',
+        model: "dall-e-3",
         prompt,
         n: Math.min(Number(n), 4), // Ensure n is a number and max 4
         size,
-        response_format,
+        response_format: responseFormat,
       });
 
       res.status(200).json({
         success: true,
         data: image.data,
       });
-    } catch (error: any) {
-      console.error('Error in generateImageHttp:', error);
+    } catch (error: unknown) {
+      console.error("Error in generateImageHttp:", error);
       res.status(500).json({
-        error: error.message || 'Internal server error',
-        details: error.details || {}
+        error: error instanceof Error ? error.message : "Internal server error",
+        details: error && typeof error === "object" && "details" in error ?
+          (error as { details: Record<string, unknown> }).details :
+          {},
       });
     }
   }

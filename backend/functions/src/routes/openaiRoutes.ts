@@ -1,14 +1,33 @@
 import axios from "axios";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
+// Using any for request/response types to avoid type conflicts with Firebase Functions v2
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Request = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Response = any;
 
 /**
  * Helper function to send consistent JSON responses
+ * @param {import('firebase-functions/v2/https').Response} res - The response object
+ * @param {number} status - HTTP status code
+ * @param {unknown} data - Data to send in the response
+ * @returns {void}
  */
-function sendResponse(res: any, status: number, data: unknown): void {
+/**
+ * Helper function to send consistent JSON responses
+ * @param {Response} res - The Express response object
+ * @param {number} status - HTTP status code
+ * @param {unknown} data - Data to send in the response
+ */
+function sendResponse(
+  res: Response,
+  status: number,
+  data: unknown
+): void {
   res.status(status).json({
     success: status >= 200 && status < 300,
-    data
+    data,
   });
 }
 
@@ -67,8 +86,14 @@ export const updateHomepage = onRequest(
     secrets: [openaiApiKey],
     cors: true,
   },
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     let responseSent = false;
+
+    /**
+     * Sends a single response and prevents multiple responses
+     * @param {number} status - HTTP status code
+     * @param {unknown} data - Data to send in the response
+     */
     function sendSingleResponse(status: number, data: unknown): void {
       if (responseSent) return;
       responseSent = true;
@@ -87,14 +112,18 @@ export const updateHomepage = onRequest(
         return;
       }
 
+      const systemMessage = {
+        role: "system" as const,
+        content: "You are an assistant that ONLY responds by calling one of the provided functions. " +
+          "Never reply in plain text.",
+      };
+      const userMessage = { role: "user" as const, content: prompt };
+
       const openAIResponse = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
           model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: "You are an assistant that ONLY responds by calling one of the provided functions. Never reply in plain text." },
-            { role: "user", content: prompt }
-          ],
+          messages: [systemMessage, userMessage],
           tools: [
             {
               type: "function",
@@ -103,10 +132,15 @@ export const updateHomepage = onRequest(
                 parameters: {
                   type: "object",
                   required: ["updateText"],
-                  properties: { updateText: { type: "string", description: "The text to update the homepage with." } }
+                  properties: {
+                    updateText: {
+                      type: "string",
+                      description: "The text to update the homepage with.",
+                    },
+                  },
                 },
-                description: "Updates the homepage with the provided text."
-              }
+                description: "Updates the homepage with the provided text.",
+              },
             },
             {
               type: "function",
@@ -117,7 +151,11 @@ export const updateHomepage = onRequest(
                   type: "object",
                   required: ["content_type", "title", "body"],
                   properties: {
-                    content_type: { type: "string", enum: ["recipe", "article", "page"], description: "The type of content to create." },
+                    content_type: {
+                      type: "string",
+                      enum: ["recipe", "article", "page"],
+                      description: "The type of content to create.",
+                    },
                     title: { type: "string" },
                     body: { type: "string" },
                     ingredients: { type: "array", items: { type: "string" } },
@@ -125,17 +163,20 @@ export const updateHomepage = onRequest(
                     cooking_time: { type: "integer" },
                     prep_time: { type: "integer" },
                     servings: { type: "integer" },
-                    difficulty: { type: "string", enum: ["easy","medium","hard"] },
+                    difficulty: {
+                      type: "string",
+                      enum: ["easy", "medium", "hard"],
+                    },
                     tags: { type: "array", items: { type: "string" } },
-                    image: { type: "string" }
-                  }
-                }
-              }
-            }
+                    image: { type: "string" },
+                  },
+                },
+              },
+            },
           ],
           tool_choice: { type: "function", function: { name: "create_content" } },
           temperature: 0.7,
-          max_tokens: 1024
+          max_tokens: 1024,
         },
         { headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" } }
       );
@@ -160,16 +201,20 @@ export const updateHomepage = onRequest(
           const updateText = args.text || "";
           const sanitizedText = sanitizeText(updateText);
           console.log("update_homepage called with args:", args);
-          results.push({ function: "update_homepage", success: true, message: `Homepage updated with: ${sanitizedText}`, data: args });
-        }
-
-        else if (toolCall.function.name === "create_content") {
+          results.push({
+            function: "update_homepage",
+            success: true,
+            message: `Homepage updated with: ${sanitizedText}`,
+            data: args,
+          });
+        } else if (toolCall.function.name === "create_content") {
           console.log("create_content called with args:", args);
 
-          // Prepare recipe-specific data if content_type is recipe
-          let node: any = {};
+          // Using Record<string, unknown> for dynamic object structure
+          let node: Array<Record<string, unknown>> = [];
+
           if (args.content_type === "recipe") {
-            const summary = args.summary || (args.body ? args.body.substring(0,200) + "..." : "No summary");
+            const summary = args.summary || (args.body ? args.body.substring(0, 200) + "..." : "No summary");
             const ingredients = (args.ingredients || []).filter(Boolean).map((v: string) => ({ value: v }));
             const instructionsHtml = (args.instructions || []).map((step: string) => `<p>${step}</p>`).join("");
             const instructions = (args.instructions || []).filter(Boolean).map((step: string) => ({ value: step }));
@@ -178,7 +223,7 @@ export const updateHomepage = onRequest(
               {
                 type: "recipe",
                 title: args.title,
-                body: { value: args.body, format: "full_html" },
+                body: { value: args.body, format: "full_html" }, // ✅ always correct shape
                 status: 1,
                 moderation_state: "published",
                 field_summary: summary,
@@ -189,30 +234,52 @@ export const updateHomepage = onRequest(
                 field_preparation_time: { value: Number(args.prep_time || instructions.length || 10) },
                 field_number_of_servings: { value: Number(args.servings || 1) },
                 field_difficulty: { value: args.difficulty || "medium" },
-                field_recipe_category: { data: { type: "taxonomy_term--recipe_category", id: "main" } }
-              }
+                field_recipe_category: { data: { type: "taxonomy_term--recipe_category", id: "main" } },
+              },
             ];
-          }
-
-          // Future: handle articles/pages here similarly
-          else if (args.content_type === "article" || args.content_type === "page") {
+          } else if (args.content_type === "article") {
             node = [
               {
-                type: args.content_type,
+                type: "article",
                 title: args.title,
-                body: { value: args.body, format: "full_html" },
+                field_body: [
+                  {
+                    value: args.body,
+                    format: "basic_html"
+                  }
+                ],
                 status: 1,
                 moderation_state: "published",
                 field_tags: (args.tags || []).map((t: string) => ({ value: t })),
-                field_image: args.image ? { uri: args.image } : undefined
-              }
+                field_image: args.image ? { uri: args.image } : undefined,
+              },
+            ];
+          } else if (args.content_type === "page") {
+            node = [
+              {
+                type: "page",
+                title: args.title,
+                field_body: [
+                  {
+                    value: args.body,
+                    format: "basic_html"
+                  }
+                ],
+                status: 1,
+                moderation_state: "published",
+              },
             ];
           }
 
           const drupalResponse = await axios.post(
             "http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/node-update",
-            node,
-            { headers: { "Content-Type": "application/json", "Accept": "application/json" } }
+            node, // Send the node array directly as expected by the endpoint
+            {
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+              },
+            }
           );
 
           console.log("Drupal response:", JSON.stringify(drupalResponse.data, null, 2));
@@ -220,19 +287,26 @@ export const updateHomepage = onRequest(
           results.push({
             function: "create_content",
             success: true,
-            message: `Content "${args.title}" created successfully`,
+            message: `✅ Created ${args.content_type} "${args.title}"`,
             type: args.content_type,
             content: args,
-            drupalResponse: drupalResponse.data
+            drupalResponse: drupalResponse.data,
           });
         }
       }
 
-      sendSingleResponse(200, { message: message.content || "Operation completed", results });
+      sendSingleResponse(200, {
+        message: message.content || "Operation completed",
+        results,
+      });
     } catch (error) {
       console.error("Error in updateHomepage:", error);
-      sendSingleResponse(500, { error: "Internal server error", message: error instanceof Error ? error.message : "Unknown error" });
-    }
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      sendSingleResponse(500, {
+        error: "Internal server error",
+        message: errorMessage,
+      });
+      }
   }
 );
 
