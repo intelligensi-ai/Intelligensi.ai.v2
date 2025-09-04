@@ -36,10 +36,12 @@
  * - DRUPAL_11_BASE_URL: Base URL of the Drupal 11 instance
  */
 
-import express, { Request, Response, NextFunction } from "express";
-import axios, { AxiosRequestConfig, isAxiosError } from "axios";
-import https from "https";
+import express, { Request, Response, RequestHandler, NextFunction } from "express";
+import axios, { isAxiosError, AxiosRequestConfig } from "axios";
+import * as https from "https";
 import { onRequest } from "firebase-functions/v2/https";
+import FormData from "form-data";
+import { Readable } from "stream";
 
 // Drupal 11 base URL - hardcoded as per requirements
 const DRUPAL_11_BASE_URL = "https://umami-intelligensi.ai.ddev.site";
@@ -111,126 +113,68 @@ const createDrupalClient = () => {
  * - Schema generation and validation
  * - System health checks
  */
-const d11Router = express.Router();
+export const d11Router = express.Router();
 
 // Debug route to list all available routes (development only)
 d11Router.get("/debug-routes", (req: Request, res: Response) => {
+  // Define a simple interface for the route information
   interface RouteInfo {
     path: string;
-    methods: { [method: string]: boolean };
+    methods: string[];
   }
 
+  // Get all registered routes
   const routes: RouteInfo[] = [];
 
-  // Type assertion for accessing private _router property
-  const routerStack = (d11Router as unknown as { _router: { stack: unknown[] } })._router.stack;
+  // Type for Express router layer
+  interface ExpressLayer {
+    route?: {
+      path: string;
+      methods: { [methodName: string]: boolean };
+      stack: ExpressLayer[];
+    };
+    name: string;
+    handle: RequestHandler | ExpressLayer;
+    regexp: RegExp;
+    keys: any[];
+    params: any;
+    method: string;
+  }
 
-  routerStack.forEach((middleware: unknown) => {
-    if (middleware && typeof middleware === "object" && "route" in middleware) {
-      // Routes registered directly on the router
-      const mw = middleware as { route: { path: string; methods: { [method: string]: boolean } } };
-      routes.push({ path: mw.route.path, methods: mw.route.methods });
-    } else if (
-      middleware &&
-      typeof middleware === "object" &&
-      "name" in middleware &&
-      middleware.name === "router" &&
-      "handle" in middleware &&
-      typeof middleware.handle === "object" &&
-      middleware.handle !== null &&
-      "stack" in middleware.handle &&
-      Array.isArray(middleware.handle.stack)
-    ) {
-      // Nested routers
-      interface RouteHandler {
-        route?: {
-          path: string;
-          methods: { [method: string]: boolean };
-        };
-      }
-      interface NestedRouter {
-        handle: {
-          stack: RouteHandler[];
-        };
-      }
-      const nestedRouter = middleware as NestedRouter;
-      nestedRouter.handle.stack.forEach((handler) => {
-        if (handler.route) {
-          routes.push({ path: handler.route.path, methods: handler.route.methods });
+  (d11Router as any)._router.stack.forEach((layer: ExpressLayer) => {
+    if (layer.route) {
+      // It's a route
+      const methods = Object.keys(layer.route.methods).map((method) => method.toUpperCase());
+      routes.push({
+        path: layer.route.path,
+        methods: methods,
+      });
+    } else if (layer.name === "router" && (layer.handle as any).stack) {
+      // It's a router mounted on a path
+      (layer.handle as any).stack.forEach((nestedLayer: ExpressLayer) => {
+        if (nestedLayer.route) {
+          const methods = Object.keys(nestedLayer.route.methods).map((method) => method.toUpperCase());
+          routes.push({
+            path: nestedLayer.route.path,
+            methods: methods,
+          });
         }
       });
     }
   });
 
+  // Send the response with all routes
   res.json({
-    message: "Registered routes in drupal11Router",
-    routes: routes.map((r) => ({
-      path: r.path,
-      methods: Object.keys(r.methods).filter((m) => r.methods[m]),
-    })),
-  });
-});
-
-// Debug route to list all available routes
-d11Router.get("/debug-routes", (req, res) => {
-  // Define interfaces for Express layer and route objects
-  interface ExpressRoute {
-    path: string;
-    methods: { [method: string]: boolean };
-    stack: unknown[];
-  }
-
-  interface ExpressLayer {
-    name: string;
-    regexp: RegExp;
-    keys: Array<{ name: string | number }>;
-    route?: ExpressRoute;
-  }
-
-  // First, log all layers in the router stack for debugging
-  console.log("[D11 Debug] Router stack layers:");
-  (d11Router.stack as unknown as ExpressLayer[]).forEach((layer, index) => {
-    console.log(`[${index}]`, {
-      name: layer.name,
-      path: layer.route?.path,
-      methods: layer.route?.methods ? Object.keys(layer.route.methods) : "middleware",
-      regexp: layer.regexp?.toString(),
-      keys: layer.keys,
-    });
-  });
-
-  // Also include all methods for each path
-  const routesByPath = new Map<string, string[]>();
-  (d11Router.stack as unknown as ExpressLayer[]).forEach((layer) => {
-    if (layer.route) {
-      const methods = Object.keys(layer.route.methods).map((m) => m.toUpperCase());
-      const existing = routesByPath.get(layer.route.path) || [];
-      routesByPath.set(layer.route.path, [...new Set([...existing, ...methods])]);
-    }
-  });
-
-  const routesWithMethods = Array.from(routesByPath.entries()).map(([path, methods]) => ({
-    path,
-    methods: methods.sort(),
-  }));
-
-  res.json({
+    status: "success",
     message: "Available routes in Drupal 11 router",
-    routes: routesWithMethods,
-    baseUrl: req.baseUrl || "/",
-    originalUrl: req.originalUrl || req.url,
-    path: req.path,
-    url: req.url,
-    headers: req.headers,
-    routerStack: (d11Router.stack as unknown as ExpressLayer[]).map((layer) => ({
-      name: layer.name,
-      path: layer.route?.path,
-      methods: layer.route?.methods ?
-        Object.keys(layer.route.methods) :
-        "middleware",
-      regexp: layer.regexp?.toString(),
-      keys: layer.keys,
-    })),
+    routes: routes,
+    request: {
+      baseUrl: req.baseUrl || "/",
+      originalUrl: req.originalUrl || req.url,
+      path: req.path,
+      url: req.url,
+      headers: req.headers,
+    },
   });
 });
 
@@ -238,6 +182,152 @@ d11Router.get("/debug-routes", (req, res) => {
 d11Router.use((req: Request, res: Response, next: NextFunction): void => {
   console.log(`[D11] ${req.method} ${req.path}`, req.query || req.body);
   next();
+});
+
+/**
+ * Upload image to Drupal
+ * POST /uploadimage
+ * Body: {
+ *   imagePath: string,  // URL of the image to upload
+ *   siteUrl: string,    // Base URL of the Drupal site
+ *   altText: string     // Alternative text for the image
+ * }
+ */
+d11Router.post("/uploadimage", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { imagePath, siteUrl, altText } = req.body;
+
+    // Validate required fields
+    if (!imagePath || !siteUrl) {
+      res.status(400).json({
+        status: "error",
+        message: "imagePath and siteUrl are required",
+      });
+      return;
+    }
+
+    // Create a client with the provided site URL
+    const client = axios.create({
+      baseURL: siteUrl,
+      httpsAgent,
+      headers: {
+        "Content-Type": "application/octet-stream",
+      },
+      maxRedirects: 5,
+      timeout: 30000,
+    });
+
+    // Download the image
+    const imageResponse = await axios.get(imagePath, {
+      responseType: "arraybuffer",
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+    });
+
+    const imageBuffer = Buffer.from(imageResponse.data, "binary");
+    const fileName = imagePath.split("/").pop() || `image-${Date.now()}.jpg`;
+
+    // Create a readable stream from the buffer
+    const imageStream = new Readable();
+    imageStream.push(imageBuffer);
+    imageStream.push(null); // Signal end of stream
+
+    // Create form data
+    const formData = new FormData();
+    formData.append("file", imageBuffer, {
+      filename: fileName,
+      contentType: imageResponse.headers["content-type"] || "image/jpeg",
+      knownLength: imageBuffer.length,
+    });
+
+    // Get form data headers
+    const formHeaders = formData.getHeaders();
+
+    // Upload to Drupal's media endpoint
+    // For Drupal 11, we'll use the JSON:API file upload endpoint
+    const uploadResponse = await client.post<{
+      data: {
+        id: string;
+        type: string;
+        attributes: {
+          uri: {
+            value: string;
+            url: string;
+          };
+          filename: string;
+          filemime: string;
+          filesize: number;
+          status: boolean;
+        };
+      };
+    }>(
+      "/jsonapi/file/upload",
+      formData,
+      {
+        headers: {
+          ...formHeaders,
+          "Content-Length": formData.getLengthSync().toString(),
+        },
+      }
+    );
+
+    if (!uploadResponse.data?.data?.id) {
+      throw new Error("Failed to upload file: Invalid response from server");
+    }
+
+    // Create media entity with the uploaded file
+    const mediaData = {
+      data: {
+        type: "media--image",
+        attributes: {
+          name: fileName,
+          bundle: "image",
+          field_media_image: {
+            data: {
+              type: "file--file",
+              id: uploadResponse.data.data.id,
+              meta: {
+                alt: altText || "",
+                title: altText || "",
+              },
+            },
+          },
+        },
+      },
+    };
+
+    // Create the media entity
+    await client.post("/jsonapi/media/image", mediaData, {
+      headers: {
+        "Content-Type": "application/vnd.api+json",
+        "Accept": "application/vnd.api+json",
+      },
+    });
+
+    // Return the uploaded file information
+    const responseData = {
+      status: "success",
+      message: "Image uploaded successfully",
+      data: {
+        fid: uploadResponse.data.data.id,
+        url: `${siteUrl}${uploadResponse.data.data.attributes.uri.url}`,
+        alt: altText || "",
+      },
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error("Error uploading image:", error);
+    const status = isAxiosError(error) ? error.response?.status || 500 : 500;
+    const message = isAxiosError(error) ?
+      error.response?.data?.message || error.message :
+      "Failed to upload image";
+
+    res.status(status).json({
+      status: "error",
+      message,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 });
 
 // Root path handler
@@ -631,8 +721,8 @@ d11Router.get("/hello", (_: Request, res: Response): void => {
   res.json({ message: "Drupal 11 Bridge is running" });
 });
 
-// Export the router and the function
-export { d11Router, generateDrupal11Schema };
+// Export the schema generation function
+export { generateDrupal11Schema };
 
 // Firebase function to generate schema from Drupal 11 site
 const generateDrupal11Schema = onRequest(

@@ -14,6 +14,7 @@ import { deleteSite } from "./routes/siteRoutes";
 import { createDrupalSite } from "./routes/windsailRoutes";
 import { simpleSearch } from "./routes/WeaviatesSimplesearch";
 import { generateImage, openaiApiKey } from "./services/openaiImageGenerator";
+import { uploadImage } from "./services/imageUpload";
 import OpenAI from "openai";
 
 // New routes/imports from ea22d36
@@ -133,6 +134,7 @@ export { generateImage, generateImageHttp,
   deleteSite,
   createDrupalSite,
   simpleSearch,
+  uploadImage,
 };
 
 // Export ThemeCraft functions

@@ -1,27 +1,23 @@
 import axios from "axios";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
-// Using any for request/response types to avoid type conflicts with Firebase Functions v2
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Request = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Response = any;
+import { storage } from "../firebase";
+
+// Clean up any remaining temp files if needed
+if (process.env.NODE_ENV === "development" || process.env.FUNCTIONS_EMULATOR === "true") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+// Response type is provided by Firebase Functions v2
+// No need to define it explicitly
 
 /**
  * Helper function to send consistent JSON responses
- * @param {import('firebase-functions/v2/https').Response} res - The response object
- * @param {number} status - HTTP status code
- * @param {unknown} data - Data to send in the response
- * @returns {void}
- */
-/**
- * Helper function to send consistent JSON responses
- * @param {Response} res - The Express response object
+ * @param {Response} res - The response object
  * @param {number} status - HTTP status code
  * @param {unknown} data - Data to send in the response
  */
 function sendResponse(
-  res: Response,
+  res: { status: (code: number) => { json: (data: unknown) => void } },
   status: number,
   data: unknown
 ): void {
@@ -33,6 +29,9 @@ function sendResponse(
 
 // Define Firebase secret
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
+
+// Drupal site URL
+const DRUPAL_SITE_URL = "https://umami-intelligensi.ai.ddev.site";
 
 // Define types for better type safety
 interface Recipe {
@@ -80,27 +79,17 @@ function sanitizeText(text: string): string {
   return text.replace(/<[^>]*>?/gm, "");
 }
 
-// ... rest of the handler code
+// Main function to handle the request
 export const updateHomepage = onRequest(
   {
     secrets: [openaiApiKey],
     cors: true,
   },
-  async (req: Request, res: Response) => {
-    let responseSent = false;
-
-    /**
-     * Sends a single response and prevents multiple responses
-     * @param {number} status - HTTP status code
-     * @param {unknown} data - Data to send in the response
-     */
-    function sendSingleResponse(status: number, data: unknown): void {
-      if (responseSent) return;
-      responseSent = true;
-      sendResponse(res, status, data);
-    }
-
+  async (req, res) => {
     try {
+      const results: ToolCallResult[] = [];
+      const responseSent = false;
+
       if (req.method === "OPTIONS") {
         res.status(204).send("");
         return;
@@ -108,8 +97,7 @@ export const updateHomepage = onRequest(
 
       const { prompt } = req.body || {};
       if (!prompt) {
-        sendSingleResponse(400, { error: "Prompt is required" });
-        return;
+        return sendResponse(res, 400, { error: "Prompt is required" });
       }
 
       const systemMessage = {
@@ -184,129 +172,187 @@ export const updateHomepage = onRequest(
       const message = openAIResponse.data.choices[0]?.message;
 
       if (!message.tool_calls || message.tool_calls.length === 0) {
-        sendSingleResponse(200, { message: message.content || "No response from assistant" });
-        return;
+        return sendResponse(res, 200, { message: message.content || "No response from assistant" });
       }
 
       const toolCalls = message.tool_calls;
-      const results: ToolCallResult[] = [];
 
-      for (const toolCall of toolCalls) {
-        if (responseSent) break;
-        if (!toolCall.function?.arguments) throw new Error("Function arguments are undefined");
-
-        const args = JSON.parse(toolCall.function.arguments);
-
-        if (toolCall.function.name === "update_homepage") {
-          const updateText = args.text || "";
-          const sanitizedText = sanitizeText(updateText);
-          console.log("update_homepage called with args:", args);
-          results.push({
-            function: "update_homepage",
-            success: true,
-            message: `Homepage updated with: ${sanitizedText}`,
-            data: args,
-          });
-        } else if (toolCall.function.name === "create_content") {
-          console.log("create_content called with args:", args);
-
-          // Using Record<string, unknown> for dynamic object structure
-          let node: Array<Record<string, unknown>> = [];
-
-          if (args.content_type === "recipe") {
-            const summary = args.summary || (args.body ? args.body.substring(0, 200) + "..." : "No summary");
-            const ingredients = (args.ingredients || []).filter(Boolean).map((v: string) => ({ value: v }));
-            const instructionsHtml = (args.instructions || []).map((step: string) => `<p>${step}</p>`).join("");
-            const instructions = (args.instructions || []).filter(Boolean).map((step: string) => ({ value: step }));
-
-            node = [
-              {
-                type: "recipe",
-                title: args.title,
-                body: { value: args.body, format: "full_html" }, // ✅ always correct shape
-                status: 1,
-                moderation_state: "published",
-                field_summary: summary,
-                field_ingredients: ingredients,
-                field_instructions: instructions,
-                field_recipe_instruction: { value: instructionsHtml, format: "full_html" },
-                field_cooking_time: { value: Number(args.cooking_time || 0) },
-                field_preparation_time: { value: Number(args.prep_time || instructions.length || 10) },
-                field_number_of_servings: { value: Number(args.servings || 1) },
-                field_difficulty: { value: args.difficulty || "medium" },
-                field_recipe_category: { data: { type: "taxonomy_term--recipe_category", id: "main" } },
-              },
-            ];
-          } else if (args.content_type === "article") {
-            node = [
-              {
-                type: "article",
-                title: args.title,
-                field_body: [
-                  {
-                    value: args.body,
-                    format: "basic_html"
-                  }
-                ],
-                status: 1,
-                moderation_state: "published",
-                field_tags: (args.tags || []).map((t: string) => ({ value: t })),
-                field_image: args.image ? { uri: args.image } : undefined,
-              },
-            ];
-          } else if (args.content_type === "page") {
-            node = [
-              {
-                type: "page",
-                title: args.title,
-                field_body: [
-                  {
-                    value: args.body,
-                    format: "basic_html"
-                  }
-                ],
-                status: 1,
-                moderation_state: "published",
-              },
-            ];
+      try {
+        for (const toolCall of toolCalls) {
+          if (responseSent) break;
+          if (!toolCall.function?.arguments) {
+            throw new Error("Function arguments are undefined");
           }
 
-          const drupalResponse = await axios.post(
-            "http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/node-update",
-            node, // Send the node array directly as expected by the endpoint
-            {
-              headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-              },
+          const args = JSON.parse(toolCall.function.arguments);
+
+          if (toolCall.function.name === "update_homepage") {
+            const updateText = args.text || "";
+            const sanitizedText = sanitizeText(updateText);
+            console.log("update_homepage called with args:", args);
+            results.push({
+              function: "update_homepage",
+              success: true,
+              message: `Homepage updated with: ${sanitizedText}`,
+              data: args,
+            });
+          } else if (toolCall.function.name === "create_content") {
+            console.log("create_content called with args:", args);
+
+            // Removed unused node variable
+
+            if (args.content_type === "recipe") {
+              // Recipe processing removed as it's not being used
             }
-          );
 
-          console.log("Drupal response:", JSON.stringify(drupalResponse.data, null, 2));
+            // 1. Generate image with OpenAI
+            const imagePrompt = args.summary || args.body || args.title;
+            console.log("Generating image with prompt:", imagePrompt);
 
-          results.push({
-            function: "create_content",
-            success: true,
-            message: `✅ Created ${args.content_type} "${args.title}"`,
-            type: args.content_type,
-            content: args,
-            drupalResponse: drupalResponse.data,
-          });
+            const openaiResponse = await axios.post(
+              "https://api.openai.com/v1/images/generations",
+              {
+                model: "dall-e-3",
+                prompt: imagePrompt,
+                size: "1024x1024",
+                n: 1,
+                response_format: "url",
+              },
+              {
+                headers: {
+                  "Authorization": `Bearer ${openaiApiKey.value()}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+
+            const imageUrl = openaiResponse.data.data[0].url;
+            console.log("Generated image URL:", imageUrl);
+
+            // 2. Download image to buffer
+            const imageResponse = await axios({
+              method: "GET",
+              url: imageUrl,
+              responseType: "arraybuffer",
+            });
+
+            // 3. Upload to Firebase Storage
+            const bucket = storage.bucket("intelligensi-ai-v2.firebasestorage.app");
+            const fileName = `generated-images/${Date.now()}-${args.title.replace(/\s+/g, "_")}.jpg`;
+            const file = bucket.file(fileName);
+
+            await file.save(Buffer.from(imageResponse.data), {
+              metadata: { contentType: "image/jpeg" },
+              resumable: false,
+            });
+
+            // Make the file publicly accessible
+            await file.makePublic();
+            const publicUrl = `https://storage.googleapis.com/intelligensi-ai-v2.firebasestorage.app/${fileName}`;
+            console.log("Image uploaded to Firebase Storage:", publicUrl);
+
+              // 5. Create node with media reference
+              interface NodeAttributes {
+                title: string;
+                body: { value: string; format: string };
+                status: boolean;
+                field_image_url: string;
+                field_summary?: string;
+                field_ingredients?: string[];
+                field_instructions?: string[];
+                field_cooking_time?: number;
+                field_servings?: number;
+                field_difficulty?: string;
+              }
+
+              const nodeData = {
+                data: {
+                  type: `node--${args.content_type}`,
+                  attributes: {
+                    title: args.title,
+                    body: {
+                      value: args.body,
+                      format: "full_html",
+                    },
+                    status: true,
+                    field_image_url: publicUrl,
+                    ...(args.content_type === "recipe" && {
+                      field_summary: args.summary || "",
+                      field_ingredients: args.ingredients || [],
+                      field_instructions: args.instructions || [],
+                      field_cooking_time: args.cooking_time || 0,
+                      field_servings: args.servings || 1,
+                      field_difficulty: args.difficulty || "medium",
+                    }),
+                  } as NodeAttributes,
+                },
+              };
+
+              try {
+                const endpoint = `${DRUPAL_SITE_URL}/jsonapi/node/${args.content_type}`;
+                console.log("Making request to Drupal API:", {
+                  url: endpoint,
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/vnd.api+json",
+                    "Accept": "application/vnd.api+json",
+                  },
+                  data: nodeData,
+                });
+
+                const nodeResponse = await axios.post(
+                  endpoint,
+                  nodeData,
+                  {
+                    headers: {
+                      "Content-Type": "application/vnd.api+json",
+                      "Accept": "application/vnd.api+json",
+                    },
+                  }
+                );
+
+                console.log("Node created:", nodeResponse.data);
+
+                results.push({
+                  function: "create_content",
+                  success: true,
+                  message: "Content created successfully",
+                  drupalResponse: nodeResponse.data,
+                });
+              } catch (error) {
+                const errMsg = error instanceof Error ? error.message : "Unknown error";
+                console.error("Error creating Drupal node:", errMsg);
+                return sendResponse(res, 500, {
+                  success: false,
+                  message: `Failed to create Drupal node: ${errMsg}`,
+                });
+              }
+          }
         }
-      }
 
-      sendSingleResponse(200, {
-        message: message.content || "Operation completed",
-        results,
-      });
-    } catch (error) {
-      console.error("Error in updateHomepage:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      sendSingleResponse(500, {
-        error: "Internal server error",
-        message: errorMessage,
-      });
+        // Send the final response
+        return sendResponse(res, 200, {
+          success: true,
+          message: "Operation completed successfully",
+          data: results,
+        });
+      } catch (error) {
+        console.error("Error in tool calls:", error);
+        const errMsg = error instanceof Error ? error.message : "Unknown error";
+        return sendResponse(res, 500, {
+          success: false,
+          message: "An error occurred while processing the request",
+          error: errMsg,
+        });
       }
+    } catch (error) {
+      console.error("Unexpected error in updateHomepage:", error);
+      const errMsg = error instanceof Error ? error.message : "Unknown error";
+      return sendResponse(res, 500, {
+        success: false,
+        message: "An unexpected error occurred",
+        error: errMsg,
+      });
+    }
   }
 );
-

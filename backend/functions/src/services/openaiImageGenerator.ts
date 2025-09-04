@@ -1,25 +1,17 @@
 /**
  * OpenAI Image Generation Service
- * 
+ *
  * This service provides functionality to generate images using OpenAI's DALL·E model
- * and handle the upload of generated images to a Drupal site.
- * 
+ * and handle the upload of generated images to Firebase Storage.
+ *
  * @module openaiImageGenerator
- * @example
- * // Example usage in a Firebase Callable Function:
- * const response = await generateImage({
- *   prompt: "A futuristic cityscape at sunset",
- *   n: 1, // Optional: Number of images to generate (default: 1)
- *   size: "1024x1024", // Optional: Image size (default: "1024x1024")
- *   responseFormat: "url" // Optional: Response format ("url" or "b64_json")
- * });
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import OpenAI from "openai";
-import FormData from "form-data";
-import { httpClient } from "../utils/httpClient"; // Use your custom Axios instance
+import fetch from "node-fetch";
+import { bucket } from "../firebase"; // ✅ centralised init
 
 // Define the secret for OpenAI API key
 export const openaiApiKey = defineSecret("OPENAI_API_KEY");
@@ -67,7 +59,7 @@ export const generateImage = onCall(
 
       const imageData: { url?: string; b64_json?: string } = image.data[0]!;
 
-      // Download image as buffer if URL provided
+      // Download image as buffer
       let imageBuffer: Buffer;
       if (imageData.url) {
         const response = await fetch(imageData.url);
@@ -78,27 +70,27 @@ export const generateImage = onCall(
         throw new Error("No image data returned from OpenAI.");
       }
 
-      // Prepare upload to Drupal using httpClient
-      const formData = new FormData();
-      formData.append("file", imageBuffer, {
-        filename: "generated.png",
-        contentType: "image/png",
+      // Upload to Firebase Storage
+      const fileName = `generatedimages/${Date.now()}-generated.png`;
+      const file = bucket.file(fileName);
+
+      await file.save(imageBuffer, {
+        metadata: { contentType: "image/png" },
+        resumable: false,
       });
 
-      formData.append("alt", prompt);
-
-      const drupalResponse = await httpClient.post(
-        "/api/image-upload", // Relative path, httpClient handles baseURL
-        formData,
-        { headers: formData.getHeaders() }
-      );
+      // Make the file publicly accessible
+      await file.makePublic();
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
 
       return {
         success: true,
-        drupalFile: drupalResponse.data,
+        storagePath: fileName,
+        publicUrl,
       };
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
       console.error("Error generating or uploading image:", error);
       throw new HttpsError(
         "internal",
