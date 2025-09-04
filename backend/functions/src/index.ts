@@ -13,7 +13,7 @@ import { createSchema } from "./routes/schemaRoutes";
 import { deleteSite } from "./routes/siteRoutes";
 import { createDrupalSite } from "./routes/windsailRoutes";
 import { simpleSearch } from "./routes/WeaviatesSimplesearch";
-import { generateImage, openaiApiKey } from "./services/openaiImageGenerator";
+import { openaiApiKey } from "./services/openaiImageGenerator";
 import { uploadImage } from "./services/imageUpload";
 import OpenAI from "openai";
 
@@ -122,7 +122,7 @@ const generateImageHttp = onRequest(
 );
 
 // Export all functions
-export { generateImage, generateImageHttp,
+export { generateImageHttp,
   updateHomepage,
   fetchusers,
   updateuser,

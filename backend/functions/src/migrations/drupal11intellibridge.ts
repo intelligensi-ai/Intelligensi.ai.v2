@@ -37,11 +37,11 @@
  */
 
 import express, { Request, Response, RequestHandler, NextFunction } from "express";
-import axios, { isAxiosError, AxiosRequestConfig } from "axios";
+import axios from "axios";
 import * as https from "https";
 import { onRequest } from "firebase-functions/v2/https";
 import FormData from "form-data";
-import { Readable } from "stream";
+import fetch from "node-fetch";
 
 // Drupal 11 base URL - hardcoded as per requirements
 const DRUPAL_11_BASE_URL = "https://umami-intelligensi.ai.ddev.site";
@@ -69,28 +69,6 @@ const httpsAgent = new https.Agent({
 //   message: string;
 //   data?: unknown;
 // }
-
-// Handle Axios errors consistently
-const handleAxiosError = (error: unknown, context: string) => {
-  if (isAxiosError(error)) {
-    console.error(`Axios error in ${context}:`, error.message);
-    if (error.response) {
-      return {
-        status: error.response.status,
-        error: `Error in ${context}`,
-        details: error.response.data || error.message,
-      };
-    }
-  } else if (error instanceof Error) {
-    console.error(`Error in ${context}:`, error.message);
-  }
-
-  return {
-    status: 500,
-    error: `Unexpected error in ${context}`,
-    details: error instanceof Error ? error.message : "Unknown error",
-  };
-};
 
 // Helper to create Drupal client
 const createDrupalClient = () => {
@@ -136,12 +114,19 @@ d11Router.get("/debug-routes", (req: Request, res: Response) => {
     name: string;
     handle: RequestHandler | ExpressLayer;
     regexp: RegExp;
-    keys: any[];
-    params: any;
+    keys: { name: string | number; optional: boolean }[];
+    params: Record<string, unknown>;
     method: string;
   }
 
-  (d11Router as any)._router.stack.forEach((layer: ExpressLayer) => {
+  // Type assertion for the Express router instance with _router
+  interface ExpressRouterWithRouter extends express.Router {
+    _router: {
+      stack: ExpressLayer[];
+    };
+  }
+
+  (d11Router as unknown as ExpressRouterWithRouter)._router.stack.forEach((layer: ExpressLayer) => {
     if (layer.route) {
       // It's a route
       const methods = Object.keys(layer.route.methods).map((method) => method.toUpperCase());
@@ -149,9 +134,9 @@ d11Router.get("/debug-routes", (req: Request, res: Response) => {
         path: layer.route.path,
         methods: methods,
       });
-    } else if (layer.name === "router" && (layer.handle as any).stack) {
+    } else if (layer.name === "router" && "stack" in layer.handle) {
       // It's a router mounted on a path
-      (layer.handle as any).stack.forEach((nestedLayer: ExpressLayer) => {
+      (layer.handle as ExpressRouterWithRouter)._router.stack.forEach((nestedLayer: ExpressLayer) => {
         if (nestedLayer.route) {
           const methods = Object.keys(nestedLayer.route.methods).map((method) => method.toUpperCase());
           routes.push({
@@ -186,18 +171,26 @@ d11Router.use((req: Request, res: Response, next: NextFunction): void => {
 
 /**
  * Upload image to Drupal
- * POST /uploadimage
+ * POST /api/image-upload
  * Body: {
  *   imagePath: string,  // URL of the image to upload
  *   siteUrl: string,    // Base URL of the Drupal site
  *   altText: string     // Alternative text for the image
  * }
  */
-d11Router.post("/uploadimage", async (req: Request, res: Response): Promise<void> => {
+/**
+ * Upload image to Drupal using the Drupal Bridge endpoint
+ * POST /api/image-upload
+ * Body: {
+ *   imagePath: string,  // URL of the image to upload
+ *   siteUrl: string,    // Base URL of the Drupal site
+ *   altText?: string    // Optional alternative text for the image
+ * }
+ */
+d11Router.post("/api/image-upload", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { imagePath, siteUrl, altText } = req.body;
+    const { imagePath, siteUrl, altText = "" } = req.body;
 
-    // Validate required fields
     if (!imagePath || !siteUrl) {
       res.status(400).json({
         status: "error",
@@ -206,483 +199,64 @@ d11Router.post("/uploadimage", async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Create a client with the provided site URL
-    const client = axios.create({
-      baseURL: siteUrl,
-      httpsAgent,
-      headers: {
-        "Content-Type": "application/octet-stream",
-      },
-      maxRedirects: 5,
-      timeout: 30000,
-    });
+    // Download the image from the provided URL (e.g., Firebase Storage)
+    const imageResponse = await fetch(imagePath);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image from ${imagePath}: ${imageResponse.status}`);
+    }
+    const imageBuffer = Buffer.from(await (await imageResponse).buffer());
 
-    // Download the image
-    const imageResponse = await axios.get(imagePath, {
-      responseType: "arraybuffer",
-      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-    });
-
-    const imageBuffer = Buffer.from(imageResponse.data, "binary");
-    const fileName = imagePath.split("/").pop() || `image-${Date.now()}.jpg`;
-
-    // Create a readable stream from the buffer
-    const imageStream = new Readable();
-    imageStream.push(imageBuffer);
-    imageStream.push(null); // Signal end of stream
-
-    // Create form data
+    // Create FormData for file upload
     const formData = new FormData();
+
+    // Add the file to form data
     formData.append("file", imageBuffer, {
-      filename: fileName,
-      contentType: imageResponse.headers["content-type"] || "image/jpeg",
+      filename: `${Date.now()}-upload.png`,
+      contentType: "image/png",
       knownLength: imageBuffer.length,
     });
+    formData.append("alt", altText);
 
-    // Get form data headers
-    const formHeaders = formData.getHeaders();
+    // Drupal endpoint
+    const uploadImageUrl = `${siteUrl.replace(/\/$/, "")}/api/image-upload`;
+    console.log("Posting image to Drupal:", uploadImageUrl);
 
-    // Upload to Drupal's media endpoint
-    // For Drupal 11, we'll use the JSON:API file upload endpoint
-    const uploadResponse = await client.post<{
-      data: {
-        id: string;
-        type: string;
-        attributes: {
-          uri: {
-            value: string;
-            url: string;
-          };
-          filename: string;
-          filemime: string;
-          filesize: number;
-          status: boolean;
-        };
-      };
-    }>(
-      "/jsonapi/file/upload",
-      formData,
-      {
-        headers: {
-          ...formHeaders,
-          "Content-Length": formData.getLengthSync().toString(),
-        },
-      }
-    );
-
-    if (!uploadResponse.data?.data?.id) {
-      throw new Error("Failed to upload file: Invalid response from server");
-    }
-
-    // Create media entity with the uploaded file
-    const mediaData = {
-      data: {
-        type: "media--image",
-        attributes: {
-          name: fileName,
-          bundle: "image",
-          field_media_image: {
-            data: {
-              type: "file--file",
-              id: uploadResponse.data.data.id,
-              meta: {
-                alt: altText || "",
-                title: altText || "",
-              },
-            },
-          },
-        },
-      },
-    };
-
-    // Create the media entity
-    await client.post("/jsonapi/media/image", mediaData, {
-      headers: {
-        "Content-Type": "application/vnd.api+json",
-        "Accept": "application/vnd.api+json",
-      },
+    // Make the request with node-fetch
+    const drupalResponse = await fetch(uploadImageUrl, {
+      method: "POST",
+      body: formData as unknown as NodeJS.ReadableStream,
+      headers: formData.getHeaders(),
     });
 
-    // Return the uploaded file information
-    const responseData = {
-      status: "success",
-      message: "Image uploaded successfully",
-      data: {
-        fid: uploadResponse.data.data.id,
-        url: `${siteUrl}${uploadResponse.data.data.attributes.uri.url}`,
-        alt: altText || "",
-      },
-    };
+    if (!drupalResponse.ok) {
+      const errorText = await drupalResponse.text();
+      throw new Error(
+        `Error uploading to Drupal: ${drupalResponse.status} ${errorText}`
+      );
+    }
 
-    res.json(responseData);
-  } catch (error) {
-    console.error("Error uploading image:", error);
-    const status = isAxiosError(error) ? error.response?.status || 500 : 500;
-    const message = isAxiosError(error) ?
-      error.response?.data?.message || error.message :
-      "Failed to upload image";
+    const result = await drupalResponse.json();
+    console.log("✅ Image uploaded successfully:", result);
 
-    res.status(status).json({
+    res.json(result);
+  } catch (error: unknown) {
+    console.error("Error in uploadimage endpoint:", error);
+    const hasStatus = error &&
+      typeof error === "object" &&
+      "status" in error &&
+      typeof (error as { status: unknown }).status === "number";
+    const errorStatus = hasStatus ?
+      (error as { status: number }).status :
+      500;
+
+    res.status(errorStatus).json({
       status: "error",
-      message,
-      error: error instanceof Error ? error.message : "Unknown error",
+      message: error instanceof Error ? error.message : "Unknown error occurred",
     });
   }
 });
 
-// Root path handler
-/**
- * Simple hello world endpoint
- */
-d11Router.get("/", (req: Request, res: Response) => {
-  console.log("[D11] Root path accessed");
-  res.json({
-    message: "Drupal 11 Bridge API is running",
-    basePath: "/",
-    availableEndpoints: [
-      "/hello - Health check endpoint",
-      "/transmit - Forward to structure endpoint",
-      "/structure - Get site structure",
-      "/info - Get site information",
-      "/export - Export nodes",
-      "/update - Update nodes",
-    ],
-  });
-});
-
-/**
- * Structure endpoint - fetches content from Drupal 11
- * This endpoint uses the Drupal 11 bulk export API to fetch content.
- *
- * @param req - Express request object with query params: types, limit, fields
- * @param res - Express response object
- */
-d11Router.get("/structure", async (req: Request, res: Response): Promise<void> => {
-  const { types = "article,page", limit = "10", fields = "title,body,field_image" } = req.query;
-
-  const fullEndpoint = `${DRUPAL_11_BASE_URL}/api/bulk-export`;
-  const params = new URLSearchParams({
-    types: types as string,
-    limit: limit as string,
-    fields: fields as string,
-  });
-
-  const config: AxiosRequestConfig = {
-    headers: {
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
-    httpsAgent,
-  };
-
-  try {
-    const response = await axios.get(`${fullEndpoint}?${params.toString()}`, config);
-    res.json({ structure: response.data });
-  } catch (error) {
-    console.error("Error in /structure:", error);
-    const status = isAxiosError(error) ? error.response?.status || 500 : 500;
-    res.status(status).json({
-      error: "Failed to fetch site structure",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-});
-
-interface SiteInfo {
-  name: string;
-  slogan: string;
-  email: string;
-  status: boolean;
-}
-
-/**
- * Get site information from Drupal 11
- * @param req - Express request object
- * @param res - Express response object
- */
-d11Router.get("/info", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const response = await axios.get(`${DRUPAL_11_BASE_URL}/api/bulk-export?types=page&limit=1`, {
-      httpsAgent,
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (response.status === 200 && Array.isArray(response.data) && response.data.length > 0) {
-      const siteInfo: SiteInfo = {
-        name: "Drupal 11 Site",
-        slogan: "Powered by Drupal 11",
-        email: "admin@example.com",
-        status: true,
-      };
-      res.json(siteInfo);
-      return;
-    } else {
-      res.status(404).json({
-        error: "Failed to fetch site info",
-        details: "No data returned from Drupal 11 API",
-      });
-      return;
-    }
-  } catch (error) {
-    console.error("Error in /info:", error);
-    const status = isAxiosError(error) ? error.response?.status || 500 : 500;
-    res.status(status).json({
-      error: "Failed to fetch site info",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-    return;
-  }
-});
-
-/**
- * Update homepage in Drupal 11 using Intelligensi Bridge
- */
-d11Router.post("/homepage", async (req: Request, res: Response): Promise<void> => {
-  const { nid, siteUrl } = req.body;
-
-  if (!nid) {
-    res.status(400).json({ error: "Node ID (nid) is required" });
-    return;
-  }
-
-  if (!siteUrl) {
-    res.status(400).json({ error: "Site URL is required" });
-    return;
-  }
-
-  try {
-    const response = await axios.post(
-      `${siteUrl}/intelligensi-bridge/update-homepage`,
-      { nid: Number(nid) },
-      {
-        httpsAgent,
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-      }
-    );
-
-    res.json({
-      success: true,
-      message: "Homepage updated successfully",
-      data: response.data,
-      source: siteUrl,
-    });
-    return;
-  } catch (error) {
-    console.error("Error in /homepage:", error);
-    const status = isAxiosError(error) ? error.response?.status || 500 : 500;
-    res.status(status).json({
-      error: "Failed to update homepage",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-    return;
-  }
-});
-
-/**
- * Update nodes in Drupal 11 via the node-update endpoint
- * This matches the curl command:
- * curl -X POST https://umami-intelligensi.ai.ddev.site/api/node-update \
- *   -H "Content-Type: application/json" \
- *   -d '[{"id":19,"type":"page",...}]'
- */
-d11Router.post("/node-update", async (req: Request, res: Response): Promise<void> => {
-  console.log("[D11] POST Export/Update endpoint accessed");
-
-  const nodes = req.body;
-
-  if (!nodes || !Array.isArray(nodes)) {
-    res.status(400).json({ error: "Request body must be an array of nodes" });
-    return;
-  }
-
-  const fullEndpoint = `${DRUPAL_11_BASE_URL}/api/node-update`;
-
-  const config: AxiosRequestConfig = {
-    headers: {
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
-    httpsAgent,
-  };
-
-  try {
-    console.log(`[D11] Making POST request to Drupal 11 API: ${fullEndpoint}`);
-    console.log(`[D11] Updating ${nodes.length} nodes`);
-
-    const response = await axios.post(fullEndpoint, nodes, config);
-
-    // Return the response from Drupal
-    res.json(response.data);
-  } catch (error) {
-    console.error("[D11] Error in POST export/update endpoint:", error);
-    const errorMessage = handleAxiosError(error, "updating nodes in Drupal 11");
-    res.status(500).json({
-      success: false,
-      error: "Failed to update nodes in Drupal 11",
-      details: errorMessage,
-    });
-  }
-});
-
-
-/**
- * Import nodes to Drupal 11 using Intelligensi Bridge
- *
- * Example cURL command:
- * curl -X POST https://umami-intelligensi.ai.ddev.site/api/import-nodes \
- *   -H "Content-Type: application/json" \
- *   -d '[{"id":19,"type":"page","title":"Test Update","field_body":[{"value":"<p>test</p>","format":"basic_html"}]}]'
- */
-d11Router.post("/import", async (req: Request, res: Response): Promise<void> => {
-  const { nodes } = req.body;
-
-  if (!nodes || !Array.isArray(nodes)) {
-    res.status(400).json({ error: "Nodes array is required" });
-    return;
-  }
-
-  try {
-    // Create a client with the hardcoded URL and no authentication
-    const client = createDrupalClient();
-
-    // Log the import request
-    console.log(`[D11] Importing ${nodes.length} nodes`);
-    console.log(`[D11] First node ID: ${nodes[0]?.id || "N/A"}`);
-
-    // Make the request to Drupal's import-nodes endpoint
-    const response = await client.post("/api/node-update", { nodes });
-
-    // Log successful import
-    console.log(`[D11] Import successful. Status: ${response.status}`);
-
-    // Return the response data
-    res.json({
-      success: true,
-      status: response.status,
-      data: response.data,
-    });
-  } catch (error) {
-    console.error("[D11] Import error:", error);
-    const errorResponse = handleAxiosError(error, "import");
-    res.status(errorResponse.status).json({
-      success: false,
-      error: errorResponse.error,
-      details: errorResponse.details,
-    });
-  }
-});
-
-/**
- * Bulk export nodes from Drupal 11
- */
-d11Router.get("/structure", async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Hardcoded endpoint for testing
-    const hardcodedEndpoint = "https://umami-intelligensi.ai.ddev.site/api/bulk-export";
-
-    // Create client with the hardcoded endpoint as base URL
-    const client = axios.create({
-      baseURL: hardcodedEndpoint,
-      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-      },
-      validateStatus: () => true, // Don't throw for any status
-    });
-
-    // Make the request to the Drupal 11 site
-    const drupalResponse = await client.get(
-      "/api/bulk-export",
-      {
-        params: req.query,
-        validateStatus: () => true, // Don't throw on HTTP error status codes
-      }
-    );
-
-    // Handle the response
-    if (drupalResponse.status === 200) {
-      // If we have data and this is not a partial export, try to create a schema
-      if (
-        drupalResponse.data &&
-        Array.isArray(drupalResponse.data) &&
-        drupalResponse.data.length > 0 &&
-        !req.query.limit
-      ) {
-        try {
-          const { createSchema } = await import("../routes/schemaRoutes");
-
-          // Create a mock request object
-          const mockReq = {
-            body: { structure: [drupalResponse.data[0]] },
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            query: {},
-            params: {},
-          } as unknown as Request; // Type assertion for Express Request
-
-          // Create a mock response object
-          const mockRes = {
-            status: (code: number) => ({
-              json: (result: unknown) => {
-                console.log("Schema creation result:", result);
-                return {
-                  status: code,
-                  data: result,
-                };
-              },
-            }),
-          } as unknown as Response; // Type assertion for Express Response
-
-          // Call createSchema with mock request and response objects
-          // @ts-expect-error - Ignore type checking for dynamic import
-          await createSchema(mockReq, mockRes);
-        } catch (schemaError) {
-          console.error("Error creating schema:", schemaError);
-          // Continue with the export even if schema creation fails
-        }
-      }
-
-      // Return the Drupal response data
-      res.json({
-        status: "success",
-        data: drupalResponse.data,
-        source: hardcodedEndpoint,
-      });
-      return;
-    }
-
-    // If we get here, the request failed
-    throw new Error(`Drupal API returned status ${drupalResponse.status}`);
-  } catch (error) {
-    console.error("Error fetching site structure:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorResponse = {
-      error: "Failed to fetch site structure",
-      details: errorMessage,
-    };
-
-    if (isAxiosError(error)) {
-      console.error("Request failed:", error.message);
-      Object.assign(errorResponse, {
-        axiosError: {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-        },
-      });
-    }
-
-    res.status(500).json(errorResponse);
-    return;
-  }
-});
+// Error handling is now done in the individual route handlers
 
 /**
  * Import nodes into Drupal 11

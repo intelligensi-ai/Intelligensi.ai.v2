@@ -2,6 +2,8 @@ import axios from "axios";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { storage } from "../firebase";
+import FormData from "form-data";
+import fetch from "node-fetch";
 
 // Clean up any remaining temp files if needed
 if (process.env.NODE_ENV === "development" || process.env.FUNCTIONS_EMULATOR === "true") {
@@ -251,82 +253,59 @@ export const updateHomepage = onRequest(
             const publicUrl = `https://storage.googleapis.com/intelligensi-ai-v2.firebasestorage.app/${fileName}`;
             console.log("Image uploaded to Firebase Storage:", publicUrl);
 
-              // 5. Create node with media reference
-              interface NodeAttributes {
-                title: string;
-                body: { value: string; format: string };
-                status: boolean;
-                field_image_url: string;
-                field_summary?: string;
-                field_ingredients?: string[];
-                field_instructions?: string[];
-                field_cooking_time?: number;
-                field_servings?: number;
-                field_difficulty?: string;
+            try {
+              const endpoint = `${DRUPAL_SITE_URL}/api/image-upload`;
+
+              // Download the image from the public URL
+              const imageResponse = await fetch(publicUrl);
+              if (!imageResponse.ok) {
+                throw new Error(`Failed to fetch image from ${publicUrl}: ${imageResponse.status}`);
+              }
+              const imageBuffer = await imageResponse.buffer();
+
+              // Create FormData for file upload
+              const formData = new FormData();
+              formData.append("file", imageBuffer, {
+                filename: `${Date.now()}-upload.jpg`,
+                contentType: "image/jpeg",
+                knownLength: imageBuffer.length,
+              });
+              formData.append("alt", args.altText || "Generated image");
+
+              console.log("Making request to Drupal Bridge:", {
+                url: endpoint,
+                method: "POST",
+                headers: formData.getHeaders(),
+              });
+
+              const response = await fetch(endpoint, {
+                method: "POST",
+                body: formData as unknown as NodeJS.ReadableStream,
+                headers: formData.getHeaders(),
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Drupal API error: ${response.status} ${errorText}`);
               }
 
-              const nodeData = {
-                data: {
-                  type: `node--${args.content_type}`,
-                  attributes: {
-                    title: args.title,
-                    body: {
-                      value: args.body,
-                      format: "full_html",
-                    },
-                    status: true,
-                    field_image_url: publicUrl,
-                    ...(args.content_type === "recipe" && {
-                      field_summary: args.summary || "",
-                      field_ingredients: args.ingredients || [],
-                      field_instructions: args.instructions || [],
-                      field_cooking_time: args.cooking_time || 0,
-                      field_servings: args.servings || 1,
-                      field_difficulty: args.difficulty || "medium",
-                    }),
-                  } as NodeAttributes,
-                },
-              };
+              const responseData = await response.json() as DrupalResponse;
+              console.log("Node created via Drupal Bridge:", responseData);
 
-              try {
-                const endpoint = `${DRUPAL_SITE_URL}/jsonapi/node/${args.content_type}`;
-                console.log("Making request to Drupal API:", {
-                  url: endpoint,
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/vnd.api+json",
-                    "Accept": "application/vnd.api+json",
-                  },
-                  data: nodeData,
-                });
-
-                const nodeResponse = await axios.post(
-                  endpoint,
-                  nodeData,
-                  {
-                    headers: {
-                      "Content-Type": "application/vnd.api+json",
-                      "Accept": "application/vnd.api+json",
-                    },
-                  }
-                );
-
-                console.log("Node created:", nodeResponse.data);
-
-                results.push({
-                  function: "create_content",
-                  success: true,
-                  message: "Content created successfully",
-                  drupalResponse: nodeResponse.data,
-                });
-              } catch (error) {
-                const errMsg = error instanceof Error ? error.message : "Unknown error";
-                console.error("Error creating Drupal node:", errMsg);
-                return sendResponse(res, 500, {
-                  success: false,
-                  message: `Failed to create Drupal node: ${errMsg}`,
-                });
-              }
+              results.push({
+                function: "create_content",
+                success: true,
+                message: "Content created successfully",
+                drupalResponse: responseData,
+              });
+            } catch (error: unknown) {
+              const errorMessage = error instanceof Error ? error.message : "Unknown error";
+              console.error("Error creating Drupal node via Bridge:", errorMessage);
+              return sendResponse(res, 500, {
+                success: false,
+                message: `Failed to create Drupal node: ${errorMessage}`,
+              });
+            }
           }
         }
 
