@@ -309,27 +309,31 @@ export const updateHomepage = onRequest(
 
               const payload = [{
                 type: "recipe",
-                title: args.title,
+                title: args.title || "Untitled Recipe",
                 body: {
-                  value: args.body,
+                  value: args.body || args.summary || "No description provided",
                   format: "basic_html"
                 },
                 status: 1, // Published
-                field_cooking_time: { value: args.cooking_time },
-                field_ingredients: (args.ingredients as string[]).map((ingredient: string) => ({
+                field_cooking_time: { value: args.cooking_time || 0 },
+                field_preparation_time: { value: args.prep_time || 0 },
+                field_ingredients: (args.ingredients as string[] || []).map((ingredient: string) => ({
                   value: ingredient
                 })),
-                field_recipe_instruction: (args.instructions as string[]).map((instruction: string) => ({
+                field_recipe_instruction: (args.instructions as string[] || []).map((instruction: string) => ({
                   value: instruction
                 })),
-                field_number_of_servings: { value: args.servings },
+                field_number_of_servings: { value: args.servings || 1 },
                 field_difficulty: args.difficulty || "medium",
+                field_summary: { value: args.summary || args.body || "No summary provided", format: "basic_html" },
                 field_media_image: [{
                   target_id: responseData.media_id,
                   alt: args.altText || args.title || "Generated image",
                   title: args.title || "Recipe image"
                 }]
               }];
+              
+              
 
               const recipeResponse = await fetch(nodeUpdateEndpoint, {
                 method: "POST",
