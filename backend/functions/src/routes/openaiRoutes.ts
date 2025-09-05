@@ -306,37 +306,33 @@ export const updateHomepage = onRequest(
               // Create recipe using the node-update endpoint
               const nodeUpdateEndpoint = `${DRUPAL_SITE_URL}/api/node-update`;
 
-              const payload = {
-                data: {
-                  type: "node--recipe",
-                  attributes: {
-                    title: args.title,
-                    body: {
-                      value: args.body,
-                      format: "basic_html",
-                    },
-                    field_cooking_time: args.cooking_time,
-                    field_ingredients: args.ingredients,
-                    field_recipe_instruction: args.instructions,
-                    field_number_of_servings: args.servings,
-                    field_difficulty: args.difficulty || "medium",
-                  },
-                  relationships: {
-                    field_media_image: {
-                      data: {
-                        type: `media--${responseData.media_bundle}`,
-                        id: responseData.uuid, // Media UUID from /api/image-upload
-                      },
-                    },
-                  },
+              const payload = [{
+                type: "recipe",
+                title: args.title,
+                body: {
+                  value: args.body,
+                  format: "basic_html"
                 },
-              };
+                status: 1, // Published
+                field_cooking_time: { value: args.cooking_time },
+                field_ingredients: (args.ingredients as string[]).map((ingredient: string) => ({
+                  value: ingredient
+                })),
+                field_recipe_instruction: (args.instructions as string[]).map((instruction: string) => ({
+                  value: instruction
+                })),
+                field_number_of_servings: { value: args.servings },
+                field_difficulty: args.difficulty || "medium",
+                field_media_image: [{
+                  target_id: responseData.fid,
+                  alt: args.altText || "Generated image"
+                }]
+              }];
 
               const recipeResponse = await fetch(nodeUpdateEndpoint, {
                 method: "POST",
                 headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${process.env.DRUPAL_API_TOKEN ?? ""}`,
+                  "Content-Type": "application/json"
                 },
                 body: JSON.stringify(payload),
               });
@@ -349,14 +345,20 @@ export const updateHomepage = onRequest(
               const recipeResult = await recipeResponse.json();
               console.log("✅ Recipe created via node-update:", recipeResult);
 
+              // Combine the response data with the recipe result
+              const combinedResponse: DrupalResponse = {
+                ...responseData,
+                data: {
+                  ...(responseData.data || {}),
+                  ...(recipeResult.data ? { node: recipeResult.data } : {})
+                } as any
+              };
+
               results.push({
                 function: "create_content",
                 success: true,
                 message: "Recipe and media created successfully",
-                drupalResponse: {
-                  ...responseData,
-                  node: recipeResult.data,
-                },
+                drupalResponse: combinedResponse
               });
             } catch (error: unknown) {
               const errorMessage = error instanceof Error ? error.message : "Unknown error";
