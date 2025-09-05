@@ -49,6 +49,7 @@ interface Recipe {
 interface DrupalResponse {
   status?: string;
   fid?: string;
+  media_id?: string;
   url?: string;
   alt?: string;
   uuid?: string;
@@ -324,8 +325,9 @@ export const updateHomepage = onRequest(
                 field_number_of_servings: { value: args.servings },
                 field_difficulty: args.difficulty || "medium",
                 field_media_image: [{
-                  target_id: responseData.fid,
-                  alt: args.altText || "Generated image"
+                  target_id: responseData.media_id,
+                  alt: args.altText || args.title || "Generated image",
+                  title: args.title || "Recipe image"
                 }]
               }];
 
