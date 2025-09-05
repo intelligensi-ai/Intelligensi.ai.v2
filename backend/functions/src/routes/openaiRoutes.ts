@@ -47,15 +47,26 @@ interface Recipe {
 }
 
 interface DrupalResponse {
+  status?: string;
+  fid?: string;
+  url?: string;
+  alt?: string;
+  uuid?: string;
+  media_bundle?: string;
   data?: {
     id: string;
     type: string;
     attributes: Record<string, unknown>;
   };
+  id?: string;
+  type?: string;
+  attributes?: Record<string, unknown>;
   error?: {
     message: string;
     code: number;
   };
+  message?: string;
+  code?: number;
 }
 
 interface ToolCallResult<T = unknown> {
@@ -278,25 +289,74 @@ export const updateHomepage = onRequest(
                 headers: formData.getHeaders(),
               });
 
-              const response = await fetch(endpoint, {
+              const drupalResponse = await fetch(endpoint, {
                 method: "POST",
                 body: formData as unknown as NodeJS.ReadableStream,
                 headers: formData.getHeaders(),
               });
 
-              if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Drupal API error: ${response.status} ${errorText}`);
+              if (!drupalResponse.ok) {
+                const errorText = await drupalResponse.text();
+                throw new Error(`Drupal Bridge error: ${drupalResponse.status} ${errorText}`);
               }
 
-              const responseData = await response.json() as DrupalResponse;
-              console.log("Node created via Drupal Bridge:", responseData);
+              const responseData = await drupalResponse.json() as DrupalResponse;
+              console.log("✅ Uploaded via Drupal Bridge:", responseData);
+
+              // Create recipe using the node-update endpoint
+              const nodeUpdateEndpoint = `${DRUPAL_SITE_URL}/api/node-update`;
+
+              const payload = {
+                data: {
+                  type: "node--recipe",
+                  attributes: {
+                    title: args.title,
+                    body: {
+                      value: args.body,
+                      format: "basic_html",
+                    },
+                    field_cooking_time: args.cooking_time,
+                    field_ingredients: args.ingredients,
+                    field_recipe_instruction: args.instructions,
+                    field_number_of_servings: args.servings,
+                    field_difficulty: args.difficulty || "medium",
+                  },
+                  relationships: {
+                    field_media_image: {
+                      data: {
+                        type: `media--${responseData.media_bundle}`,
+                        id: responseData.uuid, // Media UUID from /api/image-upload
+                      },
+                    },
+                  },
+                },
+              };
+
+              const recipeResponse = await fetch(nodeUpdateEndpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${process.env.DRUPAL_API_TOKEN ?? ""}`,
+                },
+                body: JSON.stringify(payload),
+              });
+
+              if (!recipeResponse.ok) {
+                const errorText = await recipeResponse.text();
+                throw new Error(`Failed to create recipe via node-update: ${recipeResponse.status} ${errorText}`);
+              }
+
+              const recipeResult = await recipeResponse.json();
+              console.log("✅ Recipe created via node-update:", recipeResult);
 
               results.push({
                 function: "create_content",
                 success: true,
-                message: "Content created successfully",
-                drupalResponse: responseData,
+                message: "Recipe and media created successfully",
+                drupalResponse: {
+                  ...responseData,
+                  node: recipeResult.data,
+                },
               });
             } catch (error: unknown) {
               const errorMessage = error instanceof Error ? error.message : "Unknown error";

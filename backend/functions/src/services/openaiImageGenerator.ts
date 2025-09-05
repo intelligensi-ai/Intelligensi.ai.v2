@@ -46,7 +46,7 @@ export const generateAndUploadToDrupal = onCall(
         resumable: false,
       });
 
-      // Public URL (signed URL also possible if you prefer)
+      // Public URL 
       const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
 
       // 3️⃣ Call your uploadImage Firebase function
