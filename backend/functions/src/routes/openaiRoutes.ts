@@ -55,9 +55,10 @@ interface DrupalResponse {
   uuid?: string;
   media_bundle?: string;
   data?: {
-    id: string;
-    type: string;
-    attributes: Record<string, unknown>;
+    id?: string;
+    type?: string;
+    attributes?: Record<string, unknown>;
+    node?: Record<string, unknown>;
   };
   id?: string;
   type?: string;
@@ -213,11 +214,59 @@ export const updateHomepage = onRequest(
           } else if (toolCall.function.name === "create_content") {
             console.log("create_content called with args:", args);
 
-            // Removed unused node variable
+            // Function to handle media upload to Drupal
+            const uploadMediaToDrupal = async (imageUrl: string, altText: string) => {
+              // 1. Download image to buffer
+              const imageResponse = await axios({
+                method: "GET",
+                url: imageUrl,
+                responseType: "arraybuffer",
+              });
 
-            if (args.content_type === "recipe") {
-              // Recipe processing removed as it's not being used
-            }
+              // 2. Upload to Firebase Storage
+              const bucket = storage.bucket("intelligensi-ai-v2.firebasestorage.app");
+              const fileName = `generated-images/${Date.now()}-${args.title?.replace(/\s+/g, "_") || "image"}.jpg`;
+              const file = bucket.file(fileName);
+
+              await file.save(Buffer.from(imageResponse.data), {
+                metadata: { contentType: "image/jpeg" },
+                resumable: false,
+              });
+
+              // Make the file publicly accessible
+              await file.makePublic();
+              const publicUrl = `https://storage.googleapis.com/intelligensi-ai-v2.firebasestorage.app/${fileName}`;
+              console.log("Image uploaded to Firebase Storage:", publicUrl);
+
+              // 3. Upload to Drupal
+              const endpoint = `${DRUPAL_SITE_URL}/api/image-upload`;
+              const drupalImageResponse = await fetch(publicUrl);
+              if (!drupalImageResponse.ok) {
+                throw new Error(`Failed to fetch image from ${publicUrl}: ${drupalImageResponse.status}`);
+              }
+              const imageBuffer = await drupalImageResponse.buffer();
+
+              const formData = new FormData();
+              formData.append("file", imageBuffer, {
+                filename: `${Date.now()}-upload.jpg`,
+                contentType: "image/jpeg",
+                knownLength: imageBuffer.length,
+              });
+              formData.append("alt", altText || "Generated image");
+
+              const drupalResponse = await fetch(endpoint, {
+                method: "POST",
+                body: formData as unknown as NodeJS.ReadableStream,
+                headers: formData.getHeaders(),
+              });
+
+              if (!drupalResponse.ok) {
+                const errorText = await drupalResponse.text();
+                throw new Error(`Drupal Bridge error: ${drupalResponse.status} ${errorText}`);
+              }
+
+              return await drupalResponse.json() as DrupalResponse;
+            };
 
             // 1. Generate image with OpenAI
             const imagePrompt = args.summary || args.body || args.title;
@@ -228,7 +277,7 @@ export const updateHomepage = onRequest(
               {
                 model: "dall-e-3",
                 prompt: imagePrompt,
-                size: "1024x1024",
+                size: "256x256",
                 n: 1,
                 response_format: "url",
               },
@@ -243,128 +292,117 @@ export const updateHomepage = onRequest(
             const imageUrl = openaiResponse.data.data[0].url;
             console.log("Generated image URL:", imageUrl);
 
-            // 2. Download image to buffer
-            const imageResponse = await axios({
-              method: "GET",
-              url: imageUrl,
-              responseType: "arraybuffer",
-            });
-
-            // 3. Upload to Firebase Storage
-            const bucket = storage.bucket("intelligensi-ai-v2.firebasestorage.app");
-            const fileName = `generated-images/${Date.now()}-${args.title.replace(/\s+/g, "_")}.jpg`;
-            const file = bucket.file(fileName);
-
-            await file.save(Buffer.from(imageResponse.data), {
-              metadata: { contentType: "image/jpeg" },
-              resumable: false,
-            });
-
-            // Make the file publicly accessible
-            await file.makePublic();
-            const publicUrl = `https://storage.googleapis.com/intelligensi-ai-v2.firebasestorage.app/${fileName}`;
-            console.log("Image uploaded to Firebase Storage:", publicUrl);
-
             try {
-              const endpoint = `${DRUPAL_SITE_URL}/api/image-upload`;
+              // Upload media to Drupal
+              const mediaResponse = await uploadMediaToDrupal(
+                imageUrl,
+                args.altText || args.title || "Generated image"
+              );
+              console.log("✅ Uploaded via Drupal Bridge:", mediaResponse);
 
-              // Download the image from the public URL
-              const imageResponse = await fetch(publicUrl);
-              if (!imageResponse.ok) {
-                throw new Error(`Failed to fetch image from ${publicUrl}: ${imageResponse.status}`);
-              }
-              const imageBuffer = await imageResponse.buffer();
-
-              // Create FormData for file upload
-              const formData = new FormData();
-              formData.append("file", imageBuffer, {
-                filename: `${Date.now()}-upload.jpg`,
-                contentType: "image/jpeg",
-                knownLength: imageBuffer.length,
-              });
-              formData.append("alt", args.altText || "Generated image");
-
-              console.log("Making request to Drupal Bridge:", {
-                url: endpoint,
-                method: "POST",
-                headers: formData.getHeaders(),
-              });
-
-              const drupalResponse = await fetch(endpoint, {
-                method: "POST",
-                body: formData as unknown as NodeJS.ReadableStream,
-                headers: formData.getHeaders(),
-              });
-
-              if (!drupalResponse.ok) {
-                const errorText = await drupalResponse.text();
-                throw new Error(`Drupal Bridge error: ${drupalResponse.status} ${errorText}`);
-              }
-
-              const responseData = await drupalResponse.json() as DrupalResponse;
-              console.log("✅ Uploaded via Drupal Bridge:", responseData);
-
-              // Create recipe using the node-update endpoint
               const nodeUpdateEndpoint = `${DRUPAL_SITE_URL}/api/node-update`;
-
-              const payload = [{
-                type: "recipe",
-                title: args.title || "Untitled Recipe",
+              const basePayload = {
+                title: args.title || `Untitled ${args.content_type || "content"}`,
                 body: {
                   value: args.body || args.summary || "No description provided",
-                  format: "basic_html"
+                  format: "basic_html",
                 },
-                status: 1, // Published
-                field_cooking_time: { value: args.cooking_time || 0 },
-                field_preparation_time: { value: args.prep_time || 0 },
-                field_ingredients: (args.ingredients as string[] || []).map((ingredient: string) => ({
-                  value: ingredient
-                })),
-                field_recipe_instruction: (args.instructions as string[] || []).map((instruction: string) => ({
-                  value: instruction
-                })),
-                field_number_of_servings: { value: args.servings || 1 },
-                field_difficulty: args.difficulty || "medium",
-                field_summary: { value: args.summary || args.body || "No summary provided", format: "basic_html" },
+                status: 1, // 1 = Published, 0 = Unpublished
+                moderation_state: "published", // Required for content moderation
+                promote: 1, // Promote to front page
+                sticky: 0, // Not sticky
                 field_media_image: [{
-                  target_id: responseData.media_id,
+                  target_id: mediaResponse.media_id,
                   alt: args.altText || args.title || "Generated image",
-                  title: args.title || "Recipe image"
-                }]
-              }];
-              
-              
+                  title: args.title || `${args.content_type || "Content"} image`,
+                }],
+              };
 
-              const recipeResponse = await fetch(nodeUpdateEndpoint, {
+              // Add content type specific fields
+              let payload;
+              if (args.content_type === "recipe") {
+                payload = [{
+                  ...basePayload,
+                  type: "recipe",
+                  field_cooking_time: args.cooking_time || 0,
+                  field_preparation_time: args.prep_time || 0,
+                  field_ingredients: (args.ingredients as string[] || []).join("\n"),
+                  field_recipe_instruction: {
+                    value: (args.instructions as string[] || []).join("\n"),
+                    format: "basic_html",
+                  },
+                  field_number_of_servings: args.servings || 1,
+                  field_difficulty: args.difficulty || "medium",
+                  field_summary: {
+                    value: args.summary || args.body || "No summary provided",
+                    format: "basic_html",
+                  },
+                }];
+              } else if (args.content_type === "article") {
+                payload = [{
+                  ...basePayload,
+                  type: "article",
+                  body: {
+                    value: args.body || args.summary || "No description provided",
+                    format: "basic_html",
+                  },
+                  field_summary: {
+                    value: args.summary || "",
+                    format: "basic_html",
+                  },
+                  field_tags: args.tags ? (Array.isArray(args.tags) ? args.tags : [args.tags]) : [],
+                }];
+              } else if (args.content_type === "page") {
+                payload = [{
+                  ...basePayload,
+                  type: "page",
+                  body: {
+                    value: args.body || args.summary || "No description provided",
+                    format: "basic_html",
+                  },
+                }];
+              } else {
+                // Default to page if content type is not recognized
+                payload = [{
+                  ...basePayload,
+                  type: args.content_type || "page",
+                }];
+              }
+
+              const response = await fetch(nodeUpdateEndpoint, {
                 method: "POST",
                 headers: {
-                  "Content-Type": "application/json"
+                  "Content-Type": "application/json",
                 },
                 body: JSON.stringify(payload),
               });
 
-              if (!recipeResponse.ok) {
-                const errorText = await recipeResponse.text();
-                throw new Error(`Failed to create recipe via node-update: ${recipeResponse.status} ${errorText}`);
+              if (!response.ok) {
+                const errorText = await response.text();
+                const errorMsg = `Failed to create ${args.content_type || "content"} via ` +
+                  `node-update: ${response.status} ${errorText}`;
+                throw new Error(errorMsg);
               }
 
-              const recipeResult = await recipeResponse.json();
-              console.log("✅ Recipe created via node-update:", recipeResult);
+              const result = await response.json();
+              console.log(`✅ ${args.content_type || "Content"} created via node-update:`, result);
 
-              // Combine the response data with the recipe result
+              // Combine the response data with the result
               const combinedResponse: DrupalResponse = {
-                ...responseData,
+                ...mediaResponse,
                 data: {
-                  ...(responseData.data || {}),
-                  ...(recipeResult.data ? { node: recipeResult.data } : {})
-                } as any
+                  id: mediaResponse.id || '',
+                  type: mediaResponse.type || '',
+                  attributes: mediaResponse.attributes || {},
+                  ...(result.data && { node: result.data as Record<string, unknown> })
+                }
               };
 
               results.push({
                 function: "create_content",
                 success: true,
-                message: "Recipe and media created successfully",
-                drupalResponse: combinedResponse
+                message: `${args.content_type || "Content"} and media created successfully`,
+                drupalResponse: combinedResponse,
               });
             } catch (error: unknown) {
               const errorMessage = error instanceof Error ? error.message : "Unknown error";
