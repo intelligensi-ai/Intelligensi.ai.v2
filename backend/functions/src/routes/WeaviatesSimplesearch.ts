@@ -1,5 +1,4 @@
 import { onRequest } from "firebase-functions/v2/https";
-import { setGlobalOptions } from "firebase-functions/v2/options";
 import weaviate, { ApiKey } from "weaviate-ts-client";
 
 if (!process.env.OPENAI_API_KEY) {
@@ -16,11 +15,6 @@ const client = weaviate.client({
   },
 });
 
-// Set global options for the function
-setGlobalOptions({
-  region: "us-central1",
-  maxInstances: 10,
-});
 
 /**
  * Simple search function that queries Weaviate vector database
