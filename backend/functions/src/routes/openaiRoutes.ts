@@ -2,6 +2,7 @@ import axios from "axios";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import * as https from 'https';
+import * as admin from "firebase-admin";
 
 // Configure axios to ignore SSL errors in development
 if (process.env.FUNCTIONS_EMULATOR === 'true') {
@@ -386,24 +387,89 @@ export const updateHomepage = onRequest(
           } else if (toolCall.function.name === "create_content") {
             console.log("create_content called with args:", args);
 
-            // Image upload functionality is currently disabled
-
-            // Image generation is currently disabled
-            console.log("ℹ️  Image generation is currently disabled");
+            let mediaResponse: DrupalResponse | null = null;
 
             try {
-              // Create a placeholder media response that matches the DrupalResponse interface
-              const mediaResponse: DrupalResponse = {
-                status: "skipped",
-                message: "Image generation is currently disabled",
-                media_id: "",
-                id: "",
-                type: "media",
-                attributes: {},
-                url: ""
-              };
+              // Generate and upload image if prompt is provided or if it's a recipe
+              const imagePrompt = args.image_prompt || 
+                (args.content_type === 'recipe' && args.title 
+                  ? `Appetizing food photography of ${args.title}, professional food styling, high resolution, restaurant quality`
+                  : null);
 
-              console.log("ℹ️  Media upload skipped - image generation is disabled");
+              if (imagePrompt) {
+                console.log("🖼️  Generating image with prompt:", imagePrompt);
+                
+                try {
+                  // 1. Generate image with OpenAI
+                  const imageResponse = await axios.post(
+                    "https://api.openai.com/v1/images/generations",
+                    {
+                      model: "dall-e-3",
+                      prompt: imagePrompt,
+                      size: "1024x1024",
+                      n: 1,
+                      response_format: "url",
+                    },
+                    {
+                      headers: {
+                        "Authorization": `Bearer ${openaiApiKey.value()}`,
+                        "Content-Type": "application/json",
+                      },
+                    }
+                  );
+
+                  const imageUrl = imageResponse.data.data[0].url;
+                  console.log("✅ Generated image URL:", imageUrl);
+
+                  // 2. Upload to Firebase Storage
+                  const bucket = admin.storage().bucket("intelligensi-ai-v2.firebasestorage.app");
+                  const fileName = `generated-images/${Date.now()}-${args.title?.replace(/\s+/g, "_") || "image"}.jpg`;
+                  const file = bucket.file(fileName);
+
+                  // Download the image
+                  const imageResponseBuffer = await axios({
+                    method: "GET",
+                    url: imageUrl,
+                    responseType: "arraybuffer",
+                  });
+
+                  // Upload to Firebase Storage
+                  await file.save(Buffer.from(imageResponseBuffer.data), {
+                    metadata: { contentType: "image/jpeg" },
+                    resumable: false,
+                  });
+
+                  // Make the file publicly accessible
+                  await file.makePublic();
+                  const publicUrl = `https://storage.googleapis.com/intelligensi-ai-v2.firebasestorage.app/${fileName}`;
+                  console.log("✅ Image uploaded to Firebase Storage:", publicUrl);
+
+                  // 3. Upload to Drupal using the uploadImage function
+                  const uploadResponse = await axios.post(
+                    `http://${process.env.FUNCTIONS_EMULATOR === 'true' ? '127.0.0.1:5001' : 'us-central1'}/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`,
+                    {
+                      imagePath: publicUrl,
+                      siteUrl: DRUPAL_SITE_URL,
+                      altText: args.title || "Generated recipe image"
+                    },
+                    {
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                    }
+                  );
+
+                  mediaResponse = uploadResponse.data.data;
+                  console.log("✅ Media uploaded to Drupal:", mediaResponse);
+                } catch (error) {
+                  console.error("Error generating/uploading image:", error);
+                  // Continue without failing the entire request
+                  mediaResponse = {
+                    status: "error",
+                    message: error instanceof Error ? error.message : "Failed to generate/upload image"
+                  };
+                }
+              }
 
               const nodeUpdateEndpoint = `${DRUPAL_SITE_URL}/api/node-update`;
               const basePayload = {
@@ -417,7 +483,7 @@ export const updateHomepage = onRequest(
               // Add content type specific fields
               let payload;
               if (args.content_type === "recipe") {
-                payload = [{
+                const recipePayload: any = {
                   ...basePayload,
                   type: "recipe",
                   field_cooking_time: args.cooking_time || 0,
@@ -433,7 +499,17 @@ export const updateHomepage = onRequest(
                     value: args.summary || args.body || "No summary provided",
                     format: "basic_html",
                   },
-                }];
+                  // Add media reference if available
+                  ...(mediaResponse?.fid ? {
+                    field_media_image: [{
+                      target_id: mediaResponse.fid,
+                      alt: args.title || "Recipe image",
+                      title: args.title || "Recipe image"
+                    }]
+                  } : {})
+                };
+                
+                payload = [recipePayload];
               } else if (args.content_type === "article") {
                 // Get tag names (convert to array if it's a single string)
                 const tagNames = args.tags ? (Array.isArray(args.tags) ? args.tags : [args.tags]) : [];
@@ -489,11 +565,11 @@ export const updateHomepage = onRequest(
 
               // Combine the response data with the result
               const combinedResponse: DrupalResponse = {
-                ...mediaResponse,
+                ...(mediaResponse || {}),
                 data: {
-                  id: mediaResponse.id || "",
-                  type: mediaResponse.type || "",
-                  attributes: mediaResponse.attributes || {},
+                  id: mediaResponse?.id || "",
+                  type: mediaResponse?.type || "",
+                  attributes: mediaResponse?.attributes || {},
                   ...(result.data && { node: result.data as Record<string, unknown> }),
                 },
               };
