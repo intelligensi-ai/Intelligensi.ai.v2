@@ -390,11 +390,21 @@ export const updateHomepage = onRequest(
             let mediaResponse: DrupalResponse | null = null;
 
             try {
-              // Generate and upload image if prompt is provided or if it's a recipe
-              const imagePrompt = args.image_prompt || 
-                (args.content_type === 'recipe' && args.title 
-                  ? `Appetizing food photography of ${args.title}, professional food styling, high resolution, restaurant quality`
-                  : null);
+              // Generate and upload image if prompt is provided or if content type supports it
+              let imagePrompt = args.image_prompt;
+              if (!imagePrompt && args.title) {
+                switch (args.content_type) {
+                  case 'recipe':
+                    imagePrompt = `Appetizing food photography of ${args.title}, professional food styling, high resolution, restaurant quality`;
+                    break;
+                  case 'article':
+                    imagePrompt = `Editorial style image for article: ${args.title}, professional photography, high resolution`;
+                    break;
+                  case 'page':
+                    imagePrompt = `Header image for web page: ${args.title}, modern web design, high resolution`;
+                    break;
+                }
+              }
 
               if (imagePrompt) {
                 console.log("🖼️  Generating image with prompt:", imagePrompt);
@@ -483,6 +493,7 @@ export const updateHomepage = onRequest(
               // Add content type specific fields
               let payload;
               if (args.content_type === "recipe") {
+                // Prepare recipe payload
                 const recipePayload: any = {
                   ...basePayload,
                   type: "recipe",
@@ -500,12 +511,13 @@ export const updateHomepage = onRequest(
                     format: "basic_html",
                   },
                   // Add media reference if available
-                  ...(mediaResponse?.fid ? {
-                    field_media_image: [{
-                      target_id: mediaResponse.fid,
-                      alt: args.title || "Recipe image",
-                      title: args.title || "Recipe image"
-                    }]
+                  ...(mediaResponse?.media_id ? {
+                    field_media_image: {
+                      target_id: mediaResponse.media_id,
+                      alt: mediaResponse.alt || args.title || "Recipe image",
+                      title: mediaResponse.alt || args.title || "Recipe image",
+                      target_revision_id: mediaResponse.media_id
+                    }
                   } : {})
                 };
                 
@@ -514,7 +526,7 @@ export const updateHomepage = onRequest(
                 // Get tag names (convert to array if it's a single string)
                 const tagNames = args.tags ? (Array.isArray(args.tags) ? args.tags : [args.tags]) : [];
                 
-                payload = [{
+                const articlePayload: any = {
                   ...basePayload,
                   type: "article",
                   field_body: [{
@@ -527,16 +539,40 @@ export const updateHomepage = onRequest(
                   }],
                   // Send tag names directly as strings (Drupal will handle the term resolution)
                   field_tags: tagNames,
-                }];
+                };
+
+                // Add media reference if available
+                if (mediaResponse?.media_id) {
+                  articlePayload.field_media_image = {
+                    target_id: mediaResponse.media_id,
+                    alt: mediaResponse.alt || args.title || "Article image",
+                    title: mediaResponse.alt || args.title || "Article image",
+                    target_revision_id: mediaResponse.media_id
+                  };
+                }
+
+                payload = [articlePayload];
               } else if (args.content_type === "page") {
-                payload = [{
+                const pagePayload: any = {
                   ...basePayload,
                   type: "page",
                   field_body: [{
                     value: args.body || args.summary || "No description provided",
                     format: "basic_html",
                   }],
-                }];
+                };
+
+                // Add media reference if available
+                if (mediaResponse?.media_id) {
+                  pagePayload.field_media_image = {
+                    target_id: mediaResponse.media_id,
+                    alt: mediaResponse.alt || args.title || "Page image",
+                    title: mediaResponse.alt || args.title || "Page image",
+                    target_revision_id: mediaResponse.media_id
+                  };
+                }
+
+                payload = [pagePayload];
               } else {
                 // Default to page if content type is not recognized
                 payload = [{
