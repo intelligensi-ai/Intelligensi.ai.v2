@@ -1,42 +1,40 @@
 import { onRequest } from "firebase-functions/v2/https";
-import { defineString, defineSecret } from "firebase-functions/params";
-import weaviate, { WeaviateClient, ApiKey } from "weaviate-client";
+import { defineSecret } from "firebase-functions/params";
 import axios, { isAxiosError } from "axios";
 
-// Firebase runtime parameters/secrets
-const weaviateUrlParam = defineString("WEAVIATE_URL");
+// Firebase secrets (use secrets for both to avoid CLI params requirement)
+const weaviateUrlSecret = defineSecret("WEAVIATE_URL");
 const weaviateApiKeySecret = defineSecret("WEAVIATE_API_KEY");
 
 /**
  * Firebase HTTPS function to check Weaviate connection.
  */
-export const checkWeaviate = onRequest({ secrets: [weaviateApiKeySecret] }, async function(req, res) {
-  try {
-    const weaviateUrl = weaviateUrlParam.value();
-    const weaviateApiKey = weaviateApiKeySecret.value();
-    const client = await weaviate.connectToWeaviateCloud(
-      weaviateUrl,
-      {
-        authCredentials: new ApiKey(weaviateApiKey),
-      }
-    );
-    const clientReadiness = await client.isReady();
-    console.log("Weaviate client ready:", clientReadiness);
-    res.status(200).send("Weaviate is ready.");
-    client.close();
-  } catch (error: unknown) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error("❌ Weaviate init error:", errorMsg);
-    res.status(500).send("Weaviate initialization failed: " + errorMsg);
+export const checkWeaviate = onRequest(
+  { secrets: [weaviateUrlSecret, weaviateApiKeySecret] },
+  async function(req, res) {
+    try {
+      const weaviateUrl = weaviateUrlSecret.value();
+      const weaviateApiKey = weaviateApiKeySecret.value();
+      // Perform a simple authenticated call to verify readiness
+      await axios.get(`${weaviateUrl}/v1/schema`, {
+        headers: { Authorization: `Bearer ${weaviateApiKey}` },
+      });
+      console.log("Weaviate client ready via schema endpoint");
+      res.status(200).send("Weaviate is ready.");
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("❌ Weaviate init error:", errorMsg);
+      res.status(500).send("Weaviate initialization failed: " + errorMsg);
+    }
   }
-});
+);
 
 /**
  * Firebase HTTPS function to write schema to Weaviate.
  */
-export const writeSchema = onRequest({ secrets: [weaviateApiKeySecret] }, async (req, res) => {
+export const writeSchema = onRequest({ secrets: [weaviateUrlSecret, weaviateApiKeySecret] }, async (req, res) => {
   try {
-    const weaviateUrl = weaviateUrlParam.value();
+    const weaviateUrl = weaviateUrlSecret.value();
     const weaviateApiKey = weaviateApiKeySecret.value();
     const classSchema = {
       class: "intelligensiAi",
@@ -93,9 +91,9 @@ export const writeSchema = onRequest({ secrets: [weaviateApiKeySecret] }, async 
 /**
  * Firebase HTTPS function to write data to Weaviate
  */
-export const writeWeaviate = onRequest({ secrets: [weaviateApiKeySecret] }, async (req, res) => {
+export const writeWeaviate = onRequest({ secrets: [weaviateUrlSecret, weaviateApiKeySecret] }, async (req, res) => {
   try {
-    const weaviateUrl = weaviateUrlParam.value();
+    const weaviateUrl = weaviateUrlSecret.value();
     const weaviateApiKey = weaviateApiKeySecret.value();
     // Handle both single object and batch operations
     const inputData = req.body;
