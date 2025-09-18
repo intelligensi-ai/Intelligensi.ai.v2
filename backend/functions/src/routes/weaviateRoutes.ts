@@ -1,40 +1,27 @@
-import * as dotenv from "dotenv";
 import { onRequest } from "firebase-functions/v2/https";
+import { defineString, defineSecret } from "firebase-functions/params";
 import weaviate, { WeaviateClient, ApiKey } from "weaviate-client";
 import axios, { isAxiosError } from "axios";
 
-// Load environment variables from .env file
-dotenv.config({ path: `${process.cwd()}/.env` });
-
-// Environment variables
-const weaviateUrl = process.env.WEAVIATE_URL as string;
-const weaviateApiKey = process.env.WEAVIATE_API_KEY as string;
-
-console.log("Weaviate URL:", weaviateUrl);
-
-/**
- * Initializes the Weaviate client and logs readiness.
- */
-async function initializeWeaviateClient(): Promise<WeaviateClient> {
-  const client: WeaviateClient = await weaviate.connectToWeaviateCloud(
-    weaviateUrl,
-    {
-      authCredentials: new ApiKey(weaviateApiKey),
-      // No OpenAI headers needed
-    }
-  );
-
-  const clientReadiness = await client.isReady();
-  console.log("Weaviate client ready:", clientReadiness);
-  return client;
-}
+// Firebase runtime parameters/secrets
+const weaviateUrlParam = defineString("WEAVIATE_URL");
+const weaviateApiKeySecret = defineSecret("WEAVIATE_API_KEY");
 
 /**
  * Firebase HTTPS function to check Weaviate connection.
  */
-export const checkWeaviate = onRequest(async function(req, res) {
+export const checkWeaviate = onRequest({ secrets: [weaviateApiKeySecret] }, async function(req, res) {
   try {
-    const client = await initializeWeaviateClient();
+    const weaviateUrl = weaviateUrlParam.value();
+    const weaviateApiKey = weaviateApiKeySecret.value();
+    const client = await weaviate.connectToWeaviateCloud(
+      weaviateUrl,
+      {
+        authCredentials: new ApiKey(weaviateApiKey),
+      }
+    );
+    const clientReadiness = await client.isReady();
+    console.log("Weaviate client ready:", clientReadiness);
     res.status(200).send("Weaviate is ready.");
     client.close();
   } catch (error: unknown) {
@@ -47,8 +34,10 @@ export const checkWeaviate = onRequest(async function(req, res) {
 /**
  * Firebase HTTPS function to write schema to Weaviate.
  */
-export const writeSchema = onRequest(async (req, res) => {
+export const writeSchema = onRequest({ secrets: [weaviateApiKeySecret] }, async (req, res) => {
   try {
+    const weaviateUrl = weaviateUrlParam.value();
+    const weaviateApiKey = weaviateApiKeySecret.value();
     const classSchema = {
       class: "intelligensiAi",
       description: "Articles with OpenAI embeddings for semantic search",
@@ -104,8 +93,10 @@ export const writeSchema = onRequest(async (req, res) => {
 /**
  * Firebase HTTPS function to write data to Weaviate
  */
-export const writeWeaviate = onRequest(async (req, res) => {
+export const writeWeaviate = onRequest({ secrets: [weaviateApiKeySecret] }, async (req, res) => {
   try {
+    const weaviateUrl = weaviateUrlParam.value();
+    const weaviateApiKey = weaviateApiKeySecret.value();
     // Handle both single object and batch operations
     const inputData = req.body;
     let objectsToCreate = [];

@@ -1,28 +1,32 @@
 import axios from "axios";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
-import * as https from 'https';
+import * as https from "https";
 import * as admin from "firebase-admin";
 
 // Configure axios to ignore SSL errors in development
-if (process.env.FUNCTIONS_EMULATOR === 'true') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+if (process.env.FUNCTIONS_EMULATOR === "true") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   const httpsAgent = new https.Agent({
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
   });
-  
+
   // Configure axios instance to use the custom agent
   axios.defaults.httpsAgent = httpsAgent;
-  
+
+  // Extend RequestInit to include agent property
+  interface ExtendedRequestInit extends RequestInit {
+    agent?: https.Agent;
+  }
+
   // Override global fetch to use the custom agent
   const originalFetch = global.fetch;
-  global.fetch = (input: any, init: any = {}) => {
-    const url = input.url || input;
-    const options = { ...init };
+  global.fetch = (input: RequestInfo | URL, init: ExtendedRequestInit = {}) => {
+    const options: ExtendedRequestInit = { ...init };
     if (!options.agent) {
       options.agent = httpsAgent;
     }
-    return originalFetch(url, options);
+    return originalFetch(input, options);
   };
 }
 
@@ -179,7 +183,7 @@ async function handleMenuOperation(menuName: string, operation: MenuOperation): 
     case "add_menu_item": {
       const title = parameters.Placeholder1 || parameters.title || "New Menu Item";
       const addResponse = await axios.post(
-        `${baseUrl}/main`, // Default to 'main' menu if not specified
+        `${baseUrl}/main`, // Default to "main" menu if not specified
         {
           operation: "add",
           title: title,
@@ -267,7 +271,8 @@ export const updateHomepage = onRequest(
 
       const systemMessage = {
         role: "system" as const,
-        content: "You are an assistant that ONLY responds by calling one of the provided functions. " +
+        content:
+          "You are an assistant that ONLY responds by calling one of the provided functions. " +
           "Never reply in plain text.",
       };
       const userMessage = { role: "user" as const, content: prompt };
@@ -331,7 +336,12 @@ export const updateHomepage = onRequest(
           temperature: 0.7,
           max_tokens: 1024,
         },
-        { headers: { "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" } }
+        {
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
 
       const message = openAIResponse.data.choices[0]?.message;
@@ -394,21 +404,33 @@ export const updateHomepage = onRequest(
               let imagePrompt = args.image_prompt;
               if (!imagePrompt && args.title) {
                 switch (args.content_type) {
-                  case 'recipe':
-                    imagePrompt = `Appetizing food photography of ${args.title}, professional food styling, high resolution, restaurant quality`;
-                    break;
-                  case 'article':
-                    imagePrompt = `Editorial style image for article: ${args.title}, professional photography, high resolution`;
-                    break;
-                  case 'page':
-                    imagePrompt = `Header image for web page: ${args.title}, modern web design, high resolution`;
-                    break;
+                case "recipe": {
+                  const base = "Appetizing food photography of ";
+                  const details =
+                    ", professional food styling, high resolution, restaurant quality";
+                  imagePrompt = `${base}${args.title}${details}`;
+                  break;
+                }
+                case "article": {
+                  const base = "Editorial style image for article: ";
+                  const details = ", professional photography, high resolution";
+                  imagePrompt = `${base}${args.title}${details}`;
+                  break;
+                }
+                case "page": {
+                  const base = "Header image for web page: ";
+                  const details = ", modern web design, high resolution";
+                  imagePrompt = `${base}${args.title}${details}`;
+                  break;
+                }
+                default:
+                  break;
                 }
               }
 
               if (imagePrompt) {
                 console.log("🖼️  Generating image with prompt:", imagePrompt);
-                
+
                 try {
                   // 1. Generate image with OpenAI
                   const imageResponse = await axios.post(
@@ -433,7 +455,8 @@ export const updateHomepage = onRequest(
 
                   // 2. Upload to Firebase Storage
                   const bucket = admin.storage().bucket("intelligensi-ai-v2.firebasestorage.app");
-                  const fileName = `generated-images/${Date.now()}-${args.title?.replace(/\s+/g, "_") || "image"}.jpg`;
+                  const safeTitle = args.title?.replace(/\s+/g, "_") || "image";
+                  const fileName = `generated-images/${Date.now()}-${safeTitle}.jpg`;
                   const file = bucket.file(fileName);
 
                   // Download the image
@@ -451,16 +474,20 @@ export const updateHomepage = onRequest(
 
                   // Make the file publicly accessible
                   await file.makePublic();
-                  const publicUrl = `https://storage.googleapis.com/intelligensi-ai-v2.firebasestorage.app/${fileName}`;
+                  const publicUrl =
+                    `https://storage.googleapis.com/intelligensi-ai-v2.firebasestorage.app/${fileName}`;
                   console.log("✅ Image uploaded to Firebase Storage:", publicUrl);
 
                   // 3. Upload to Drupal using the uploadImage function
+                  const uploadHost =
+                    process.env.FUNCTIONS_EMULATOR === "true" ? "127.0.0.1:5001" : "us-central1";
+                  const uploadUrl = `http://${uploadHost}/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`;
                   const uploadResponse = await axios.post(
-                    `http://${process.env.FUNCTIONS_EMULATOR === 'true' ? '127.0.0.1:5001' : 'us-central1'}/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`,
+                    uploadUrl,
                     {
                       imagePath: publicUrl,
                       siteUrl: DRUPAL_SITE_URL,
-                      altText: args.title || "Generated recipe image"
+                      altText: args.title || "Generated recipe image",
                     },
                     {
                       headers: {
@@ -476,25 +503,32 @@ export const updateHomepage = onRequest(
                   // Continue without failing the entire request
                   mediaResponse = {
                     status: "error",
-                    message: error instanceof Error ? error.message : "Failed to generate/upload image"
+                    message:
+                      error instanceof Error ? error.message : "Failed to generate/upload image",
                   };
                 }
               }
 
               const nodeUpdateEndpoint = `${DRUPAL_SITE_URL}/api/node-update`;
-              const basePayload = {
+              type BasePayload = {
+                title: string;
+                status: number;
+                moderation_state: string;
+                promote: number;
+                sticky: number;
+              };
+              const basePayload: BasePayload = {
                 title: args.title || `Untitled ${args.content_type || "content"}`,
                 status: 1, // 1 = Published, 0 = Unpublished
-                moderation_state: "published", // Required for content moderation
+                moderation_state: "published", // Content moderation
                 promote: 1, // Promote to front page
                 sticky: 0, // Not sticky
               };
 
-              // Add content type specific fields
-              let payload;
+              let payload: Array<Record<string, unknown>>;
               if (args.content_type === "recipe") {
                 // Prepare recipe payload
-                const recipePayload: any = {
+                const recipePayload: Record<string, unknown> = {
                   ...basePayload,
                   type: "recipe",
                   field_cooking_time: args.cooking_time || 0,
@@ -510,75 +544,81 @@ export const updateHomepage = onRequest(
                     value: args.summary || args.body || "No summary provided",
                     format: "basic_html",
                   },
-                  // Add media reference if available
-                  ...(mediaResponse?.media_id ? {
-                    field_media_image: {
-                      target_id: mediaResponse.media_id,
-                      alt: mediaResponse.alt || args.title || "Recipe image",
-                      title: mediaResponse.alt || args.title || "Recipe image",
-                      target_revision_id: mediaResponse.media_id
-                    }
-                  } : {})
+                  ...(mediaResponse?.media_id ?
+                    {
+                      field_media_image: {
+                        target_id: mediaResponse.media_id,
+                        alt: mediaResponse.alt || args.title || "Recipe image",
+                        title: mediaResponse.alt || args.title || "Recipe image",
+                        target_revision_id: mediaResponse.media_id,
+                      },
+                    } :
+                    {}),
                 };
-                
+
                 payload = [recipePayload];
               } else if (args.content_type === "article") {
-                // Get tag names (convert to array if it's a single string)
-                const tagNames = args.tags ? (Array.isArray(args.tags) ? args.tags : [args.tags]) : [];
-                
-                const articlePayload: any = {
+                const tagNames = args.tags ?
+                  (Array.isArray(args.tags) ? args.tags : [args.tags]) :
+                  [];
+
+                const articlePayload: Record<string, unknown> = {
                   ...basePayload,
                   type: "article",
-                  field_body: [{
-                    value: args.body || args.summary || "No description provided",
-                    format: "basic_html",
-                  }],
-                  field_summary: [{
-                    value: args.summary || "",
-                    format: "basic_html",
-                  }],
-                  // Send tag names directly as strings (Drupal will handle the term resolution)
+                  field_body: [
+                    {
+                      value: args.body || args.summary || "No description provided",
+                      format: "basic_html",
+                    },
+                  ],
+                  field_summary: [
+                    {
+                      value: args.summary || "",
+                      format: "basic_html",
+                    },
+                  ],
                   field_tags: tagNames,
                 };
 
-                // Add media reference if available
                 if (mediaResponse?.media_id) {
-                  articlePayload.field_media_image = {
+                  (articlePayload as Record<string, unknown>).field_media_image = {
                     target_id: mediaResponse.media_id,
                     alt: mediaResponse.alt || args.title || "Article image",
                     title: mediaResponse.alt || args.title || "Article image",
-                    target_revision_id: mediaResponse.media_id
-                  };
+                    target_revision_id: mediaResponse.media_id,
+                  } as unknown as Record<string, unknown>;
                 }
 
                 payload = [articlePayload];
               } else if (args.content_type === "page") {
-                const pagePayload: any = {
+                const pagePayload: Record<string, unknown> = {
                   ...basePayload,
                   type: "page",
-                  field_body: [{
-                    value: args.body || args.summary || "No description provided",
-                    format: "basic_html",
-                  }],
+                  field_body: [
+                    {
+                      value: args.body || args.summary || "No description provided",
+                      format: "basic_html",
+                    },
+                  ],
                 };
 
-                // Add media reference if available
                 if (mediaResponse?.media_id) {
-                  pagePayload.field_media_image = {
+                  (pagePayload as Record<string, unknown>).field_media_image = {
                     target_id: mediaResponse.media_id,
                     alt: mediaResponse.alt || args.title || "Page image",
                     title: mediaResponse.alt || args.title || "Page image",
-                    target_revision_id: mediaResponse.media_id
-                  };
+                    target_revision_id: mediaResponse.media_id,
+                  } as unknown as Record<string, unknown>;
                 }
 
                 payload = [pagePayload];
               } else {
-                // Default to page if content type is not recognized
-                payload = [{
-                  ...basePayload,
-                  type: args.content_type || "page",
-                }];
+                payload = [
+                  {
+                    ...basePayload,
+                    type: args.content_type || "page",
+                  },
+                ];
               }
 
               const response = await fetch(nodeUpdateEndpoint, {

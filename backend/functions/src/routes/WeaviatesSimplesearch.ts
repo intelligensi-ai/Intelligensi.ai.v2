@@ -1,19 +1,9 @@
 import { onRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import weaviate, { ApiKey } from "weaviate-ts-client";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY environment variable is not set");
-}
-
-// Initialize Weaviate client with environment variables
-const client = weaviate.client({
-  scheme: "https",
-  host: "o8rpm9n6tz69qo7mrhl1a.c0.europe-west3.gcp.weaviate.cloud",
-  apiKey: new ApiKey("pqb7M3NvwICXPvO4Cf72knOhrplAqWNiKRy4"),
-  headers: {
-    "X-OpenAI-Api-Key": process.env.OPENAI_API_KEY as string,
-  },
-});
+// Use Firebase Secret for OpenAI key; do not read env at import time
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
 
 /**
@@ -21,7 +11,7 @@ const client = weaviate.client({
  * @param query - The search query string
  * @param limit - Maximum number of results to return (default: 10)
  */
-export const simpleSearch = onRequest(async (req, res) => {
+export const simpleSearch = onRequest({ secrets: [openaiApiKey] }, async (req, res) => {
   // Set response headers
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, POST");
@@ -33,6 +23,16 @@ export const simpleSearch = onRequest(async (req, res) => {
     return;
   }
   try {
+    const openaiKey = openaiApiKey.value();
+    // Initialize Weaviate client with runtime secret
+    const client = weaviate.client({
+      scheme: "https",
+      host: "o8rpm9n6tz69qo7mrhl1a.c0.europe-west3.gcp.weaviate.cloud",
+      apiKey: new ApiKey("pqb7M3NvwICXPvO4Cf72knOhrplAqWNiKRy4"),
+      headers: {
+        "X-OpenAI-Api-Key": openaiKey,
+      },
+    });
     // Parse the request body if it exists
     let query;
     let prompt;
