@@ -88,69 +88,64 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
           .from('users')
           .select('id, uid, email')
           .eq('uid', currentUser.uid)
-          .single();
+          .maybeSingle();
 
         if (userError) {
-          console.error('Error fetching Supabase user:', userError);
+          console.error('Error fetching Supabase user (non-fatal if PGRST116):', userError);
         }
 
         console.log('Supabase user data:', userData);
 
         if (!userData) {
-          console.log('No existing user found, creating new Supabase user for:', currentUser.email);
-          // Create the user in Supabase if they don't exist
-          const { data: newUser, error: createError } = await supabase
+          console.log('No user by UID. Checking for existing Supabase user by email:', currentUser.email);
+          const { data: emailUser, error: emailLookupError } = await supabase
             .from('users')
-            .insert([{
-              uid: currentUser.uid,
-              email: currentUser.email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }])
             .select('id, uid, email')
-            .single();
+            .eq('email', currentUser.email)
+            .maybeSingle();
 
-          if (createError) {
-            // If we get a unique constraint error, try to fetch the user again
-            if (createError.message.includes('duplicate key value')) {
-              const { data: existingUser, error: fetchError } = await supabase
-                .from('users')
-                .select('id, uid, email')
-                .eq('uid', currentUser.uid)
-                .single();
+          if (emailLookupError) {
+            console.error('Email lookup error (non-fatal):', emailLookupError);
+          }
 
-              if (fetchError || !existingUser) {
-                console.error('Error fetching existing user:', fetchError);
-                throw new Error('Failed to get user information');
-              }
+          if (emailUser) {
+            console.log('Found user by email. Updating UID on existing record:', emailUser.id);
+            const { data: updatedUser, error: updateErr } = await supabase
+              .from('users')
+              .update({ uid: currentUser.uid, updated_at: new Date().toISOString() })
+              .eq('id', emailUser.id)
+              .select('id, uid, email')
+              .single();
 
-              console.log('Found existing user after conflict:', existingUser);
-              setFormData(prev => ({
-                ...prev,
-                user_id: existingUser.id
-              }));
-              return;
+            if (updateErr || !updatedUser) {
+              console.error('Failed to update user UID on email match:', updateErr);
+              throw new Error('Failed to link Firebase UID to existing user');
             }
 
-            console.error('Error creating Supabase user:', createError);
-            throw new Error(`Failed to create user in database: ${createError.message}`);
-          }
-          
-          if (!newUser) {
-            throw new Error('User creation succeeded but no user data returned');
-          }
+            setFormData(prev => ({ ...prev, user_id: updatedUser.id }));
+          } else {
+            console.log('No user by email. Creating new Supabase user');
+            const { data: newUser, error: insertErr } = await supabase
+              .from('users')
+              .insert({
+                uid: currentUser.uid,
+                email: currentUser.email,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select('id, uid, email')
+              .single();
 
-          console.log('Successfully created new Supabase user:', newUser);
-          setFormData(prev => ({
-            ...prev,
-            user_id: newUser.id
-          }));
+            if (insertErr || !newUser) {
+              console.error('Insert user failed:', insertErr);
+              throw new Error(`Failed to create user in database: ${insertErr?.message || 'unknown error'}`);
+            }
+
+            setFormData(prev => ({ ...prev, user_id: newUser.id }));
+          }
         } else {
           console.log('Found existing Supabase user:', userData);
-          setFormData(prev => ({
-            ...prev,
-            user_id: userData.id
-          }));
+          setFormData(prev => ({ ...prev, user_id: userData.id }));
         }
 
         // Set initial data if provided
