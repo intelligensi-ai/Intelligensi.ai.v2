@@ -530,24 +530,21 @@ const Sites: React.FC<SitesProps> = ({
           {/* Site Info Card */}
           {selectedSite && (
             <div className="hidden md:block bg-[#2D3748] px-4 rounded-lg border border-gray-600 shadow-sm w-full md:w-[55%]">
-              <h2 className="text-sm font-semibold px-4  text-gray-100 tracking-wider mb-3 pb-1 border-b border-gray-600">Site Information</h2>
+              <h2 className="text-sm px-4  text-gray-100 tracking-wider mb-3 pb-1 border-b border-gray-600 font-black">{selectedSite.site_name}</h2>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2 px-4">
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Name</p>
-                    <p className="text-sm text-gray-200">{selectedSite.site_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">CMS</p>
-                    <p className="text-sm text-gray-200">{selectedSite.cms?.name || 'N/A'}</p>
-                  </div>
+                <div>
+                     <p className="text-xs text-gray-400 mb-0.5">Description</p>
+                    <p className="text-sm text-gray-200">{selectedSite.description}</p>
+                </div>
+              
                 </div>
                 {selectedSite.description && (
                   <div className="space-y-2">
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Description</p>
-                      <p className="text-sm text-gray-200">{selectedSite.description}</p>
-                    </div>
+                      <div>
+                    <p className="text-xs text-gray-400 mb-0.5">CMS</p>
+                    <p className="text-sm text-gray-200">{selectedSite.cms?.name || 'N/A'}</p>
+                  </div>
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5">Link to site</p>
                       <a 

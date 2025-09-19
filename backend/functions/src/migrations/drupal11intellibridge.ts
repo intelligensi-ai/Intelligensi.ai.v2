@@ -42,6 +42,7 @@ import * as https from "https";
 import { onRequest } from "firebase-functions/v2/https";
 import FormData from "form-data";
 import fetch from "node-fetch";
+import { getSupabase } from "../services/supabaseService";
 
 // Drupal 11 base URL - hardcoded as per requirements
 const DRUPAL_11_BASE_URL = "https://umami-intelligensi.ai.ddev.site";
@@ -264,17 +265,256 @@ d11Router.post("/api/image-upload", async (req: Request, res: Response): Promise
 // Import nodes into Drupal 11
 // Import nodes to Drupal 11
 d11Router.post("/import", async (req: Request, res: Response): Promise<void> => {
-  const { nodes } = req.body;
+  const { sender_id: providedSenderId } = (req.body || {}) as { sender_id?: number };
+  const incomingNodes: unknown = Array.isArray(req.body) ? req.body : (req.body?.nodes as unknown);
 
-  if (!nodes) {
-    res.status(400).json({ error: "Nodes are required" });
+  if (!Array.isArray(incomingNodes) || incomingNodes.length === 0) {
+    res.status(400).json({ error: "Nodes are required and must be a non-empty array" });
     return;
   }
 
   try {
     const client = createDrupalClient();
-    const response = await client.post("/api/node-update", { nodes });
-    res.json(response.data);
+
+    type AnyRec = Record<string, unknown>;
+    const valStr = (v: unknown, d = ""): string => (typeof v === "string" ? v : d);
+    const boolNum = (v: unknown, d = 1): number => (typeof v === "number" ? v : d);
+
+    // Map a flexible node input into the Drupal bridge shape (see openaiRoutes create_content)
+    const mapNode = (item: AnyRec): AnyRec => {
+      const type = valStr(item.type);
+      const title = typeof item.title === "string" ?
+        item.title :
+        (item.title && typeof item.title === "object" && "value" in (item.title as AnyRec) ?
+          valStr((item.title as AnyRec).value) :
+          "");
+
+      const base: AnyRec = {
+        title: title || "Untitled",
+        status: boolNum(item.status, 1),
+        moderation_state: valStr(item.moderation_state, "published"),
+        promote: boolNum(item.promote, 1),
+        sticky: boolNum(item.sticky, 0),
+      };
+
+      if (type === "recipe") {
+        return {
+          ...base,
+          type: "recipe",
+          field_cooking_time: item.cooking_time ?? item.field_cooking_time ?? 0,
+          field_preparation_time: item.prep_time ?? item.field_preparation_time ?? 0,
+          field_ingredients:
+            Array.isArray(item.ingredients) ?
+              (item.ingredients as unknown[])
+                .map(String)
+                .join("\n") :
+              valStr(item.field_ingredients),
+          field_recipe_instruction: {
+            value:
+              Array.isArray(item.instructions) ?
+                (item.instructions as unknown[])
+                  .map(String)
+                  .join("\n") :
+                valStr(
+                  (item as AnyRec).recipe_instructions ||
+                  (item as AnyRec).field_recipe_instruction
+                ),
+            format: "basic_html",
+          },
+          field_number_of_servings: item.servings ?? item.field_number_of_servings ?? 1,
+          field_difficulty: valStr(item.difficulty, "medium"),
+          field_summary: {
+            value:
+              valStr((item as AnyRec).summary) ||
+              valStr((item as AnyRec).body) ||
+              valStr((item as AnyRec).field_summary),
+            format: "basic_html",
+          },
+        };
+      }
+
+      if (type === "article") {
+        return {
+          ...base,
+          type: "article",
+          field_body: [
+            {
+              value:
+                valStr((item as AnyRec).body) ||
+                valStr((item as AnyRec).summary, "No description provided"),
+              format: "basic_html",
+            },
+          ],
+          field_summary: [
+            { value: valStr((item as AnyRec).summary, ""), format: "basic_html" },
+          ],
+          field_tags: Array.isArray((item as AnyRec).tags) ? (item as { tags: unknown[] }).tags : [],
+        };
+      }
+
+      // default to page
+      return {
+        ...base,
+        type: type || "page",
+        field_body: [
+          {
+            value:
+              valStr((item as AnyRec).body) ||
+              valStr((item as AnyRec).summary, "No description provided"),
+            format: "basic_html",
+          },
+        ],
+      };
+    };
+
+    const payload: AnyRec[] = (incomingNodes as AnyRec[]).map(mapNode);
+    const response = await client.post("/api/node-update", payload);
+    const data = response.data as { status?: string; message?: string; results?: { details?: string[] } };
+
+    // Helper to safely get text from various field shapes
+    const getText = (val: unknown): string => {
+      if (!val) return "";
+      if (typeof val === "string") return val;
+      if (Array.isArray(val)) {
+        // Look for first object with value or first string
+        for (const item of val) {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object" && "value" in item) {
+            const v = (item as { value?: unknown }).value;
+            if (typeof v === "string") return v;
+          }
+        }
+        return "";
+      }
+      if (typeof val === "object") {
+        const obj = val as Record<string, unknown>;
+        if (typeof obj.value === "string") return obj.value;
+        if (typeof obj.summary === "string") return obj.summary;
+      }
+      return "";
+    };
+
+    const extractTitle = (item: Record<string, unknown>): string => {
+      if (typeof item.title === "string") return item.title;
+      if (item.title && typeof item.title === "object" && "value" in (item.title as object)) {
+        const v = (item.title as { value?: unknown }).value;
+        if (typeof v === "string") return v;
+      }
+      if (typeof (item as { label?: string }).label === "string") return (item as { label?: string }).label!;
+      return "Untitled";
+    };
+
+    const extractSnippet = (item: Record<string, unknown>): string => {
+      // Preferred order: summary-like then body-like then generic
+      const candidates: unknown[] = [
+        (item as Record<string, unknown>).summary,
+        (item as Record<string, unknown>).body,
+        (item as Record<string, unknown>).field_summary,
+        (item as Record<string, unknown>).field_body,
+        (item as Record<string, unknown>).description,
+        (item as Record<string, unknown>).excerpt,
+      ];
+      let text = "";
+      for (const c of candidates) {
+        text = getText(c);
+        if (text) break;
+      }
+      if (!text) return "";
+      const trimmed = text.trim();
+      if (trimmed.length <= 25) return trimmed;
+      return `${trimmed.slice(0, 25)}…`;
+    };
+
+    const normalizeArray = (resp: unknown): Record<string, unknown>[] => {
+      if (Array.isArray(resp)) return resp as Record<string, unknown>[];
+      if (resp && typeof resp === "object") {
+        const obj = resp as Record<string, unknown>;
+        if (Array.isArray(obj.data)) return obj.data as Record<string, unknown>[];
+        return [obj];
+      }
+      return [];
+    };
+
+    const items = normalizeArray(data);
+    // If API doesn't return structured items, try to parse nids from details strings
+    let detailNids: Array<{ nid: string; title?: string }> = [];
+    if (data && typeof data === "object") {
+      const resultsMaybe = (data as { results?: unknown }).results;
+      const detailsMaybe =
+        resultsMaybe && typeof resultsMaybe === "object" ?
+          (resultsMaybe as { details?: unknown }).details :
+          undefined;
+      const detailsArr: string[] = Array.isArray(detailsMaybe) ?
+        (detailsMaybe as unknown[]).map(String) :
+        [];
+      if (detailsArr.length) {
+        const nidRegex = /Created node\s+(\d+):\s*(.+)$/i;
+        detailNids = detailsArr
+          .map((line) => {
+            const m = nidRegex.exec(line);
+            if (m) return { nid: m[1], title: m[2] };
+            return { nid: "" };
+          })
+          .filter((x) => x.nid);
+      }
+    }
+    const createdMessages: Array<{ nid?: number | string; inserted?: boolean; error?: string }> = [];
+    const chatId = 1; // general stream
+    const now = new Date().toISOString();
+
+    // Loop through returned items and create a chat card when nid exists
+    for (const item of items.length ? items : (detailNids as unknown as AnyRec[])) {
+      const nid = (item as { nid?: unknown; id?: unknown }).nid ?? (item as { id?: unknown }).id;
+      if (nid === undefined || nid === null) {
+        continue;
+      }
+      const title = items.length ? extractTitle(item) : ((item as { title?: string }).title || "Untitled");
+      const snippet = extractSnippet(item);
+      const url = `${DRUPAL_11_BASE_URL.replace(/\/$/, "")}/node/${String(nid)}`;
+
+      try {
+        const contentPayload = {
+          title,
+          snippet,
+          url,
+          icon: "link",
+        };
+        const senderId = typeof providedSenderId === "number" ? providedSenderId : null;
+
+        const insertPayload = {
+          chat_id: chatId,
+          sender_id: senderId,
+          message_type: "card",
+          content: JSON.stringify(contentPayload),
+          reactions: {},
+          read_by: [],
+          sent_at: now,
+          updated_at: now,
+        } as Record<string, unknown>;
+
+        const { error: insertError } = await getSupabase()
+          .from("chat_messages")
+          .insert(insertPayload);
+
+        if (insertError) {
+          console.error("[D11] Failed to insert chat card:", insertError);
+          createdMessages.push({ nid: nid as number | string, inserted: false, error: insertError.message });
+        } else {
+          console.log("[D11] Inserted chat card for nid", nid);
+          createdMessages.push({ nid: nid as number | string, inserted: true });
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[D11] Exception while inserting chat card:", msg);
+        createdMessages.push({ nid: nid as number | string, inserted: false, error: msg });
+      }
+    }
+
+    // Return original response plus a summary of created chat cards
+    res.json({
+      drupal: data,
+      chat_cards: createdMessages,
+    });
   } catch (error) {
     console.error("Error importing nodes:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
