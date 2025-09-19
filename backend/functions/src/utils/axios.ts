@@ -1,31 +1,28 @@
-import axios, { AxiosInstance } from "axios";
+import axiosOriginal, { AxiosInstance } from "axios";
 import * as https from "https";
 
-/** Determine if running in Firebase emulator. */
-export const isEmulator = (): boolean => {
-  // Firebase sets FUNCTIONS_EMULATOR=true when using emulators
-  return process.env.FUNCTIONS_EMULATOR === "true";
-};
+let axios: AxiosInstance = axiosOriginal;
 
-/**
- * Create a pre-configured axios instance.
- * - Adds https agent that ignores self-signed certs in emulator
- * - Sets JSON defaults
- */
-export const createAxios = (baseURL?: string): AxiosInstance => {
-  const agent = isEmulator()
-    ? new https.Agent({ rejectUnauthorized: false })
-    : undefined;
+if (process.env.FUNCTIONS_EMULATOR === "true") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
-  return axios.create({
-    baseURL,
-    httpsAgent: agent,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-  });
-};
+  axios = axiosOriginal.create({ httpsAgent });
 
-/** Shared default axios client without baseURL. */
-export const axiosClient = createAxios();
+  // patch global fetch (node 18+)
+  type ExtendedRequestInit = RequestInit & { agent?: https.Agent };
+  type GlobalWithFetch = typeof globalThis & {
+    fetch?: (input: RequestInfo | URL, init?: ExtendedRequestInit) => Promise<Response>;
+  };
+  const g = global as GlobalWithFetch;
+  const originalFetch = g.fetch;
+  if (originalFetch) {
+    g.fetch = (input: RequestInfo | URL, init: ExtendedRequestInit = {}) => {
+      const options: ExtendedRequestInit = { ...init };
+      if (!options.agent) options.agent = httpsAgent;
+      return originalFetch(input, options);
+    };
+  }
+}
+
+export default axios;

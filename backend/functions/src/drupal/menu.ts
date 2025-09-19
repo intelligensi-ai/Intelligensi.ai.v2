@@ -1,105 +1,81 @@
-import { AxiosInstance } from "axios";
+import axios from "../utils/axios";
 
-export type MenuOperationType =
-  | "create-menu"
-  | "update-menu"
-  | "delete-menu"
-  | "add-item"
-  | "update-item"
-  | "remove-item"
-  | "get";
+export type MenuOperation = {
+  action:
+    | "list_menus"
+    | "read_menu"
+    | "add_menu_item"
+    | "update_menu_item"
+    | "delete_menu_item";
+  parameters: Record<string, unknown>;
+};
 
-export interface MenuItemInput {
-  title: string;
-  url?: string;
-  weight?: number;
-  parent?: string | null;
-}
-
-export interface MenuOperation {
-  operation: MenuOperationType;
-  menuName?: string;
-  itemId?: string | number;
-  item?: MenuItemInput;
-  // raw payload passthrough if needed
-  payload?: Record<string, unknown>;
-}
-
-export interface MenuOperationResult {
-  success: boolean;
-  message?: string;
-  data?: unknown;
-}
+const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "https://umami-intelligensi.ai.ddev.site";
+const DRUPAL_API_USERNAME = process.env.DRUPAL_API_USERNAME || "";
+const DRUPAL_API_PASSWORD = process.env.DRUPAL_API_PASSWORD || "";
 
 /**
- * Handle a Drupal menu operation by calling the Drupal bridge.
- * This is a thin wrapper; adapt the endpoint paths to your Drupal bridge.
+ * Execute a menu operation against the Drupal bridge.
+ * @param {string} menuName Default menu name to operate on
+ * @param {MenuOperation} operation Operation descriptor
+ * @return {Promise<unknown>} Raw response data from the bridge
  */
 export async function handleMenuOperation(
-  client: AxiosInstance,
-  op: MenuOperation
-): Promise<MenuOperationResult> {
-  try {
-    switch (op.operation) {
-      case "get": {
-        const res = await client.get("/api/menu", {
-          params: { name: op.menuName },
-          validateStatus: () => true,
-        });
-        return {
-          success: res.status >= 200 && res.status < 300,
-          message: res.statusText,
-          data: res.data,
-        };
-      }
-      case "create-menu": {
-        const res = await client.post("/api/menu", {
-          name: op.menuName,
-          ...(op.payload || {}),
-        });
-        return { success: true, data: res.data };
-      }
-      case "update-menu": {
-        const res = await client.patch("/api/menu", {
-          name: op.menuName,
-          ...(op.payload || {}),
-        });
-        return { success: true, data: res.data };
-      }
-      case "delete-menu": {
-        const res = await client.delete("/api/menu", {
-          data: { name: op.menuName },
-        });
-        return { success: true, data: res.data };
-      }
-      case "add-item": {
-        const res = await client.post("/api/menu/item", {
-          menu: op.menuName,
-          item: op.item,
-          ...(op.payload || {}),
-        });
-        return { success: true, data: res.data };
-      }
-      case "update-item": {
-        const res = await client.patch("/api/menu/item", {
-          menu: op.menuName,
-          id: op.itemId,
-          item: op.item,
-          ...(op.payload || {}),
-        });
-        return { success: true, data: res.data };
-      }
-      case "remove-item": {
-        const res = await client.delete("/api/menu/item", {
-          data: { menu: op.menuName, id: op.itemId },
-        });
-        return { success: true, data: res.data };
-      }
-      default:
-        return { success: false, message: `Unsupported operation: ${op.operation}` };
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return { success: false, message: msg };
+  menuName: string,
+  operation: MenuOperation
+): Promise<unknown> {
+  const { action, parameters } = operation;
+  const baseUrl = `${DRUPAL_SITE_URL}/api/menu`;
+  const auth = { username: DRUPAL_API_USERNAME, password: DRUPAL_API_PASSWORD };
+
+  switch (action) {
+  case "list_menus": {
+    const r = await axios.get(`${baseUrl}/list`, { auth });
+    return r.data;
+  }
+  case "read_menu": {
+    const r = await axios.get(`${baseUrl}/${parameters.menu_name || menuName}`, { auth });
+    return r.data;
+  }
+  case "add_menu_item": {
+    const title = (parameters.Placeholder1 as unknown) ||
+      (parameters.title as unknown) ||
+      "New Menu Item";
+    const titleStr = String(title);
+    const payload = {
+      operation: "add",
+      title: titleStr,
+      url: (parameters.url as unknown) ||
+        `internal:${titleStr.toLowerCase().replace(/\s+/g, "-")}`,
+      weight: parameters.weight || 0,
+      parent: parameters.parent || "",
+      expanded: parameters.expanded || false,
+      enabled: parameters.enabled !== false,
+    };
+    const r = await axios.post(`${baseUrl}/main`, payload, { auth });
+    return r.data;
+  }
+  case "update_menu_item": {
+    if (!parameters.uuid) throw new Error("UUID required for update");
+    const payload: Record<string, unknown> = {
+      operation: "update",
+      uuid: parameters.uuid as string,
+    };
+    if (parameters.title) (payload as Record<string, unknown>).title = parameters.title;
+    if (parameters.url) (payload as Record<string, unknown>).url = parameters.url;
+    if (parameters.weight !== undefined) (payload as Record<string, unknown>).weight = parameters.weight;
+    if (parameters.parent !== undefined) (payload as Record<string, unknown>).parent = parameters.parent;
+    if (parameters.expanded !== undefined) (payload as Record<string, unknown>).expanded = parameters.expanded;
+    if (parameters.enabled !== undefined) (payload as Record<string, unknown>).enabled = parameters.enabled;
+    const r = await axios.post(`${baseUrl}/${menuName}`, payload, { auth });
+    return r.data;
+  }
+  case "delete_menu_item": {
+    if (!parameters.uuid) throw new Error("UUID required for delete");
+    const r = await axios.post(`${baseUrl}/${menuName}`, { operation: "delete", uuid: parameters.uuid }, { auth });
+    return r.data;
+  }
+  default:
+    throw new Error(`Unsupported menu action: ${action}`);
   }
 }

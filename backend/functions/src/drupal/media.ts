@@ -1,100 +1,98 @@
-import OpenAI from "openai";
-import { defineString } from "firebase-functions/params";
-import fetch from "node-fetch";
-import FormData from "form-data";
-import type { AxiosInstance } from "axios";
+import axios from "../utils/axios";
+import * as admin from "firebase-admin";
 
-const OPENAI_API_KEY = defineString("OPENAI_API_KEY");
-
-export interface GenerateImageOptions {
+/**
+ * Options for the generateAndUploadImage function
+ */
+interface GenerateAndUploadImageOptions {
+  /** The prompt for image generation */
   prompt: string;
-  size?: "256x256" | "512x512" | "1024x1024";
-}
-
-export interface DrupalImageUploadResult {
-  success: boolean;
-  data?: unknown;
-  error?: string;
+  /** Optional title for the image */
+  title?: string;
+  /** Optional site URL for upload */
+  siteUrl?: string;
 }
 
 /**
- * Generate an image via OpenAI Images API and return base64 payload.
+ * Generates an image using OpenAI's DALL-E and uploads it to Firebase Storage,
+ * then triggers a Drupal upload via a Cloud Function.
+ * @param {GenerateAndUploadImageOptions} options - Configuration options
+ * @return {Promise<Record<string, unknown>>} Result from the uploadImage function
+ * @throws {Error} If required environment variables are missing or API calls fail
  */
-export async function generateImageBase64(opts: GenerateImageOptions): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY || OPENAI_API_KEY.value();
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
-
-  const openai = new OpenAI({ apiKey });
-  const res = await openai.images.generate({
-    model: "gpt-image-1",
-    prompt: opts.prompt,
-    size: opts.size || "1024x1024",
-    response_format: "b64_json",
-  });
-  const b64 = res.data?.[0]?.b64_json;
-  if (!b64) throw new Error("No image returned from OpenAI");
-  return b64;
-}
-
+// init admin lazily (caller should init in entrypoint)
 /**
- * Upload an image buffer to Drupal using the bridge endpoint `/api/image-upload`.
- * Content-Type is inferred from filename extension (defaults to image/png).
+ * Generates an image using OpenAI's DALL-E and uploads it to Firebase Storage,
+ * then triggers a Drupal upload via a Cloud Function.
+ * @param {GenerateAndUploadImageOptions} options - Configuration options
+ * @return {Promise<Record<string, unknown>>} Result from the uploadImage function
+ * @throws {Error} If required environment variables are missing or API calls fail
  */
-export async function uploadImageBufferToDrupal(args: {
-  buffer: Buffer;
-  filename?: string;
-  siteUrl: string;
-  altText?: string;
-}): Promise<DrupalImageUploadResult> {
-  const { buffer, filename = `${Date.now()}-upload.png`, siteUrl, altText = "" } = args;
+const generateAndUploadImage = async function(options: GenerateAndUploadImageOptions) {
+  const { prompt, title, siteUrl } = options;
+  // NOTE: this function keeps a similar flow to before but isolates concerns.
+  try {
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) throw new Error("OPENAI_API_KEY not configured");
 
-  const formData = new FormData();
-  formData.append("file", buffer, {
-    filename,
-    contentType: filename.endsWith(".jpg") || filename.endsWith(".jpeg") ? "image/jpeg" : "image/png",
-    knownLength: buffer.length,
-  });
-  formData.append("alt", altText);
+    const imageResp = await axios.post(
+      "https://api.openai.com/v1/images/generations",
+      {
+        model: "dall-e-3",
+        prompt,
+        size: "1024x1024",
+        n: 1,
+        response_format: "url",
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${openaiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-  const uploadUrl = `${siteUrl.replace(/\/$/, "")}/api/image-upload`;
-  const r = await fetch(uploadUrl, {
-    method: "POST",
-    body: formData as unknown as NodeJS.ReadableStream,
-    headers: formData.getHeaders(),
-  });
+    const imageUrl = imageResp.data?.data?.[0]?.url;
+    if (!imageUrl) throw new Error("No image URL returned from OpenAI");
 
-  if (!r.ok) {
-    const text = await r.text();
-    return { success: false, error: `Drupal upload failed: ${r.status} ${text}` };
+    // ensure admin is initialised by caller (e.g. in the route file)
+    const bucketName = process.env.FIREBASE_BUCKET || "intelligensi-ai-v2.firebasestorage.app";
+    const bucket = admin.storage().bucket(bucketName);
+    const safeTitle = (title || "image").replace(/\s+/g, "_");
+    const fileName = `generated-images/${Date.now()}-${safeTitle}.jpg`;
+    const file = bucket.file(fileName);
+
+    const imageBufferResp = await axios({
+      method: "GET",
+      url: imageUrl,
+      responseType: "arraybuffer",
+    });
+    await file.save(Buffer.from(imageBufferResp.data), {
+      metadata: { contentType: "image/jpeg" },
+      resumable: false,
+    });
+    await file.makePublic();
+    const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+
+    // Upload to Drupal via the uploadImage function (internal cloud function)
+    const uploadHost = process.env.FUNCTIONS_EMULATOR === "true" ? "127.0.0.1:5001" : "us-central1";
+    const uploadUrl =
+      `http://${uploadHost}/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`;
+    const uploadResponse = await axios.post(
+      uploadUrl,
+      {
+        imagePath: publicUrl,
+        siteUrl: siteUrl || process.env.DRUPAL_SITE_URL,
+        altText: title || "Generated image",
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    return uploadResponse.data.data;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { status: "error", message: msg };
   }
-  const json = await r.json();
-  return { success: true, data: json };
-}
+};
 
-/**
- * Convenience: decode base64 image and upload to Drupal.
- */
-export async function uploadBase64ImageToDrupal(args: {
-  base64: string;
-  siteUrl: string;
-  altText?: string;
-  filename?: string;
-}) {
-  const buffer = Buffer.from(args.base64, "base64");
-  return uploadImageBufferToDrupal({ buffer, siteUrl: args.siteUrl, altText: args.altText, filename: args.filename });
-}
-
-/**
- * Optional: fetch an image by URL and upload to Drupal.
- */
-export async function uploadImageUrlToDrupal(args: {
-  imageUrl: string;
-  siteUrl: string;
-  altText?: string;
-  filename?: string;
-}) {
-  const resp = await fetch(args.imageUrl);
-  if (!resp.ok) throw new Error(`Failed to download image: ${resp.status}`);
-  const buffer = Buffer.from(await (await resp).buffer());
-  return uploadImageBufferToDrupal({ buffer, siteUrl: args.siteUrl, altText: args.altText, filename: args.filename });
-}
+export { generateAndUploadImage };
