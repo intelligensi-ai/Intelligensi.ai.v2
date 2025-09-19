@@ -96,6 +96,17 @@ const Sites: React.FC<SitesProps> = ({
     setSites(sitesInput);
   }, [sitesInput]);
   
+  // Auto-select the first site when sites load and nothing is selected yet
+  useEffect(() => {
+    if (!selectedSiteIdState && sites.length > 0) {
+      const firstWithId = sites.find(s => typeof s.id === 'number');
+      if (firstWithId && typeof firstWithId.id === 'number') {
+        setSelectedSiteIdState(firstWithId.id);
+        onSiteSelected(firstWithId.id);
+      }
+    }
+  }, [sites, selectedSiteIdState, onSiteSelected]);
+  
   // Function to refresh sites list
   const fetchSites = useCallback(() => {
     // In a real implementation, this would make an API call
