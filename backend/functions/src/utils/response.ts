@@ -1,32 +1,26 @@
-/* Utility helpers for consistent HTTP responses and text sanitization */
-import { Response } from "express";
-
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  message?: string;
-  data?: T;
-  error?: string;
-  details?: unknown;
-}
-
+// Precedence version: simplified responder and HTML sanitizer
 /**
- * Send a standardized JSON response.
- * @param res Express response
- * @param status HTTP status code
- * @param payload Payload to send
+ * Send a standardized JSON response with success flag.
+ * @param {Object} res - Response-like object with status and json methods
+ * @param {number} status - HTTP status code
+ * @param {unknown} data - Response payload
  */
-export function sendResponse<T>(
-  res: Response,
+export function sendResponse(
+  res: { status: (code: number) => { json: (data: unknown) => void; send?: (data: string) => void } },
   status: number,
-  payload: ApiResponse<T>
+  data: unknown
 ): void {
-  res.status(status).json(payload);
+  res.status(status).json({
+    success: status >= 200 && status < 300,
+    data,
+  });
 }
 
 /**
- * Very small sanitizer to normalize whitespace and trim text.
+ * Remove HTML tags from a string.
+ * @param {string} text - Input text containing HTML
+ * @return {string} Sanitized plain text
  */
-export function sanitizeText(input: unknown, fallback = ""): string {
-  if (typeof input !== "string") return fallback;
-  return input.replace(/\s+/g, " ").trim();
+export function sanitizeText(text: string): string {
+  return text.replace(/<[^>]*>?/gm, "");
 }
