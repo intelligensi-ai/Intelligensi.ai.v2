@@ -88,7 +88,26 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
       { headers: { "Content-Type": "application/json" } }
     );
 
-    return uploadResponse.data.data;
+    if (uploadResponse.data.status !== 'success') {
+      throw new Error(`Failed to upload image to Drupal: ${uploadResponse.data.message}`);
+    }
+
+    // Return the media ID and other details in the expected format
+    // Note: The response contains both 'fid' and 'media_id' - we should use 'media_id' as it's the actual media entity ID
+    return {
+      media_id: uploadResponse.data.data.media_id, // Use media_id from response
+      id: uploadResponse.data.data.media_id,       // Use media_id as the ID
+      alt: uploadResponse.data.data.alt || title || 'Generated image',
+      title: title || 'Generated image',
+      data: {
+        id: uploadResponse.data.data.media_id,     // Use media_id for consistency
+        alt: uploadResponse.data.data.alt || title || 'Generated image',
+        title: title || 'Generated image',
+        url: uploadResponse.data.data.url,         // Include the URL from the response
+        uuid: uploadResponse.data.data.uuid,       // Include the UUID from the response
+        media_bundle: uploadResponse.data.data.media_bundle // Include the media bundle
+      }
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { status: "error", message: msg };
