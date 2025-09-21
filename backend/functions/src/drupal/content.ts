@@ -44,22 +44,41 @@ export async function createDrupalContent(
 
   // Handle media attachment if provided
   const attachMedia = (payload: Record<string, unknown>): void => {
-    if (!mediaResponse || typeof mediaResponse !== 'object') return;
+    if (!mediaResponse || typeof mediaResponse !== 'object') {
+      console.log('No media response or invalid media response object');
+      return;
+    }
+    
+    console.log('Processing media response:', JSON.stringify(mediaResponse, null, 2));
     
     const media = mediaResponse as MediaResponse;
     const mediaImage: Record<string, unknown> = {};
     
-    if (media.media_id || media.id) {
-      mediaImage.target_id = media.media_id || media.id;
-      mediaImage.alt = str(media.alt || media.title || args.title, "Image");
-      mediaImage.title = str(media.title || media.alt || args.title, "Image");
-      mediaImage.target_revision_id = media.media_id || media.id;
-    } else if (media.data?.id) {
-      mediaImage.target_id = media.data.id;
-      mediaImage.alt = str(media.data.alt || media.data.title || args.title, "Image");
-      mediaImage.title = str(media.data.title || media.data.alt || args.title, "Image");
-      mediaImage.target_revision_id = media.data.id;
+    // Get the media ID, preferring media_id over id
+    const mediaId = media.media_id || (media as any).fid || (media as any).id || (media.data?.id as string);
+    
+    if (!mediaId) {
+      console.error('No media ID found in response:', mediaResponse);
+      return;
     }
+    
+    console.log(`Found media ID: ${mediaId}`);
+    
+    // For Drupal, we need to use the media reference field name
+    // This should match the field name in your content type
+    const mediaFieldName = 'field_media_image'; // Update this to match your Drupal content type field
+    
+    // Build the media reference object in the format Drupal expects
+    mediaImage.target_id = mediaId;
+    mediaImage.alt = str(media.alt || (media as any).alt || media.title || args.title, "Image");
+    mediaImage.title = str(media.title || (media as any).title || media.alt || args.title, "Image");
+    mediaImage.target_revision_id = mediaId;
+    
+    // Add the media reference to the payload
+    // Drupal expects the field to be an object, not an array
+    payload[mediaFieldName] = mediaImage;
+    
+    console.log(`Attached media to field '${mediaFieldName}':`, JSON.stringify(mediaImage, null, 2));
     
     if (Object.keys(mediaImage).length > 0) {
       payload.field_media_image = mediaImage;
@@ -91,16 +110,17 @@ export async function createDrupalContent(
     
     attachMedia(recipePayload);
     payload = [recipePayload];
-  } else if (contentType === "article") {
+  } else  if (contentType === "article") {
     const tagNames = (() => {
       if (Array.isArray(args.tags)) return args.tags as unknown[];
       if (args.tags !== undefined) return [args.tags as unknown];
       return [] as unknown[];
     })();
+    
     const articlePayload: Record<string, unknown> = {
       ...basePayload,
       type: "article",
-      field_body: [
+      body: [
         {
           value: str(args.body) || str(args.summary) || "No description provided",
           format: "basic_html",
@@ -111,19 +131,28 @@ export async function createDrupalContent(
       ],
       field_tags: tagNames,
     };
-    if (mediaResponse && typeof mediaResponse === "object" &&
-      "media_id" in mediaResponse) {
-      (articlePayload as UnknownRec).field_media_image = {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+    // Attach media entity if available
+    if (mediaResponse && typeof mediaResponse === "object" && "media_id" in mediaResponse) {
+      (articlePayload as UnknownRec).field_media_image = [
+        {
+          target_id: Number((mediaResponse as any).media_id),
+          alt: str((mediaResponse as any).alt || args.title, "Article image"),
+          title: str((mediaResponse as any).title || args.title, "Article image"),
+        },
+      ];
+      
+      console.log('Attached media to article:', JSON.stringify({
         target_id: (mediaResponse as any).media_id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        alt: (mediaResponse as any).alt || str(args.title),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        title: (mediaResponse as any).alt || str(args.title),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        target_revision_id: (mediaResponse as any).media_id,
-      };
+        alt: (mediaResponse as any).alt || args.title,
+        title: (mediaResponse as any).title || args.title,
+      }, null, 2));
+    } else {
+      console.log('No media attached to article');
     }
+    
+    console.log('Final payload being sent:', JSON.stringify([articlePayload], null, 2));
+    
     payload = [articlePayload];
   } else if (contentType === "page") {
     const pagePayload: Record<string, unknown> = {
