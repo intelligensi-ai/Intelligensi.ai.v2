@@ -35,18 +35,20 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
     const openaiKey = process.env.OPENAI_API_KEY;
     if (!openaiKey) throw new Error("OPENAI_API_KEY not configured");
 
+
+    //use model: "dall-e-3", for production and better quality
     const imageResp = await axios.post(
       "https://api.openai.com/v1/images/generations",
       {
-        model: "dall-e-3",
+        model: "dall-e-2",
         prompt,
-        size: "1024x1024",
+        size: "256x256", // or "512x512"
         n: 1,
         response_format: "url",
       },
       {
         headers: {
-          "Authorization": `Bearer ${openaiKey}`,
+          Authorization: `Bearer ${openaiKey}`,
           "Content-Type": "application/json",
         },
       }
