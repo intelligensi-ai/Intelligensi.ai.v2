@@ -1,14 +1,21 @@
-import * as functions from "firebase-functions";
+import * as admin from "firebase-admin";
 import FormData from "form-data";
-import fs from "fs";
-import path from "path";
 import fetch from "node-fetch";
+import path from "path";
 
 interface ImageUploadResponse {
   status: string;
   fid: string;
   url: string;
   alt: string;
+  media_id: string;
+  uuid: string;
+  media_bundle: string;
+}
+
+// Initialize Firebase Admin if not already initialized
+if (!admin.apps.length) {
+  admin.initializeApp();
 }
 
 export const uploadImageToDrupal = async (
@@ -18,91 +25,94 @@ export const uploadImageToDrupal = async (
 ): Promise<ImageUploadResponse> => {
   try {
     const formData = new FormData();
-    const isUrl = filePath.startsWith("http");
-    const fileName = path.basename(filePath);
+    let fileBuffer: Buffer;
+    let contentType = "image/png";
+    let fileName = `upload-${Date.now()}.png`;
 
-    if (isUrl) {
-      // Handle remote URL
+    // Check if this is a Firebase Storage URL
+    if (filePath.includes("firebasestorage.googleapis.com")) {
+      console.log("🔍 Detected Firebase Storage URL");
+
+      // Extract the file path from the URL
+      const filePathDecoded = decodeURIComponent(filePath.split("/o/")[1].split("?")[0]);
+      console.log("📂 Firebase file path:", filePathDecoded);
+
+      // Get the file from Firebase Storage
+      const bucket = admin.storage().bucket();
+      const file = bucket.file(filePathDecoded);
+
+      // Check if file exists
+      const [exists] = await file.exists();
+      if (!exists) {
+        throw new Error(`File ${filePathDecoded} does not exist in Firebase Storage`);
+      }
+      // Get file metadata
+      const [metadata] = await file.getMetadata();
+      contentType = metadata.contentType || "image/png";
+      fileName = filePathDecoded.split("/").pop() || fileName;
+
+      // Download the file
+      const [buffer] = await file.download();
+      fileBuffer = Buffer.from(buffer);
+
+      console.log(`✅ Downloaded ${fileBuffer.length} bytes from Firebase Storage`);
+    } else if (filePath.startsWith("http")) {
+      // Handle regular HTTP URLs
+      console.log("🌐 Downloading image from URL...");
       const response = await fetch(filePath);
       if (!response.ok) {
         throw new Error(`Failed to fetch image from URL: ${response.statusText}`);
       }
-      const buffer = await response.buffer();
-      formData.append("file", buffer, {
-        filename: fileName,
-        contentType: response.headers.get("content-type") || "image/jpeg",
-      });
-    } else {
-      // Handle local relative or absolute file path
-      const absolutePath = path.resolve(filePath); // normalize
-      console.log("Resolved file path:", absolutePath);
-
-      if (!fs.existsSync(absolutePath)) {
-        throw new Error(`File not found at path: ${absolutePath}`);
-      }
-
-      const fileStream = fs.createReadStream(absolutePath);
-      formData.append("file", fileStream, {
-        filename: fileName,
-        contentType: "image/jpeg", // Default to jpeg
-      });
+      fileBuffer = await response.buffer();
+      contentType = response.headers.get("content-type") || "image/png";
+      fileName = `${Date.now()}-${path.basename(new URL(filePath).pathname) || "upload.png"}`;
+    }
+    // Handle local file paths (if needed)
+    else {
+      throw new Error("Local file paths are not supported. Please use a URL or Firebase Storage path.");
     }
 
-    formData.append("alt", altText);
+    // Add file to form data
+    formData.append("file", fileBuffer, {
+      filename: fileName,
+      contentType: contentType,
+      knownLength: fileBuffer.length,
+    });
 
-    // Make the request to Drupal
-    const baseUrl = siteUrl.endsWith("/") ? siteUrl.slice(0, -1) : siteUrl;
-    const response = await fetch(`${baseUrl}/api/image-upload`, {
+    // Add alt text if provided
+    if (altText) {
+      formData.append("alt", altText);
+    }
+
+    // Upload to Drupal
+    const uploadUrl = `${siteUrl.replace(/\/$/, "")}/api/image-upload`;
+    console.log("🚀 Uploading to Drupal:", uploadUrl);
+
+    const response = await fetch(uploadUrl, {
       method: "POST",
+      body: formData,
       headers: formData.getHeaders(),
-      body: formData as unknown as NodeJS.ReadableStream,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Drupal upload failed: ${response.status} - ${errorText}`);
+      throw new Error(`Drupal upload failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    return (await response.json()) as ImageUploadResponse;
+    const result = await response.json();
+    console.log("✅ Drupal upload successful:", JSON.stringify(result, null, 2));
+
+    return {
+      status: "success",
+      fid: result.data?.fid?.toString() || "",
+      url: result.data?.url || "",
+      alt: altText,
+      media_id: result.data?.media_id?.toString() || "",
+      uuid: result.data?.uuid || "",
+      media_bundle: result.data?.media_bundle || "image",
+    };
   } catch (error) {
-    console.error("Error uploading image to Drupal:", error);
+    console.error("❌ Error in uploadImageToDrupal:", error);
     throw error;
   }
 };
-
-// Firebase HTTP function for uploading images
-export const uploadImage = functions.https.onRequest(async (req, res) => {
-  try {
-    const { imagePath, siteUrl, altText = "" } = req.body;
-
-    if (!imagePath || !siteUrl) {
-      res.status(400).json({
-        status: "error",
-        message: "Both imagePath and siteUrl are required",
-      });
-      return;
-    }
-
-    console.log(`Attempting to upload image from: ${imagePath} to ${siteUrl}`);
-    const result = await uploadImageToDrupal(imagePath, siteUrl, altText);
-    console.log("Upload successful:", result);
-
-    res.json({
-      status: "success",
-      message: "Image uploaded successfully",
-      data: result,
-    });
-  } catch (error: unknown) {
-    console.error("Upload failed:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    const errorDetails =
-      error instanceof Error ? error.toString() : String(error);
-
-    res.status(500).json({
-      status: "error",
-      message: errorMessage,
-      details: errorDetails,
-    });
-  }
-});

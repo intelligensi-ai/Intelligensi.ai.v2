@@ -36,7 +36,7 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
     if (!openaiKey) throw new Error("OPENAI_API_KEY not configured");
 
 
-    //use model: "dall-e-3", for production and better quality
+    // use model: "dall-e-3", for production and better quality
     const imageResp = await axios.post(
       "https://api.openai.com/v1/images/generations",
       {
@@ -48,7 +48,7 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
       },
       {
         headers: {
-          Authorization: `Bearer ${openaiKey}`,
+          "Authorization": `Bearer ${openaiKey}`,
           "Content-Type": "application/json",
         },
       }
@@ -76,10 +76,10 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
     await file.makePublic();
     const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
 
-    // Upload to Drupal via the uploadImage function (internal cloud function)
+    // Upload to Drupal via the uploadImageToDrupal function (internal cloud function)
     const uploadHost = process.env.FUNCTIONS_EMULATOR === "true" ? "127.0.0.1:5001" : "us-central1";
     const uploadUrl =
-      `http://${uploadHost}/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`;
+      `http://${uploadHost}/${process.env.GCLOUD_PROJECT}/us-central1/uploadImageToDrupal`;
     const uploadResponse = await axios.post(
       uploadUrl,
       {
@@ -90,25 +90,28 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
       { headers: { "Content-Type": "application/json" } }
     );
 
-    if (uploadResponse.data.status !== 'success') {
-      throw new Error(`Failed to upload image to Drupal: ${uploadResponse.data.message}`);
+    if (uploadResponse.data.status !== "success") {
+      throw new Error(
+        `Failed to upload image to Drupal: ${uploadResponse.data.message}`
+      );
     }
 
     // Return the media ID and other details in the expected format
-    // Note: The response contains both 'fid' and 'media_id' - we should use 'media_id' as it's the actual media entity ID
+    // Note: The response contains both 'fid' and 'media_id' - we should use 'media_id'
+    // as it's the actual media entity ID
     return {
       media_id: uploadResponse.data.data.media_id, // Use media_id from response
-      id: uploadResponse.data.data.media_id,       // Use media_id as the ID
-      alt: uploadResponse.data.data.alt || title || 'Generated image',
-      title: title || 'Generated image',
+      id: uploadResponse.data.data.media_id, // Use media_id as the ID
+      alt: uploadResponse.data.data.alt || title || "Generated image",
+      title: title || "Generated image",
       data: {
-        id: uploadResponse.data.data.media_id,     // Use media_id for consistency
-        alt: uploadResponse.data.data.alt || title || 'Generated image',
-        title: title || 'Generated image',
-        url: uploadResponse.data.data.url,         // Include the URL from the response
-        uuid: uploadResponse.data.data.uuid,       // Include the UUID from the response
-        media_bundle: uploadResponse.data.data.media_bundle // Include the media bundle
-      }
+        id: uploadResponse.data.data.media_id, // Use media_id for consistency
+        alt: uploadResponse.data.data.alt || title || "Generated image",
+        title: title || "Generated image",
+        url: uploadResponse.data.data.url, // Include the URL from the response
+        uuid: uploadResponse.data.data.uuid, // Include the UUID from the response
+        media_bundle: uploadResponse.data.data.media_bundle, // Include the media bundle
+      },
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -92,18 +92,18 @@ export const updateHomepage = onRequest({ secrets: [openaiApiKey], cors: true },
                 title: args.title,
                 siteUrl: process.env.DRUPAL_SITE_URL,
               });
-              console.log('Media upload successful:', JSON.stringify(mediaResponse, null, 2));
+              console.log("Media upload successful:", JSON.stringify(mediaResponse, null, 2));
             } catch (error) {
-              console.error('Error generating/uploading image:', error);
+              console.error("Error generating/uploading image:", error);
               // Continue without media if image generation fails
               mediaResponse = null;
             }
           }
 
-          console.log('Creating Drupal content with args:', JSON.stringify(args, null, 2));
-          console.log('Media response:', JSON.stringify(mediaResponse, null, 2));
+          console.log("Creating Drupal content with args:", JSON.stringify(args, null, 2));
+          console.log("Media response:", JSON.stringify(mediaResponse, null, 2));
           const created = await createDrupalContent(args, mediaResponse);
-          console.log('Drupal content created:', JSON.stringify(created, null, 2));
+          console.log("Drupal content created:", JSON.stringify(created, null, 2));
           results.push({
             function: "create_content",
             success: true,

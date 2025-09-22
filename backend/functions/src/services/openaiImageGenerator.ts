@@ -49,9 +49,9 @@ export const generateAndUploadToDrupal = onCall(
       // Public URL
       const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
 
-      // 3️⃣ Call your uploadImage Firebase function
+      // 3️⃣ Call the uploadImageToDrupal Firebase function
       const uploadResponse = await fetch(
-        `http://localhost:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`,
+        `http://localhost:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImageToDrupal`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
