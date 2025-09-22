@@ -66,9 +66,7 @@ export const uploadImageToDrupal = async (
       fileBuffer = await response.buffer();
       contentType = response.headers.get("content-type") || "image/png";
       fileName = `${Date.now()}-${path.basename(new URL(filePath).pathname) || "upload.png"}`;
-    }
-    // Handle local file paths (if needed)
-    else {
+    } else { // Handle local file paths (if needed)
       throw new Error("Local file paths are not supported. Please use a URL or Firebase Storage path.");
     }
 

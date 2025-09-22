@@ -49,6 +49,99 @@ export const drupal7 = onRequest({
   cors: true,
 }, drupal7App);
 
+// Middleware to parse JSON bodies
+const jsonParser = express.json();
+
+// Export the uploadImage function to handle image uploads to Drupal
+export const uploadImage = onRequest({
+  region: "us-central1",
+  cors: true,
+}, async (req, res) => {
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(204).send('');
+    return;
+  }
+  
+  // Parse JSON body
+  jsonParser(req, res, async () => {
+  try {
+    // Log the incoming request for debugging
+    console.log("📥 Incoming upload request:", {
+      method: req.method,
+      headers: req.headers,
+      body: req.body ? JSON.parse(JSON.stringify(req.body)) : null,
+    });
+
+    // Check if the request has a body
+    if (!req.body) {
+      console.error("❌ No request body provided");
+      res.status(400).json({
+        status: "error",
+        message: "Request body is required",
+      });
+      return;
+    }
+
+    const { imagePath, siteUrl, altText } = req.body;
+
+    // Validate required fields
+    if (!imagePath) {
+      console.error("❌ imagePath is required");
+      res.status(400).json({
+        status: "error",
+        message: "imagePath is required",
+      });
+      return;
+    }
+
+    const targetSiteUrl = siteUrl || process.env.DRUPAL_SITE_URL;
+    if (!targetSiteUrl) {
+      console.error("❌ siteUrl is required");
+      res.status(400).json({
+        status: "error",
+        message: "siteUrl is required and not provided in environment variables",
+      });
+      return;
+    }
+
+    console.log("🚀 Starting image upload with:", {
+      imagePath,
+      siteUrl: targetSiteUrl,
+      altText: altText || "",
+    });
+
+    // Process the upload
+    const result = await uploadImageToDrupal(
+      imagePath,
+      targetSiteUrl,
+      altText || ""
+    );
+
+    console.log("✅ Upload successful:", JSON.stringify(result, null, 2));
+    res.json({
+      status: "success",
+      data: result,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("❌ Error in uploadImage:", errorMessage, error);
+
+    res.status(500).json({
+      status: "error",
+      message: `Failed to process upload: ${errorMessage}`,
+      details: process.env.NODE_ENV === "development" ?
+        (error instanceof Error ? error.stack : undefined) : undefined,
+    });
+  }
+
+  return; // Explicit return to satisfy TypeScript
+  });
+});
+
 export const drupal11 = onRequest({
   region: "us-central1",
   cors: true,

@@ -9,7 +9,7 @@ async function testStorage() {
     
     // Re-initialize storage with emulator settings
     const app = admin.initializeApp();
-    const bucket = storage.bucket('intelligensi-ai-v2.appspot.com');
+    const bucket = storage.bucket('intelligensi-ai-v2.firebasestorage.app');
   }
   try {
     console.log('Testing storage with bucket:', bucket.name);
