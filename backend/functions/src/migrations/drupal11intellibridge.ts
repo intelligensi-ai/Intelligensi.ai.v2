@@ -40,9 +40,8 @@ import express, { Request, Response, RequestHandler, NextFunction } from "expres
 import axios from "axios";
 import * as https from "https";
 import { onRequest } from "firebase-functions/v2/https";
-import FormData from "form-data";
-import fetch from "node-fetch";
 import { getSupabase } from "../services/supabaseService";
+import { uploadImageToDrupal } from "../services/imageUpload";
 
 // Drupal 11 base URL - hardcoded as per requirements
 const DRUPAL_11_BASE_URL = "https://umami-intelligensi.ai.ddev.site";
@@ -183,10 +182,20 @@ d11Router.use((req: Request, res: Response, next: NextFunction): void => {
  * Upload image to Drupal using the Drupal Bridge endpoint
  * POST /api/image-upload
  * Body: {
- *   imagePath: string,  // URL of the image to upload
+ *   imagePath: string,  // URL of the image to upload (can be Firebase Storage URL)
  *   siteUrl: string,    // Base URL of the Drupal site
  *   altText?: string    // Optional alternative text for the image
  * }
+ */
+/**
+ * @api {post} /api/image-upload Upload image to Drupal
+ * @apiName UploadImage
+ * @apiGroup Drupal
+ * @apiDescription Uploads an image to Drupal from a given URL or Firebase Storage
+ *
+ * @apiBody {String} imagePath URL of the image to upload (can be HTTP/HTTPS or Firebase Storage URL)
+ * @apiBody {String} siteUrl Base URL of the Drupal site
+ * @apiBody {String} [altText] Optional alternative text for the image
  */
 d11Router.post("/api/image-upload", async (req: Request, res: Response): Promise<void> => {
   try {
@@ -200,57 +209,23 @@ d11Router.post("/api/image-upload", async (req: Request, res: Response): Promise
       return;
     }
 
-    // Download the image from the provided URL (e.g., Firebase Storage)
-    const imageResponse = await fetch(imagePath);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image from ${imagePath}: ${imageResponse.status}`);
-    }
-    const imageBuffer = Buffer.from(await (await imageResponse).buffer());
+    console.log("⏳ Starting image upload process...");
+    console.log("📄 Image source:", imagePath);
+    console.log("🏷️ Alt text:", altText);
+    console.log("🌐 Target Drupal site:", siteUrl);
 
-    // Create FormData for file upload
-    const formData = new FormData();
+    // Use the uploadImageToDrupal service to handle the upload
+    const result = await uploadImageToDrupal(imagePath, siteUrl, altText);
 
-    // Add the file to form data
-    formData.append("file", imageBuffer, {
-      filename: `${Date.now()}-upload.png`,
-      contentType: "image/png",
-      knownLength: imageBuffer.length,
+    console.log("✅ Image uploaded successfully:", JSON.stringify(result, null, 2));
+    res.json({
+      status: "success",
+      message: "Image uploaded successfully",
+      data: result,
     });
-    formData.append("alt", altText);
-
-    // Drupal endpoint
-    const uploadImageUrl = `${siteUrl.replace(/\/$/, "")}/api/image-upload`;
-    console.log("Posting image to Drupal:", uploadImageUrl);
-
-    // Make the request with node-fetch
-    const drupalResponse = await fetch(uploadImageUrl, {
-      method: "POST",
-      body: formData as unknown as NodeJS.ReadableStream,
-      headers: formData.getHeaders(),
-    });
-
-    if (!drupalResponse.ok) {
-      const errorText = await drupalResponse.text();
-      throw new Error(
-        `Error uploading to Drupal: ${drupalResponse.status} ${errorText}`
-      );
-    }
-
-    const result = await drupalResponse.json();
-    console.log("✅ Image uploaded successfully:", result);
-
-    res.json(result);
-  } catch (error: unknown) {
-    console.error("Error in uploadimage endpoint:", error);
-    const hasStatus = error &&
-      typeof error === "object" &&
-      "status" in error &&
-      typeof (error as { status: unknown }).status === "number";
-    const errorStatus = hasStatus ?
-      (error as { status: number }).status :
-      500;
-
-    res.status(errorStatus).json({
+  } catch (error) {
+    console.error("❌ Error in image upload:", error);
+    res.status(500).json({
       status: "error",
       message: error instanceof Error ? error.message : "Unknown error occurred",
     });
