@@ -46,7 +46,7 @@ const ContentPrompt: React.FC<ContentPromptProps> = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-80 transition-opacity" />
         </Transition.Child>
 
         <div className="fixed inset-0 z-10 overflow-y-auto">
@@ -60,11 +60,11 @@ const ContentPrompt: React.FC<ContentPromptProps> = ({
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
-                <div className="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
+              <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-gray-800 px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 border border-gray-700">
+                <div className="absolute right-0 top-0 pr-4 pt-4">
                   <button
                     type="button"
-                    className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+                    className="rounded-md text-gray-400 hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
                     onClick={onClose}
                   >
                     <span className="sr-only">Close</span>
@@ -72,12 +72,12 @@ const ContentPrompt: React.FC<ContentPromptProps> = ({
                   </button>
                 </div>
                 <div>
-                  <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
+                  <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-white">
                     Create Content Prompt
                   </Dialog.Title>
                   <div className="mt-2">
-                    <p className="text-sm text-gray-500">
-                      Please enter a prompt for {siteName} to generate content:
+                    <p className="text-sm text-gray-300">
+                      Please enter a prompt for <span className="text-blue-400">{siteName}</span> to generate content:
                     </p>
                     <form onSubmit={handleSubmit} className="mt-4">
                       <div>
@@ -88,7 +88,7 @@ const ContentPrompt: React.FC<ContentPromptProps> = ({
                           rows={4}
                           name="prompt"
                           id="prompt"
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                          className="block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm placeholder-gray-400"
                           placeholder="Enter your prompt here..."
                           value={prompt}
                           onChange={(e) => setPrompt(e.target.value)}
@@ -98,9 +98,9 @@ const ContentPrompt: React.FC<ContentPromptProps> = ({
                         <button
                           type="submit"
                           disabled={!prompt.trim() || isSubmitting}
-                          className={`inline-flex w-full justify-center rounded-md border border-transparent px-4 py-2 text-base font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 sm:col-start-2 sm:text-sm ${
+                          className={`inline-flex w-full justify-center rounded-md border border-transparent px-4 py-2 text-base font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 sm:col-start-2 sm:text-sm transition-colors ${
                             !prompt.trim() || isSubmitting
-                              ? 'bg-blue-300 cursor-not-allowed'
+                              ? 'bg-blue-700 cursor-not-allowed opacity-50'
                               : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
                           }`}
                         >
@@ -108,7 +108,7 @@ const ContentPrompt: React.FC<ContentPromptProps> = ({
                         </button>
                         <button
                           type="button"
-                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:col-start-1 sm:mt-0 sm:text-sm"
+                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-600 bg-gray-700 px-4 py-2 text-base font-medium text-gray-200 shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 sm:col-start-1 sm:mt-0 sm:text-sm transition-colors"
                           onClick={onClose}
                         >
                           Cancel

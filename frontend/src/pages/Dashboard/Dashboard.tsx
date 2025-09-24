@@ -10,6 +10,7 @@ import Sites from './Sites';
 import { ISite, ICMS } from '../../types/sites';
 import { supabase } from '../../utils/supabase';
 import { getAuth, User } from 'firebase/auth';
+import { handleApiError } from '../../utils/errorHandler';
 
 export const Dashboard: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -33,7 +34,7 @@ export const Dashboard: React.FC = () => {
       if (!currentUser || !supabase) return;
 
       console.log("Fetching sites for user:", currentUser.uid);
-      setIsLoading(true); // Optional: indicate loading for sites
+      setIsLoading(true);
       try {
         const { data, error: fetchError } = await supabase
           .from('sites')
@@ -96,8 +97,12 @@ export const Dashboard: React.FC = () => {
         }
       } catch (e) {
         console.error("Exception fetching sites:", e);
-        setError("An unexpected error occurred while loading sites.");
-        setSites([]);
+        // Use our error handler which will suppress in development
+        const shouldShowError = handleApiError(error, 'Fetch Sites');
+        if (shouldShowError) {
+          setError("An unexpected error occurred while loading sites.");
+          setSites([]);
+        }
       } finally {
         setIsLoading(false); // Optional: stop site loading indicator
       }
@@ -123,11 +128,14 @@ export const Dashboard: React.FC = () => {
     try {
       const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
       if (!apiBaseUrl) {
-        console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
-        setError("Application configuration error: API endpoint is missing.");
-        setMessages(prev => prev.map(msg => 
-          msg.id === userMessage.id ? {...msg, status: 'error', text: msg.text + " (Config Error)"} : msg
-        ));
+        const error = new Error("REACT_APP_API_BASE_URL is not defined");
+        const shouldShowError = handleApiError(error, 'API Config');
+        if (shouldShowError) {
+          setError("Application configuration error: API endpoint is missing.");
+          setMessages(prev => prev.map(msg => 
+            msg.id === userMessage.id ? {...msg, status: 'error', text: msg.text + " (Config Error)"} : msg
+          ));
+        }
         setIsLoading(false);
         return;
       }
@@ -151,14 +159,19 @@ export const Dashboard: React.FC = () => {
       };
       setMessages(prev => [...prev, aiMessage]);
     } catch (err) {
-      setMessages(prev => prev.map(msg => 
-        msg.id === userMessage.id ? {...msg, status: 'error'} : msg
-      ));
+      const error = axios.isAxiosError(err) 
+        ? new Error(err.response?.data?.error || err.message || "Failed to process request")
+        : err instanceof Error ? err : new Error("Failed to process request");
       
-      const errorMessage = axios.isAxiosError(err) 
-        ? err.response?.data?.error || err.message || "Failed to process request"
-        : err instanceof Error ? err.message : "Failed to process request";
-      setError(errorMessage);
+      // Use our error handler which will suppress in development
+      const shouldShowError = handleApiError(error, 'Chat Message');
+      
+      if (shouldShowError) {
+        setMessages(prev => prev.map(msg => 
+          msg.id === userMessage.id ? {...msg, status: 'error'} : msg
+        ));
+        setError(error.message);
+      }
     } finally {
       setIsLoading(false);
     }
