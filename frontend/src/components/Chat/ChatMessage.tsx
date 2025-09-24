@@ -1,6 +1,7 @@
 // src/components/Chat/ChatMessage.tsx
 import React from 'react';
 import { ChatMessage as ChatMessageType } from '../../types/chat';
+import { NodeCard } from './NodeCard';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -30,6 +31,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     }
     return message.text;
   };
+
+  // Render node card if message type is 'node'
+  if (message.type === 'node' && message.node) {
+    return (
+      <div className="flex justify-start mb-2">
+        <div className="max-w-xs md:max-w-md w-full">
+          <NodeCard content={message.node} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>

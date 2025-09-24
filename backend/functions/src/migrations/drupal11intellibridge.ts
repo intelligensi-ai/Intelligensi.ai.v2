@@ -30,7 +30,6 @@
  *    Body: { nodes: [...] } - Array of node objects to create
  *    Example:
  *      POST http://localhost:5001/intelligensi-ai-v2/us-central1/drupal11/import
- *      Body: {"nodes": [{"type": "article", "title": "New Article"}]}
  *
  * Environment Variables:
  * - DRUPAL_11_BASE_URL: Base URL of the Drupal 11 instance
@@ -38,61 +37,18 @@
 
 import express, { Request, Response, RequestHandler, NextFunction } from "express";
 import axios from "axios";
-import * as https from "https";
+import https from "https";
+import { nodeCreationMiddleware } from "../middleware/nodeEvents";
 import { onRequest } from "firebase-functions/v2/https";
 import FormData from "form-data";
 import fetch from "node-fetch";
 import { getSupabase } from "../services/supabaseService";
 
-// Drupal 11 base URL - hardcoded as per requirements
-const DRUPAL_11_BASE_URL = "https://umami-intelligensi.ai.ddev.site";
-
-// Create an HTTPS agent that doesn't reject self-signed certificates
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: false, // Only for development/testing with self-signed certificates
-});
-
-// Type for Drupal 11 node data (commented out since not currently used)
-// interface Drupal11Node {
-//   id: number;
-//   type: string;
-//   title: string;
-//   field_body?: Array<{
-//     value: string;
-//     format: string;
-//   }>;
-//   [key: string]: unknown; // For dynamic fields
-// }
-
-// Type for import result (commented out since not currently used)
-// interface ImportResult {
-//   success: boolean;
-//   message: string;
-//   data?: unknown;
-// }
-
-// Helper to create Drupal client
-const createDrupalClient = () => {
-  return axios.create({
-    baseURL: DRUPAL_11_BASE_URL,
-    httpsAgent,
-    headers: {
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
-  });
-};
-
-/**
- * Drupal 11 Bridge Router
- *
- * This router handles all Drupal 11 specific API endpoints. It provides the following functionality:
- * - Content retrieval and querying
- * - Node creation and updates
- * - Schema generation and validation
- * - System health checks
- */
+// Create the Drupal 11 router
 export const d11Router = express.Router();
+
+// Apply node creation middleware to all routes
+d11Router.use(nodeCreationMiddleware);
 
 // Debug route to list all available routes (development only)
 d11Router.get("/debug-routes", (req: Request, res: Response) => {
@@ -369,7 +325,34 @@ d11Router.post("/import", async (req: Request, res: Response): Promise<void> => 
 
     const payload: AnyRec[] = (incomingNodes as AnyRec[]).map(mapNode);
     const response = await client.post("/api/node-update", payload);
-    const data = response.data as { status?: string; message?: string; results?: { details?: string[] } };
+    const data = response.data as { 
+      status?: string; 
+      message?: string; 
+      results?: { 
+        details?: string[];
+        // Drupal's response might include the created node data
+        data?: Array<{ nid: string; title: string; type: string; [key: string]: any }>;
+      } 
+    };
+
+    // Emit node created events for each created node
+    if (data.results?.data?.length) {
+      data.results.data.forEach(node => {
+        const nodeData = {
+          content_type: node.type || 'content',
+          title: node.title || 'Untitled',
+          body: node.body?.[0]?.value || '',
+          image: node.field_image?.[0]?.url ? 
+            `${client.defaults.baseURL}${node.field_image[0].url}` : 
+            undefined,
+          link: `${client.defaults.baseURL}/node/${node.nid}`
+        };
+        
+        // Emit event that the frontend can listen to
+        response.locals = response.locals || {};
+        response.locals.nodeCreated = nodeData;
+      });
+    }
 
     // Helper to safely get text from various field shapes
     const getText = (val: unknown): string => {

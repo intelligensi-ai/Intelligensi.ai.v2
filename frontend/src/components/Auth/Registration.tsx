@@ -145,7 +145,7 @@ const Registration: React.FC = () => {
                     <img 
                       src={`/images/plans/${plan.id}.png`} 
                       alt={`${plan.name} plan`}
-                      className="w-10 h-10 object-contain"
+                      className="w-10 h-6 object-contain"
                       onError={(e) => {
                         // Fallback to text if image fails to load
                         const target = e.target as HTMLImageElement;

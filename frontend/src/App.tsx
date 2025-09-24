@@ -12,7 +12,10 @@ import { auth } from './components/Config/firebaseConfig';
 import Auth from './components/Auth/Auth';
 import Registration from './components/Auth/Registration';
 import Profile from './pages/Dashboard/Profile';
-import { Dashboard } from './pages/Dashboard/Dashboard'; 
+import Dashboard from './pages/Dashboard/Dashboard'; 
+
+import { ChatProvider } from './contexts/ChatContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -38,22 +41,26 @@ const App: React.FC = () => {
   }
 
   return (
-    <Router>
-      <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
-      <Routes>
-        {/* ✅ Redirect to Dashboard if authenticated */}
-        <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Auth />} />
-        
-        <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Registration />} />
-        <Route path="/profile" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/" />} />
+    <AuthProvider>
+      <ChatProvider>
+        <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
+        <Router>
+          <Routes>
+            {/* ✅ Redirect to Dashboard if authenticated */}
+            <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Auth />} />
+            
+            <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Registration />} />
+            <Route path="/profile" element={user ? <Navigate to="/dashboard" /> : <Navigate to="/" />} />
 
-        {/* 🆕 Add the new Dashboard route */}
-        <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/" />} />
+            {/* 🆕 Add the new Dashboard route */}
+            <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/" />} />
 
-        {/* 🌟 Catch-all route */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Router>
+            {/* 🌟 Catch-all route */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </Router>
+      </ChatProvider>
+    </AuthProvider>
   );
 };
 
