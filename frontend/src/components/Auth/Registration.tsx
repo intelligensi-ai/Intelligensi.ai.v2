@@ -31,7 +31,7 @@ const accountTypes: AccountType[] = [
     name: 'Enterprise',
     description: 'For large organizations',
     price: 'Custom',
-    features: ['20 Sites', '10 migrations', '24/7 Support', 'Enterprise Private Cloud', 'Custom Integrations', ]
+    features: ['20 Sites', '10 migrations', 'Enterprise Private Cloud', 'Custom Integrations', ]
   }
 ];
 
@@ -91,7 +91,7 @@ const Registration: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#0F172A] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen relative overflow-hidden bg-[#0F172A] flex flex-col items-center justify-center p-3">
       {/* Background */}
       <div className="absolute inset-0 w-full h-full overflow-hidden z-0">
         <img 
@@ -129,12 +129,12 @@ const Registration: React.FC = () => {
         <div className="w-full max-w-8xl mx-auto">
           <h2 className="text-xl font-bold text-white mb-4 text-center">Choose Your Plan</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
             {accountTypes.map((plan) => (
               <div 
                 key={plan.id}
                 onClick={() => setSelectedPlan(plan.id)}
-                className={`bg-[#2D3748] rounded-2xl p-6 cursor-pointer transition-all duration-300 border-2 ${
+                className={`bg-[#2D3748] rounded-2xl p-3 cursor-pointer transition-all duration-300 border-2 ${
                   selectedPlan === plan.id 
                     ? 'border-teal-500 transform scale-105 shadow-lg' 
                     : 'border-transparent hover:border-gray-500 hover:shadow-md'
