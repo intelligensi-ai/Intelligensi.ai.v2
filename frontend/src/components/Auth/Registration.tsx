@@ -110,7 +110,7 @@ const Registration: React.FC = () => {
           <img 
             src="/logocutout.png" 
             alt="Intelligensi Logo" 
-            className="h-16 w-16 mx-auto"
+            className="h-20 w-20 mx-auto"
           />
         </div>
 
