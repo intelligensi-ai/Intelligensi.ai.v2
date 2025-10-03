@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../utils/api';
 import { Chat } from '../../components/Chat/Chat';
 import Prompt from './Prompt';
 import { ChatMessage } from '../../types/chat';
@@ -125,16 +126,7 @@ export const Dashboard: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
-      if (!apiBaseUrl) {
-        console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
-        setError("Application configuration error: API endpoint is missing.");
-        setMessages(prev => prev.map(msg => 
-          msg.id === userMessage.id ? {...msg, status: 'error', text: msg.text + " (Config Error)"} : msg
-        ));
-        setIsLoading(false);
-        return;
-      }
+      const apiBaseUrl = getApiBaseUrl();
 
       const response = await axios.post(
         `${apiBaseUrl}/updateHomepage`,

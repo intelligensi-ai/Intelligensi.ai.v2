@@ -35,8 +35,6 @@ if (process.env.FUNCTIONS_EMULATOR === "true") {
 
 // Drupal site configuration (must be provided via args.site_url or environment)
 const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "";
-const DRUPAL_API_USERNAME = process.env.DRUPAL_API_USERNAME || "";
-const DRUPAL_API_PASSWORD = process.env.DRUPAL_API_PASSWORD || "";
 
 // Define types for better type safety
 interface Recipe {
@@ -164,7 +162,12 @@ function sanitizeText(text: string): string {
   return text.replace(/<[^>]*>?/gm, "");
 }
 
-// Truncate a string to a maximum length
+/**
+ * Truncates a string to a maximum length.
+ * @param {string} text The input text to truncate
+ * @param {number} max The maximum length
+ * @return {string} The truncated string (or empty string if input is not a string)
+ */
 function truncateString(text: string, max: number): string {
   if (typeof text !== "string") return "";
   return text.length > max ? text.slice(0, max) : text;
@@ -181,14 +184,9 @@ async function handleMenuOperation(menuName: string, operation: MenuOperation): 
   const baseUrl = `${DRUPAL_SITE_URL}/api/menu`;
 
   try {
-    const auth = {
-      username: DRUPAL_API_USERNAME,
-      password: DRUPAL_API_PASSWORD,
-    };
-
     switch (action) {
     case "list_menus": {
-      const listResponse = await axios.get(`${baseUrl}/list`, { auth });
+      const listResponse = await axios.get(`${baseUrl}/list`);
       return listResponse.data;
     }
 
@@ -205,13 +203,13 @@ async function handleMenuOperation(menuName: string, operation: MenuOperation): 
           expanded: parameters.expanded || false,
           enabled: parameters.enabled !== false,
         },
-        { auth }
+        {}
       );
       return addResponse.data;
     }
 
     case "read_menu": {
-      const readResponse = await axios.get(`${baseUrl}/${parameters.menu_name || menuName}`, { auth });
+      const readResponse = await axios.get(`${baseUrl}/${parameters.menu_name || menuName}`);
       return readResponse.data;
     }
 
@@ -230,8 +228,7 @@ async function handleMenuOperation(menuName: string, operation: MenuOperation): 
           ...(parameters.parent !== undefined && { parent: parameters.parent }),
           ...(parameters.expanded !== undefined && { expanded: parameters.expanded }),
           ...(parameters.enabled !== undefined && { enabled: parameters.enabled }),
-        },
-        { auth }
+        }
       );
       return updateResponse.data;
     }
@@ -245,8 +242,7 @@ async function handleMenuOperation(menuName: string, operation: MenuOperation): 
         {
           operation: "delete",
           uuid: parameters.uuid,
-        },
-        { auth }
+        }
       );
       return deleteResponse.data;
     }
@@ -260,6 +256,16 @@ async function handleMenuOperation(menuName: string, operation: MenuOperation): 
   }
 }
 
+/**
+ * HTTP function that orchestrates OpenAI tool calls to perform Drupal operations.
+ * Exposes a single endpoint that:
+ * - Accepts a `prompt` and optional `site_url` in the request body
+ * - Calls OpenAI with function tools to decide between updating homepage, creating content, or managing menus
+ * - Proxies resulting actions to the Drupal bridge endpoints
+ * @param {import("firebase-functions").https.Request} req Express-like request
+ * @param {import("firebase-functions").https.Response} res Express-like response
+ * @return {Promise<void>} Sends a JSON response
+ */
 // Main function to handle the request
 export const updateHomepage = onRequest(
   {
@@ -534,9 +540,9 @@ export const updateHomepage = onRequest(
                   console.log("✅ Image uploaded to Firebase Storage:", storagePublicUrl);
 
                   // 3. Upload to Drupal via our uploadImage function
-                  const uploadFunctionUrl = process.env.FUNCTIONS_EMULATOR === "true"
-                    ? `http://127.0.0.1:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`
-                    : `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/uploadImage`;
+                  const uploadFunctionUrl = process.env.FUNCTIONS_EMULATOR === "true" ?
+                    `http://127.0.0.1:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage` :
+                    `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/uploadImage`;
 
                   const siteUrlFromArgs = (siteUrlFromClient as string) || (args.site_url as string) || DRUPAL_SITE_URL;
                   const uploadResponse = await axios.post(
@@ -681,15 +687,10 @@ export const updateHomepage = onRequest(
                 ];
               }
 
-              const authHeader = (DRUPAL_API_USERNAME && DRUPAL_API_PASSWORD)
-                ? `Basic ${Buffer.from(`${DRUPAL_API_USERNAME}:${DRUPAL_API_PASSWORD}`).toString("base64")}`
-                : undefined;
-
               const response = await fetch(nodeUpdateEndpoint, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  ...(authHeader ? { Authorization: authHeader } : {}),
                 },
                 body: JSON.stringify(payload),
               });
