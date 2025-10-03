@@ -18,7 +18,9 @@ const DRUPAL_API_PASSWORD = process.env.DRUPAL_API_PASSWORD || "";
  * Execute a menu operation against the Drupal bridge.
  * @param {string} menuName Default menu name to operate on
  * @param {MenuOperation} operation Operation descriptor
- * @return {Promise<unknown>} Raw response data from the bridge
+ * @param {string} [siteUrl] Optional base URL for the target Drupal site.
+ * If omitted, uses DRUPAL_SITE_URL env. * @param {string} [siteUrl] Optional base URL for the target Drupal site.
+ * If omitted, uses DRUPAL_SITE_URL env. * @return {Promise<unknown>} Raw response data from the bridge
  */
 export async function handleMenuOperation(
   menuName: string,

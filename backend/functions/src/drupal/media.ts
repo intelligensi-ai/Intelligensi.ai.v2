@@ -74,41 +74,40 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
       metadata: {
         contentType: "image/jpeg",
         metadata: {
-          firebaseStorageDownloadTokens: 'auto-generated',
+          firebaseStorageDownloadTokens: "auto-generated",
         },
       },
-      resumable: false,
-      public: true
+      public: true,
     });
-    
+
     // Get the public URL
     await file.getMetadata(); // Ensure metadata is updated
-    const publicUrl = `https://storage.googleapis.com/${bucketName}/${encodeURIComponent(fileName).replace(/%2F/g, '/')}?alt=media`;
+    const encodedPath = encodeURIComponent(fileName).replace(/%2F/g, "/");
+    const publicUrl = `https://storage.googleapis.com/${bucketName}/${encodedPath}?alt=media`;
 
     // Upload to Drupal via the uploadImage function (internal cloud function)
     const uploadHost = process.env.FUNCTIONS_EMULATOR === "true" ? "127.0.0.1:5001" : "us-central1";
     const uploadUrl =
       `http://${uploadHost}/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`;
-    // Prepare the upload data
     const uploadData = {
       imagePath: publicUrl,
       siteUrl: siteUrl || process.env.DRUPAL_SITE_URL,
       altText: title || "Generated image",
     };
-    
+
     console.log("📤 Uploading to Drupal with data:", JSON.stringify(uploadData, null, 2));
-    
+
     const uploadResponse = await axios.post(
       uploadUrl,
       uploadData,
-      { 
-        headers: { 
-          "Content-Type": "application/json" 
+      {
+        headers: {
+          "Content-Type": "application/json",
         },
-        timeout: 30000 // 30 second timeout
+        timeout: 30000, // 30 second timeout
       }
     );
-    
+
     console.log("📥 Drupal upload response:", JSON.stringify(uploadResponse.data, null, 2));
 
     if (uploadResponse.data.status !== "success") {

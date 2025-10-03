@@ -164,7 +164,12 @@ function sanitizeText(text: string): string {
   return text.replace(/<[^>]*>?/gm, "");
 }
 
-// Truncate a string to a maximum length
+/**
+ * Truncates a string to a maximum length.
+ * @param {string} text The input text to truncate
+ * @param {number} max The maximum length
+ * @return {string} The truncated string (or empty string if input is not a string)
+ */
 function truncateString(text: string, max: number): string {
   if (typeof text !== "string") return "";
   return text.length > max ? text.slice(0, max) : text;
@@ -534,9 +539,9 @@ export const updateHomepage = onRequest(
                   console.log("✅ Image uploaded to Firebase Storage:", storagePublicUrl);
 
                   // 3. Upload to Drupal via our uploadImage function
-                  const uploadFunctionUrl = process.env.FUNCTIONS_EMULATOR === "true"
-                    ? `http://127.0.0.1:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`
-                    : `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/uploadImage`;
+                  const uploadFunctionUrl = process.env.FUNCTIONS_EMULATOR === "true" ?
+                    `http://127.0.0.1:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage` :
+                    `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/uploadImage`;
 
                   const siteUrlFromArgs = (siteUrlFromClient as string) || (args.site_url as string) || DRUPAL_SITE_URL;
                   const uploadResponse = await axios.post(
@@ -681,9 +686,9 @@ export const updateHomepage = onRequest(
                 ];
               }
 
-              const authHeader = (DRUPAL_API_USERNAME && DRUPAL_API_PASSWORD)
-                ? `Basic ${Buffer.from(`${DRUPAL_API_USERNAME}:${DRUPAL_API_PASSWORD}`).toString("base64")}`
-                : undefined;
+              const authHeader = (DRUPAL_API_USERNAME && DRUPAL_API_PASSWORD) ?
+                `Basic ${Buffer.from(`${DRUPAL_API_USERNAME}:${DRUPAL_API_PASSWORD}`).toString("base64")}` :
+                undefined;
 
               const response = await fetch(nodeUpdateEndpoint, {
                 method: "POST",
