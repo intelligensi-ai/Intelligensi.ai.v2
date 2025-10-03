@@ -16,6 +16,7 @@ export const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sites, setSites] = useState<ISite[]>([]);
+  const [selectedSite, setSelectedSite] = useState<ISite | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Get current Firebase user
@@ -92,6 +93,9 @@ export const Dashboard: React.FC = () => {
             return { ...s, cms: cmsData };
           }) : [];
           setSites(sitesWithCms);
+          // Auto-select a site if one is marked as selected
+          const preselected = sitesWithCms.find(s => s.is_selected) || null;
+          if (preselected) setSelectedSite(preselected);
           setError(null);
         }
       } catch (e) {
@@ -134,7 +138,7 @@ export const Dashboard: React.FC = () => {
 
       const response = await axios.post(
         `${apiBaseUrl}/updateHomepage`,
-        { prompt: message },
+        { prompt: message, site_url: selectedSite?.site_url || undefined },
         { headers: { "Content-Type": "application/json" } }
       );
 
@@ -333,10 +337,15 @@ export const Dashboard: React.FC = () => {
             console.warn('No site ID in message:', message);
           }
         }}
-        onSiteSelected={(site) => {
-          // Handle site selection logic, e.g., set selectedSite state
-          console.log("Site selected in Dashboard:", site);
-          // Example: setSelectedSite(site);
+        onSiteSelected={(siteOrId) => {
+          console.log("Site selected in Dashboard:", siteOrId);
+          // Support both passing an ISite or a numeric ID
+          if (typeof siteOrId === 'number') {
+            const found = sites.find(s => s.id === siteOrId) || null;
+            setSelectedSite(found);
+          } else {
+            setSelectedSite(siteOrId as ISite);
+          }
         }}
         currentUser={currentUser} // Pass currentUser to Sites component
       />

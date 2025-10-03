@@ -43,8 +43,8 @@ import { onRequest } from "firebase-functions/v2/https";
 import { getSupabase } from "../services/supabaseService";
 import { uploadImageToDrupal } from "../services/imageUpload";
 
-// Drupal 11 base URL - hardcoded as per requirements
-const DRUPAL_11_BASE_URL = "https://umami-intelligensi.ai.ddev.site";
+// Drupal 11 base URL from environment (fallback to DRUPAL_SITE_URL if provided)
+const DRUPAL_11_BASE_URL = (process.env.DRUPAL_11_BASE_URL || process.env.DRUPAL_SITE_URL || "").replace(/\/$/, "");
 
 // Create an HTTPS agent that doesn't reject self-signed certificates
 const httpsAgent = new https.Agent({
@@ -72,6 +72,9 @@ const httpsAgent = new https.Agent({
 
 // Helper to create Drupal client
 const createDrupalClient = () => {
+  if (!DRUPAL_11_BASE_URL) {
+    throw new Error("DRUPAL_11_BASE_URL (or DRUPAL_SITE_URL) is not set.");
+  }
   return axios.create({
     baseURL: DRUPAL_11_BASE_URL,
     httpsAgent,
@@ -535,6 +538,10 @@ const generateDrupal11Schema = onRequest(
         return;
       }
 
+      if (!DRUPAL_11_BASE_URL) {
+        sendError(500, "DRUPAL_11_BASE_URL is not configured");
+        return;
+      }
       console.log(`[generateDrupal11Schema] Fetching data from ${DRUPAL_11_BASE_URL}`);
 
       // Make request to Drupal 11 bulk export endpoint

@@ -20,7 +20,7 @@ const ContentPrompt = React.lazy(() => import('../../components/Content/ContentP
 
 interface SitesProps {
   sites: ISite[];
-  onSiteSelected: (siteId: number | null) => void;
+  onSiteSelected: (site: ISite | number | null) => void;
   onSiteRemoved?: (siteId: number) => void;
   onSiteAdded: (newSite: ISite) => void;
   onSiteUpdated: (updatedSite: ISite) => void;

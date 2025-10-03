@@ -33,8 +33,8 @@ if (process.env.FUNCTIONS_EMULATOR === "true") {
   };
 }
 
-// Drupal site configuration
-const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "https://umami-intelligensi.ai.ddev.site";
+// Drupal site configuration (must be provided via args.site_url or environment)
+const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "";
 const DRUPAL_API_USERNAME = process.env.DRUPAL_API_USERNAME || "";
 const DRUPAL_API_PASSWORD = process.env.DRUPAL_API_PASSWORD || "";
 
@@ -276,7 +276,7 @@ export const updateHomepage = onRequest(
         return;
       }
 
-      const { prompt } = req.body || {};
+      const { prompt, site_url: siteUrlFromClient } = req.body || {};
       if (!prompt) {
         return sendResponse(res, 400, { error: "Prompt is required" });
       }
@@ -538,11 +538,12 @@ export const updateHomepage = onRequest(
                     ? `http://127.0.0.1:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`
                     : `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/uploadImage`;
 
+                  const siteUrlFromArgs = (siteUrlFromClient as string) || (args.site_url as string) || DRUPAL_SITE_URL;
                   const uploadResponse = await axios.post(
                     uploadFunctionUrl,
                     {
                       imagePath: storagePublicUrl,
-                      siteUrl: DRUPAL_SITE_URL,
+                      siteUrl: siteUrlFromArgs,
                       altText: args.title || "Generated content image",
                     },
                     {
@@ -564,7 +565,8 @@ export const updateHomepage = onRequest(
                 }
               }
 
-              const nodeUpdateEndpoint = `${DRUPAL_SITE_URL}/api/node-update`;
+              const siteUrlForNode = (siteUrlFromClient as string) || (args.site_url as string) || DRUPAL_SITE_URL;
+              const nodeUpdateEndpoint = `${siteUrlForNode}/api/node-update`;
               type BasePayload = {
                 title: string;
                 status: number;

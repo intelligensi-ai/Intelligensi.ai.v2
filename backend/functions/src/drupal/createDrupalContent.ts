@@ -3,8 +3,7 @@ import { createArticlePayload } from "./payloads/articlePayload";
 import { createPagePayload } from "./payloads/pagePayload";
 import { createRecipePayload } from "./payloads/recipePayload";
 
-const DRUPAL_SITE_URL =
-  process.env.DRUPAL_SITE_URL || "https://umami-intelligensi.ai.ddev.site";
+const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "";
 
 /**
  * Create Drupal content via the bridge node-update endpoint.
@@ -14,9 +13,14 @@ const DRUPAL_SITE_URL =
  */
 export async function createDrupalContent(
   args: ContentArgs,
-  mediaResponse?: MediaResponse | unknown
+  mediaResponse?: MediaResponse | unknown,
+  siteUrl?: string
 ): Promise<{ node: unknown; media: unknown }> {
-  const nodeUpdateEndpoint = `${DRUPAL_SITE_URL}/api/node-update`;
+  const baseUrl = (typeof siteUrl === "string" && siteUrl) ? siteUrl : DRUPAL_SITE_URL;
+  if (!baseUrl) {
+    throw new Error("No Drupal site URL provided. Pass siteUrl argument or set DRUPAL_SITE_URL env.");
+  }
+  const nodeUpdateEndpoint = `${baseUrl.replace(/\/$/, "")}/api/node-update`;
   const str = (v: unknown, d = ""): string => (typeof v === "string" ? v : d);
 
   const basePayload = {

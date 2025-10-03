@@ -10,7 +10,7 @@ export type MenuOperation = {
   parameters: Record<string, unknown>;
 };
 
-const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "https://umami-intelligensi.ai.ddev.site";
+const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "";
 const DRUPAL_API_USERNAME = process.env.DRUPAL_API_USERNAME || "";
 const DRUPAL_API_PASSWORD = process.env.DRUPAL_API_PASSWORD || "";
 
@@ -22,10 +22,13 @@ const DRUPAL_API_PASSWORD = process.env.DRUPAL_API_PASSWORD || "";
  */
 export async function handleMenuOperation(
   menuName: string,
-  operation: MenuOperation
+  operation: MenuOperation,
+  siteUrl?: string
 ): Promise<unknown> {
   const { action, parameters } = operation;
-  const baseUrl = `${DRUPAL_SITE_URL}/api/menu`;
+  const base = (typeof siteUrl === "string" && siteUrl) ? siteUrl : DRUPAL_SITE_URL;
+  if (!base) throw new Error("No Drupal site URL provided. Pass siteUrl or set DRUPAL_SITE_URL env.");
+  const baseUrl = `${base.replace(/\/$/, "")}/api/menu`;
   const auth = { username: DRUPAL_API_USERNAME, password: DRUPAL_API_PASSWORD };
 
   switch (action) {
