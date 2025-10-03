@@ -565,7 +565,8 @@ export const updateHomepage = onRequest(
                 }
               }
 
-              const siteUrlForNode = (siteUrlFromClient as string) || (args.site_url as string) || DRUPAL_SITE_URL;
+              const rawSiteUrlForNode = (siteUrlFromClient as string) || (args.site_url as string) || DRUPAL_SITE_URL;
+              const siteUrlForNode = (rawSiteUrlForNode || "").replace(/\/$/, "");
               const nodeUpdateEndpoint = `${siteUrlForNode}/api/node-update`;
               type BasePayload = {
                 title: string;
@@ -680,19 +681,24 @@ export const updateHomepage = onRequest(
                 ];
               }
 
+              const authHeader = (DRUPAL_API_USERNAME && DRUPAL_API_PASSWORD)
+                ? `Basic ${Buffer.from(`${DRUPAL_API_USERNAME}:${DRUPAL_API_PASSWORD}`).toString("base64")}`
+                : undefined;
+
               const response = await fetch(nodeUpdateEndpoint, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
+                  ...(authHeader ? { Authorization: authHeader } : {}),
                 },
                 body: JSON.stringify(payload),
               });
 
               if (!response.ok) {
                 const errorText = await response.text();
-                const errorMsg = `Failed to create ${args.content_type || "content"} ` +
-                  `via node-update: ${response.status} ` +
-                  errorText;
+                const errorMsg = `Failed to create ${args.content_type || "content"} via node-update. ` +
+                  `status=${response.status} url=${nodeUpdateEndpoint} payload=${JSON.stringify(payload)} ` +
+                  `error=${errorText}`;
                 throw new Error(errorMsg);
               }
 
