@@ -164,6 +164,12 @@ function sanitizeText(text: string): string {
   return text.replace(/<[^>]*>?/gm, "");
 }
 
+// Truncate a string to a maximum length
+function truncateString(text: string, max: number): string {
+  if (typeof text !== "string") return "";
+  return text.length > max ? text.slice(0, max) : text;
+}
+
 /**
  * Handles menu operations for the Drupal site
  * @param {string} menuName - The name of the menu to operate on
@@ -523,16 +529,19 @@ export const updateHomepage = onRequest(
 
                   // Make the file publicly accessible
                   await file.makePublic();
-                  const publicUrl = process.env.FUNCTIONS_EMULATOR === "true" ?
-                    `http://127.0.0.1:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage` :
-                    `https://storage.googleapis.com/${bucket.name}/${fileName}`;
-                  console.log("✅ Image uploaded to Firebase Storage:", publicUrl);
+                  // Always use the public GCS URL as the imagePath we send to the uploader
+                  const storagePublicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+                  console.log("✅ Image uploaded to Firebase Storage:", storagePublicUrl);
 
-                  // 3. Upload to Drupal
+                  // 3. Upload to Drupal via our uploadImage function
+                  const uploadFunctionUrl = process.env.FUNCTIONS_EMULATOR === "true"
+                    ? `http://127.0.0.1:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`
+                    : `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/uploadImage`;
+
                   const uploadResponse = await axios.post(
-                    publicUrl,
+                    uploadFunctionUrl,
                     {
-                      imagePath: publicUrl,
+                      imagePath: storagePublicUrl,
                       siteUrl: DRUPAL_SITE_URL,
                       altText: args.title || "Generated content image",
                     },
@@ -581,7 +590,8 @@ export const updateHomepage = onRequest(
                   type: "recipe",
                   field_cooking_time: args.cooking_time || 0,
                   field_preparation_time: args.prep_time || 0,
-                  field_ingredients: (args.ingredients as string[] || []).join("\n"),
+                  // Prevent DB truncation errors on Drupal column field_ingredients_value
+                  field_ingredients: truncateString(((args.ingredients as string[] || []).join("\n")), 255),
                   field_recipe_instruction: {
                     value: (args.instructions as string[] || []).join("\n"),
                     format: "basic_html",
@@ -593,12 +603,13 @@ export const updateHomepage = onRequest(
                     format: "basic_html",
                   },
                   ...(mediaResponse?.media_id ? {
-                    field_media_image: {
-                      target_id: mediaResponse.media_id,
-                      alt: mediaResponse.alt || args.title || "Recipe image",
-                      title: mediaResponse.alt || args.title || "Recipe image",
-                      target_revision_id: mediaResponse.media_id,
-                    },
+                    // field_media_image is a Media reference; pass Media entity id
+                    field_media_image: [
+                      {
+                        target_id: mediaResponse.media_id,
+                        target_type: "media",
+                      },
+                    ],
                   } : {}),
                 };
 
@@ -627,12 +638,12 @@ export const updateHomepage = onRequest(
                 };
 
                 if (mediaResponse?.media_id) {
-                  (articlePayload as Record<string, unknown>).field_media_image = {
-                    target_id: mediaResponse.media_id,
-                    alt: mediaResponse.alt || args.title || "Article image",
-                    title: mediaResponse.alt || args.title || "Article image",
-                    target_revision_id: mediaResponse.media_id,
-                  } as unknown as Record<string, unknown>;
+                  (articlePayload as Record<string, unknown>).field_media_image = [
+                    {
+                      target_id: mediaResponse.media_id,
+                      target_type: "media",
+                    },
+                  ] as unknown as Record<string, unknown>;
                 }
 
                 payload = [articlePayload];
@@ -649,12 +660,12 @@ export const updateHomepage = onRequest(
                 };
 
                 if (mediaResponse?.media_id) {
-                  (pagePayload as Record<string, unknown>).field_media_image = {
-                    target_id: mediaResponse.media_id,
-                    alt: mediaResponse.alt || args.title || "Page image",
-                    title: mediaResponse.alt || args.title || "Page image",
-                    target_revision_id: mediaResponse.media_id,
-                  } as unknown as Record<string, unknown>;
+                  (pagePayload as Record<string, unknown>).field_media_image = [
+                    {
+                      target_id: mediaResponse.media_id,
+                      target_type: "media",
+                    },
+                  ] as unknown as Record<string, unknown>;
                 }
 
                 payload = [pagePayload];
