@@ -26,7 +26,7 @@ export const generateAndUploadToDrupal = onCall(
         model: "dall-e-2",
         prompt,
         n: 1,
-        size: "256x256", 
+        size: "256x256",
         response_format: "url",
       });
 

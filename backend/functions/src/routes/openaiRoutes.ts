@@ -3,6 +3,9 @@ import { onRequest } from "firebase-functions/v2/https";
 // import { defineSecret } from "firebase-functions/params";  // Unused import
 import * as https from "https";
 import * as admin from "firebase-admin";
+import { sendResponse } from "../utils/http";
+import { sanitizeText, truncateString } from "../utils/text";
+import { handleMenuOperation } from "../drupal/menuService";
 
 // Constants
 const STORAGE_BUCKET = "intelligensi-ai-v2.firebasestorage.app";
@@ -98,20 +101,7 @@ interface Menu {
   count: number;
 }
 
-interface MenuOperation {
-  action: "list_menus" | "read_menu" | "add_menu_item" | "update_menu_item" | "delete_menu_item";
-  parameters: {
-    menu_name?: string;
-    title?: string;
-    url?: string;
-    uuid?: string;
-    weight?: number;
-    parent?: string;
-    expanded?: boolean;
-    enabled?: boolean;
-    Placeholder1?: string;
-  };
-}
+// MenuOperation type moved to ../drupal/menuService
 
 interface ToolCallResult<T = unknown> {
   function: string;
@@ -137,133 +127,9 @@ if (!admin.apps.length) {
   }
 }
 
-/**
- * Sends a JSON response with the given status code and data
- * @param {Object} res - The response object
- * @param {number} status - The HTTP status code
- * @param {any} data - The data to send in the response
- * @return {void}
- */
-function sendResponse(
-  res: { status: (code: number) => { json: (data: unknown) => void } },
-  status: number,
-  data: unknown
-): void {
-  res.status(status).json({
-    success: status >= 200 && status < 300,
-    data,
-  });
-}
+// helpers moved to ../utils/http and ../utils/text
 
-/**
- * Sanitizes text by removing HTML tags
- * @param {string} text - The text to sanitize
- * @return {string} The sanitized text
- */
-function sanitizeText(text: string): string {
-  return text.replace(/<[^>]*>?/gm, "");
-}
-
-/**
- * Truncates a string to a maximum length.
- * @param {string} text The input text to truncate
- * @param {number} max The maximum length
- * @return {string} The truncated string (or empty string if input is not a string)
- */
-function truncateString(text: string, max: number): string {
-  if (typeof text !== "string") return "";
-  return text.length > max ? text.slice(0, max) : text;
-}
-
-/**
- * Handles menu operations for the Drupal site
- * @param {string} menuName - The name of the menu to operate on
- * @param {MenuOperation} operation - The operation to perform
- * @return {Promise<DrupalResponse>} The result of the operation
- */
-async function handleMenuOperation(menuName: string, operation: MenuOperation): Promise<DrupalResponse> {
-  const { action, parameters } = operation;
-  const baseUrl = `${DRUPAL_SITE_URL}/api/menu`;
-
-  try {
-    const auth = {
-      username: DRUPAL_API_USERNAME,
-      password: DRUPAL_API_PASSWORD,
-    };
-
-    switch (action) {
-    case "list_menus": {
-      const listResponse = await axios.get(`${baseUrl}/list`, { auth });
-      return listResponse.data;
-    }
-
-    case "add_menu_item": {
-      const title = parameters.Placeholder1 || parameters.title || "New Menu Item";
-      const addResponse = await axios.post(
-        `${baseUrl}/main`,
-        {
-          operation: "add",
-          title: title,
-          url: parameters.url || `internal:${title.toLowerCase().replace(/\s+/g, "-")}`,
-          weight: parameters.weight || 0,
-          parent: parameters.parent || "",
-          expanded: parameters.expanded || false,
-          enabled: parameters.enabled !== false,
-        },
-        { auth }
-      );
-      return addResponse.data;
-    }
-
-    case "read_menu": {
-      const readResponse = await axios.get(`${baseUrl}/${parameters.menu_name || menuName}`, { auth });
-      return readResponse.data;
-    }
-
-    case "update_menu_item": {
-      if (!parameters.uuid) {
-        throw new Error("UUID is required for updating a menu item");
-      }
-      const updateResponse = await axios.post(
-        `${baseUrl}/${menuName}`,
-        {
-          operation: "update",
-          uuid: parameters.uuid,
-          ...(parameters.title && { title: parameters.title }),
-          ...(parameters.url && { url: parameters.url }),
-          ...(parameters.weight !== undefined && { weight: parameters.weight }),
-          ...(parameters.parent !== undefined && { parent: parameters.parent }),
-          ...(parameters.expanded !== undefined && { expanded: parameters.expanded }),
-          ...(parameters.enabled !== undefined && { enabled: parameters.enabled }),
-        },
-        { auth }
-      );
-      return updateResponse.data;
-    }
-
-    case "delete_menu_item": {
-      if (!parameters.uuid) {
-        throw new Error("UUID is required for deleting a menu item");
-      }
-      const deleteResponse = await axios.post(
-        `${baseUrl}/${menuName}`,
-        {
-          operation: "delete",
-          uuid: parameters.uuid,
-        },
-        { auth }
-      );
-      return deleteResponse.data;
-    }
-
-    default:
-      throw new Error(`Unsupported menu operation: ${action}`);
-    }
-  } catch (error) {
-    console.error("Menu operation failed:", error);
-    throw error;
-  }
-}
+// menu operations moved to ../drupal/menuService
 
 // Main function to handle the request
 export const updateHomepage = onRequest(
