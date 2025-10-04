@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../utils/functionsApi';
 import { ISite } from '../../types/sites';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
@@ -61,7 +62,7 @@ const Vectorize: React.FC<VectorizeProps> = ({ site, onComplete, onError, onClos
         setError(null);
         
         // Use the backend proxy to avoid CORS issues
-        const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/intelligensi-ai-v2/us-central1';
+        const apiBaseUrl = getApiBaseUrl();
         
         console.log(`[Vectorize] Fetching content via backend proxy for: ${site.site_url}`);
         
@@ -179,14 +180,7 @@ const Vectorize: React.FC<VectorizeProps> = ({ site, onComplete, onError, onClos
           try {
             const payload = preparePayload([node]);
             
-            const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
-            if (!apiBaseUrl) {
-              console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined. Ensure it is set in your .env file for the frontend.");
-              setError('Application configuration error: API endpoint is missing.');
-              setLoading(false);
-              // Optionally, you could throw an error here or break the loop
-              return; // Stop the vectorization process if the base URL isn't set
-            }
+            const apiBaseUrl = getApiBaseUrl();
 
             await axios.post(
               `${apiBaseUrl}/writeWeaviate`,

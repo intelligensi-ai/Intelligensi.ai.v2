@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../utils/functionsApi';
 import { ISite } from '../../types/sites';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
@@ -49,7 +50,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ site, onClose }) => {
         setError(null);
         
         // Use the backend proxy to avoid CORS issues
-        const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/intelligensi-ai-v2/us-central1';
+        const apiBaseUrl = getApiBaseUrl();
         
         console.log(`Fetching content via backend proxy for: ${site.site_url}`);
         

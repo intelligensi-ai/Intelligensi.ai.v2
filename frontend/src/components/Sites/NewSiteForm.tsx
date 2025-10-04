@@ -3,6 +3,7 @@ import { ISite, ICMS } from '../../types/sites';
 import { supabase, isSupabaseConfigured } from '../../utils/supabase';
 import { getAuth, User } from 'firebase/auth';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../utils/functionsApi';
 
 interface NewSiteFormProps {
   isOpen: boolean;
@@ -298,13 +299,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
         try {
           console.log(`Fetching Drupal structure from: ${siteRecordForApp.site_url}`);
           
-          const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
-          if (!apiBaseUrl) {
-            console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
-            setError("Application configuration error: API endpoint is missing for Drupal structure fetch.");
-            // Potentially stop further execution or handle error appropriately
-            // For now, we'll let it proceed and fail at the axios call if not caught by a general error handler
-          }
+          const apiBaseUrl = getApiBaseUrl();
 
           const structureResponse = await axios.get(
             `${apiBaseUrl}/drupal7/structure`,
@@ -344,16 +339,7 @@ const NewSiteForm: React.FC<NewSiteFormProps> = ({ isOpen, onClose, onSave, init
           try {
             console.log('Calling /createSchema with example payload...');
             
-            // REACT_APP_API_BASE_URL should already be defined and checked from the previous block
-            // If it wasn't, the earlier check would have (or should have) handled it.
-            // Adding another check here for robustness in case the code flow changes or this block is called independently.
-            const apiBaseUrlForSchema = process.env.REACT_APP_API_BASE_URL; 
-            if (!apiBaseUrlForSchema) {
-              console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined for schema creation.");
-              setError("Application configuration error: API endpoint is missing for schema creation.");
-              // Stop or handle error
-              return; // Or throw new Error(...)
-            }
+            const apiBaseUrlForSchema = getApiBaseUrl(); 
 
             const schemaResponse = await axios.post(
               `${apiBaseUrlForSchema}/createSchema`,
