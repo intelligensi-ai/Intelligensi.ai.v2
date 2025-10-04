@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../Config/firebaseConfig';
 import axios from 'axios';
+import { getApiBaseUrl } from '../../utils/functionsApi';
 
 const Auth: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -12,12 +13,7 @@ const Auth: React.FC = () => {
 
   const handleLogin = async () => {
     try {
-      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
-      if (!apiBaseUrl) {
-        console.error("CRITICAL: REACT_APP_API_BASE_URL is not defined.");
-        setError("Application configuration error: API endpoint is missing. Please contact support.");
-        return;
-      }
+      const apiBaseUrl = getApiBaseUrl();
       const { data } = await axios.get(
         `${apiBaseUrl}/fetchuser?email=${email}`
       );

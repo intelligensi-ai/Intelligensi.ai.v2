@@ -11,14 +11,16 @@ export type MenuOperation = {
 };
 
 const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "";
+const DRUPAL_API_USERNAME = process.env.DRUPAL_API_USERNAME || "";
+const DRUPAL_API_PASSWORD = process.env.DRUPAL_API_PASSWORD || "";
 
 /**
  * Execute a menu operation against the Drupal bridge.
  * @param {string} menuName Default menu name to operate on
  * @param {MenuOperation} operation Operation descriptor
  * @param {string} [siteUrl] Optional base URL for the target Drupal site.
- * If omitted, falls back to DRUPAL_SITE_URL env.
- * @return {Promise<unknown>} Raw response data from the bridge
+ * If omitted, uses DRUPAL_SITE_URL env. * @param {string} [siteUrl] Optional base URL for the target Drupal site.
+ * If omitted, uses DRUPAL_SITE_URL env. * @return {Promise<unknown>} Raw response data from the bridge
  */
 export async function handleMenuOperation(
   menuName: string,
@@ -29,13 +31,15 @@ export async function handleMenuOperation(
   const base = (typeof siteUrl === "string" && siteUrl) ? siteUrl : DRUPAL_SITE_URL;
   if (!base) throw new Error("No Drupal site URL provided. Pass siteUrl or set DRUPAL_SITE_URL env.");
   const baseUrl = `${base.replace(/\/$/, "")}/api/menu`;
+  const auth = { username: DRUPAL_API_USERNAME, password: DRUPAL_API_PASSWORD };
+
   switch (action) {
   case "list_menus": {
-    const r = await axios.get(`${baseUrl}/list`);
+    const r = await axios.get(`${baseUrl}/list`, { auth });
     return r.data;
   }
   case "read_menu": {
-    const r = await axios.get(`${baseUrl}/${parameters.menu_name || menuName}`);
+    const r = await axios.get(`${baseUrl}/${parameters.menu_name || menuName}`, { auth });
     return r.data;
   }
   case "add_menu_item": {
@@ -53,7 +57,7 @@ export async function handleMenuOperation(
       expanded: parameters.expanded || false,
       enabled: parameters.enabled !== false,
     };
-    const r = await axios.post(`${baseUrl}/main`, payload);
+    const r = await axios.post(`${baseUrl}/main`, payload, { auth });
     return r.data;
   }
   case "update_menu_item": {
@@ -68,12 +72,12 @@ export async function handleMenuOperation(
     if (parameters.parent !== undefined) (payload as Record<string, unknown>).parent = parameters.parent;
     if (parameters.expanded !== undefined) (payload as Record<string, unknown>).expanded = parameters.expanded;
     if (parameters.enabled !== undefined) (payload as Record<string, unknown>).enabled = parameters.enabled;
-    const r = await axios.post(`${baseUrl}/${menuName}`, payload);
+    const r = await axios.post(`${baseUrl}/${menuName}`, payload, { auth });
     return r.data;
   }
   case "delete_menu_item": {
     if (!parameters.uuid) throw new Error("UUID required for delete");
-    const r = await axios.post(`${baseUrl}/${menuName}`, { operation: "delete", uuid: parameters.uuid });
+    const r = await axios.post(`${baseUrl}/${menuName}`, { operation: "delete", uuid: parameters.uuid }, { auth });
     return r.data;
   }
   default:

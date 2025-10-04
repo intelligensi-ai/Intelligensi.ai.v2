@@ -11,6 +11,7 @@ const DRUPAL_SITE_URL = process.env.DRUPAL_SITE_URL || "";
  * @param {MediaResponse | unknown} [mediaResponse] - Optional media response data
  * @param {string} [siteUrl] - Optional base URL for the target Drupal site.
  * If omitted, falls back to DRUPAL_SITE_URL env.
+ * If omitted, falls back to DRUPAL_SITE_URL env.
  * @return {Promise<{node: unknown, media: unknown}>} The created node and media
  */
 export async function createDrupalContent(

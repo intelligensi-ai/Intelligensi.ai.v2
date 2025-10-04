@@ -77,7 +77,6 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
           firebaseStorageDownloadTokens: "auto-generated",
         },
       },
-      resumable: false,
       public: true,
     });
 
@@ -90,7 +89,6 @@ const generateAndUploadImage = async function(options: GenerateAndUploadImageOpt
     const uploadHost = process.env.FUNCTIONS_EMULATOR === "true" ? "127.0.0.1:5001" : "us-central1";
     const uploadUrl =
       `http://${uploadHost}/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage`;
-    // Prepare the upload data
     const uploadData = {
       imagePath: publicUrl,
       siteUrl: siteUrl || process.env.DRUPAL_SITE_URL,
