@@ -6,6 +6,7 @@ import * as admin from "firebase-admin";
 import { sendResponse } from "../utils/http";
 import { sanitizeText, truncateString } from "../utils/text";
 import { handleMenuOperation } from "../drupal/menuService";
+import { generateAndUploadImage } from "../services/imageService";
 
 // Constants
 const STORAGE_BUCKET = "intelligensi-ai-v2.firebasestorage.app";
@@ -356,83 +357,21 @@ export const updateHomepage = onRequest(
 
               if (imagePrompt) {
                 console.log("🖼️  Generating image with prompt:", imagePrompt);
-
                 try {
-                  // 1. Generate image with OpenAI
-                  const imageResponse = await axios.post(
-                    "https://api.openai.com/v1/images/generations",
-                    {
-                      model: "dall-e-2",
-                      prompt,
-                      size: "256x256",
-                      n: 1,
-                      response_format: "url",
-                    },
-                    {
-                      headers: {
-                        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-                        "Content-Type": "application/json",
-                      },
-                    }
-                  );
-
-                  const imageUrl = imageResponse.data.data[0].url;
-                  console.log("✅ Generated image URL:", imageUrl);
-
-                  // 2. Upload to Firebase Storage
-                  const bucket = admin.storage().bucket(STORAGE_BUCKET);
-                  const safeTitle = args.title?.replace(/\s+/g, "_") || "image";
-                  const fileName = `generated-images/${Date.now()}-${safeTitle}.jpg`;
-                  const file = bucket.file(fileName);
-
-                  // Download the image
-                  const imageResponseBuffer = await axios({
-                    method: "GET",
-                    url: imageUrl,
-                    responseType: "arraybuffer",
-                  });
-
-                  // Upload to Firebase Storage
-                  await file.save(Buffer.from(imageResponseBuffer.data), {
-                    metadata: { contentType: "image/jpeg" },
-                    resumable: false,
-                  });
-
-                  // Make the file publicly accessible
-                  await file.makePublic();
-                  // Always use the public GCS URL as the imagePath we send to the uploader
-                  const storagePublicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
-                  console.log("✅ Image uploaded to Firebase Storage:", storagePublicUrl);
-
-                  // 3. Upload to Drupal via our uploadImage function
-                  const uploadFunctionUrl = process.env.FUNCTIONS_EMULATOR === "true" ?
-                    `http://127.0.0.1:5001/${process.env.GCLOUD_PROJECT}/us-central1/uploadImage` :
-                    `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/uploadImage`;
-
                   const siteUrlFromArgs = (siteUrlFromClient as string) || (args.site_url as string) || DRUPAL_SITE_URL;
-                  const uploadResponse = await axios.post(
-                    uploadFunctionUrl,
-                    {
-                      imagePath: storagePublicUrl,
-                      siteUrl: siteUrlFromArgs,
-                      altText: args.title || "Generated content image",
-                    },
-                    {
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                    }
-                  );
-
-                  mediaResponse = uploadResponse.data.data;
+                  const { mediaResponse: media } = await generateAndUploadImage({
+                    title: args.title,
+                    imagePrompt,
+                    siteUrl: siteUrlFromArgs,
+                  });
+                  mediaResponse = media as DrupalResponse;
                   console.log("✅ Media uploaded to Drupal:", mediaResponse);
                 } catch (error) {
                   console.error("Error generating/uploading image:", error);
-                  // Continue without failing the entire request
                   mediaResponse = {
                     status: "error",
                     message: error instanceof Error ? error.message : "Failed to generate/upload image",
-                  };
+                  } as DrupalResponse;
                 }
               }
 
