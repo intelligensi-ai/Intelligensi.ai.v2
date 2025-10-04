@@ -191,7 +191,7 @@ const generateImageHttp = onRequest(
       });
 
       const image = await openai.images.generate({
-        model: "dall-e-3",
+        model: "dall-e-2",
         prompt,
         n: Math.min(Number(n), 4), // Ensure n is a number and max 4
         size,

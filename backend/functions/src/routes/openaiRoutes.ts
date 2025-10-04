@@ -496,9 +496,9 @@ export const updateHomepage = onRequest(
                   const imageResponse = await axios.post(
                     "https://api.openai.com/v1/images/generations",
                     {
-                      model: "dall-e-3",
-                      prompt: imagePrompt,
-                      size: "1024x1024",
+                      model: "dall-e-2",
+                      prompt,
+                      size: "256x256",
                       n: 1,
                       response_format: "url",
                     },
